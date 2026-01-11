@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Procedurable - Procedural 3D Content Generation</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0f0f0f;
+      color: #e0e0e0;
+    }
+
+    #app {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      position: relative;
+    }
+
+    #info-overlay {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      background: rgba(26, 26, 46, 0.9);
+      padding: 20px;
+      border-radius: 8px;
+      border: 1px solid rgba(74, 158, 255, 0.3);
+      max-width: 350px;
+      font-size: 14px;
+      backdrop-filter: blur(10px);
+      z-index: 1000;
+    }
+
+    #info-overlay h2 {
+      color: #4a9eff;
+      margin: 0 0 15px 0;
+      font-size: 18px;
+    }
+
+    #info-overlay p {
+      margin: 8px 0;
+      line-height: 1.6;
+    }
+
+    #info-overlay .status {
+      display: flex;
+      align-items: center;
+      margin: 6px 0;
+    }
+
+    #info-overlay .status::before {
+      content: "✓";
+      color: #4ecdc4;
+      margin-right: 8px;
+      font-weight: bold;
+    }
+
+    #info-overlay .controls {
+      margin-top: 15px;
+      padding-top: 15px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 12px;
+      color: #aaa;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="info-overlay">
+      <h2>Procedurable</h2>
+      <p style="color: #888; font-size: 13px; margin-bottom: 15px;">
+        Procedural 3D Generation System
+      </p>
+      <div class="status">Edge-loop based geometry</div>
+      <div class="status">Deterministic random (seed: 42)</div>
+      <div class="status">Mathematical modeling</div>
+      <div class="status">Three.js rendering</div>
+      <div class="controls">
+        <strong>Controls:</strong><br>
+        • Click + drag to rotate camera<br>
+        • Scroll to zoom in/out<br>
+        • Objects rotate automatically
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
+
