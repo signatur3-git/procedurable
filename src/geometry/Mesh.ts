@@ -1,6 +1,7 @@
 ﻿import { Vertex } from './Vertex';
 import { Face } from './Face';
 import { Vec3 } from '../core/Vec3';
+import { AABB } from '../core/AABB';
 
 export class Mesh {
   public vertices: Vertex[];
@@ -42,6 +43,12 @@ export class Mesh {
     return new Mesh(this.vertices, triangulatedFaces);
   }
 
+  /**
+   * Get the axis-aligned bounding box of this mesh
+   */
+  getAABB(): AABB {
+    return AABB.fromPoints(this.vertices.map(v => v.position));
+  }
 
   calculateNormals(): void {
     const normals = this.vertices.map(() => Vec3.zero());

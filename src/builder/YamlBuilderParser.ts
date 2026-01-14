@@ -10,6 +10,7 @@ import { evaluate as mathEvaluate } from '../core/MathService';
 import { lathe as latheGeometry, sweep as sweepGeometry, Profile, Profiles } from '../geometry/Sweep';
 import { Spline } from '../core/Spline';
 import { subdivideCatmullClark } from '../geometry/Subdivision';
+import { placeAroundRectangle, placeAroundCircle } from './Placement';
 
 // ============================================================================
 // YAML SCHEMA TYPES
@@ -33,6 +34,38 @@ export interface YamlBuilderDefinition {
   splines?: Record<string, YamlSpline>;      // 3D spline paths for sweep
   geometry?: YamlGeometryCommand[];
   compose?: Record<string, YamlComposition>;
+  placement?: YamlPlacement;                  // Constraint-based placement (P2-M2)
+}
+
+/**
+ * Placement configuration for constraint-based object arrangement (P2-M2)
+ */
+export interface YamlPlacement {
+  mode: 'around_rectangle' | 'around_circle';
+  center?: YamlPosition;
+
+  // For around_rectangle
+  width?: string | number;
+  depth?: string | number;
+
+  // For around_circle
+  radius?: string | number;
+
+  // Object to place
+  builder: string;
+  count: string | number;
+
+  // Constraints
+  minDistance?: string | number;
+
+  // Allow fewer objects if space runs out
+  allowReducedCount?: boolean;
+
+  // Overrides to pass to each placed object
+  overrides?: Record<string, any>;
+
+  // Instance name prefix (default: "placed")
+  instancePrefix?: string;
 }
 
 /**
@@ -194,6 +227,13 @@ export interface YamlComposition {
   rotation?: YamlPosition;
   scale?: number;
   overrides?: Record<string, any>;
+  /** Condition for including this composition (e.g., "$has_stretchers", "count > 0") */
+  if?: string;
+  /** Repeat this composition N times with index variable */
+  repeat?: {
+    count: number | string;
+    as: string;  // Index variable name (e.g., "i")
+  };
 }
 
 // ============================================================================
@@ -357,61 +397,233 @@ export function parseAndExecuteBuilder(
 
   if (yaml.compose && options?.builderResolver) {
     for (const [instanceName, composition] of Object.entries(yaml.compose)) {
-      const subBuilderFn = options.builderResolver(composition.builder);
-      if (!subBuilderFn) {
-        throw new Error(`Composed builder not found: ${composition.builder}`);
-      }
-
-      // Resolve overrides (replace $references with parent values)
-      const resolvedOverrides: Record<string, any> = {};
-      if (composition.overrides) {
-        for (const [key, value] of Object.entries(composition.overrides)) {
-          if (typeof value === 'string' && value.startsWith('$')) {
-            const parentKey = value.slice(1);
-            // First check decisions, then try evaluating as expression (for measurements/derived)
-            if (decisionValues.has(parentKey)) {
-              resolvedOverrides[key] = decisionValues.get(parentKey);
-            } else {
-              // Try to evaluate as expression (for measurements and derived values)
-              try {
-                const evaluated = builder.context.evaluate(parentKey);
-                resolvedOverrides[key] = evaluated.value;
-              } catch {
-                // If evaluation fails, pass through as-is
-                resolvedOverrides[key] = value;
-              }
-            }
-          } else {
-            resolvedOverrides[key] = value;
-          }
+      // Check conditional - skip if condition is false
+      if (composition.if !== undefined) {
+        const shouldInclude = evaluateCompositionCondition(composition.if, decisionValues, builder);
+        if (!shouldInclude) {
+          continue; // Skip this composition
         }
       }
 
-      // Evaluate offset expressions
-      let offset: { x: number; y: number; z: number } | undefined;
-      if (composition.offset) {
-        offset = {
-          x: evaluatePositionComponent(composition.offset.x, builder),
-          y: evaluatePositionComponent(composition.offset.y, builder),
-          z: evaluatePositionComponent(composition.offset.z, builder)
-        };
+      // Handle repeat - compose multiple instances
+      if (composition.repeat) {
+        const repeatCount = typeof composition.repeat.count === 'number'
+          ? composition.repeat.count
+          : evaluateExpression(String(composition.repeat.count), decisionValues, builder);
+        const indexVar = composition.repeat.as;
+
+        for (let i = 0; i < repeatCount; i++) {
+          // Set index in context for expression evaluation
+          const originalValue = builder.context.get(indexVar);
+          builder.context.setMeasurement(indexVar, i);
+          decisionValues.set(indexVar, i);
+
+          // Generate unique instance name
+          const iterInstanceName = `${instanceName}_${i}`;
+
+          // Compose this instance
+          composeInstance(iterInstanceName, composition, builder, decisionValues, options);
+
+          // Restore context
+          if (originalValue !== undefined) {
+            builder.context.setMeasurement(indexVar, originalValue);
+          }
+          decisionValues.delete(indexVar);
+        }
+      } else {
+        // Single composition (no repeat)
+        composeInstance(instanceName, composition, builder, decisionValues, options);
+      }
+    }
+  }
+
+  // Helper function to compose a single instance
+  function composeInstance(
+    instanceName: string,
+    composition: YamlComposition,
+    builder: TracedBuilder,
+    decisionValues: Map<string, any>,
+    options: ParseOptions
+  ): void {
+    const subBuilderFn = options.builderResolver!(composition.builder);
+    if (!subBuilderFn) {
+      throw new Error(`Composed builder not found: ${composition.builder}`);
+    }
+
+    // Resolve overrides (replace $references with parent values)
+    const resolvedOverrides: Record<string, any> = {};
+    if (composition.overrides) {
+      for (const [key, value] of Object.entries(composition.overrides)) {
+        if (typeof value === 'string' && value.startsWith('$')) {
+          const parentKey = value.slice(1);
+          // First check decisions, then try evaluating as expression (for measurements/derived)
+          if (decisionValues.has(parentKey)) {
+            resolvedOverrides[key] = decisionValues.get(parentKey);
+          } else {
+            // Try to evaluate as expression (for measurements and derived values)
+            try {
+              const evaluated = builder.context.evaluate(parentKey);
+              resolvedOverrides[key] = evaluated.value;
+            } catch {
+              // If evaluation fails, pass through as-is
+              resolvedOverrides[key] = value;
+            }
+          }
+        } else {
+          resolvedOverrides[key] = value;
+        }
+      }
+    }
+
+    // Evaluate offset expressions
+    let offset: { x: number; y: number; z: number } | undefined;
+    if (composition.offset) {
+      offset = {
+        x: evaluatePositionComponent(composition.offset.x, builder),
+        y: evaluatePositionComponent(composition.offset.y, builder),
+        z: evaluatePositionComponent(composition.offset.z, builder)
+      };
+    }
+
+    let rotation: { x: number; y: number; z: number } | undefined;
+    if (composition.rotation) {
+      rotation = {
+        x: evaluatePositionComponent(composition.rotation.x, builder),
+        y: evaluatePositionComponent(composition.rotation.y, builder),
+        z: evaluatePositionComponent(composition.rotation.z, builder)
+      };
+    }
+
+    builder.compose(instanceName, subBuilderFn, {
+      offset,
+      rotation,
+      scale: composition.scale,
+      overrides: resolvedOverrides
+    });
+  }
+
+  // ==========================================================================
+  // PHASE 6: Constraint-Based Placement (P2-M2)
+  // ==========================================================================
+
+  if (yaml.placement && options?.builderResolver) {
+    const placement = yaml.placement;
+    const subBuilderFn = options.builderResolver(placement.builder);
+
+    if (!subBuilderFn) {
+      throw new Error(`Placement builder not found: ${placement.builder}`);
+    }
+
+    // Resolve placement parameters using evaluateExpression (has access to decisionValues)
+    const count = typeof placement.count === 'string'
+      ? evaluateExpression(placement.count, decisionValues, builder)
+      : placement.count;
+
+    const minDistance = typeof placement.minDistance === 'string'
+      ? evaluateExpression(placement.minDistance, decisionValues, builder)
+      : (placement.minDistance ?? 0.1);
+
+    const instancePrefix = placement.instancePrefix ?? 'placed';
+
+    // Resolve overrides once (all placed objects get same overrides)
+    const resolvedOverrides: Record<string, any> = {};
+    if (placement.overrides) {
+      for (const [key, value] of Object.entries(placement.overrides)) {
+        if (typeof value === 'string' && value.startsWith('$')) {
+          const parentKey = value.slice(1);
+          if (decisionValues.has(parentKey)) {
+            resolvedOverrides[key] = decisionValues.get(parentKey);
+          } else {
+            try {
+              const evaluated = builder.context.evaluate(parentKey);
+              resolvedOverrides[key] = evaluated.value;
+            } catch {
+              resolvedOverrides[key] = value;
+            }
+          }
+        } else {
+          resolvedOverrides[key] = value;
+        }
+      }
+    }
+
+    // Build one instance to get the AABB (for collision detection)
+    const sampleOutput = subBuilderFn(seed ?? 1, resolvedOverrides);
+    if (!sampleOutput || !sampleOutput.mesh) {
+      throw new Error(`Placement builder ${placement.builder} returned invalid output`);
+    }
+    const objectAABB = sampleOutput.mesh.getAABB();
+
+
+    let placementResult: any;
+
+    if (placement.mode === 'around_rectangle') {
+      const width = typeof placement.width === 'string'
+        ? evaluateExpression(placement.width, decisionValues, builder)
+        : (placement.width ?? 1);
+      const depth = typeof placement.depth === 'string'
+        ? evaluateExpression(placement.depth, decisionValues, builder)
+        : (placement.depth ?? 1);
+
+      const center = placement.center ? new Vec3(
+        evaluatePositionComponent(placement.center.x, builder),
+        evaluatePositionComponent(placement.center.y, builder),
+        evaluatePositionComponent(placement.center.z, builder)
+      ) : new Vec3(0, 0, 0);
+
+      placementResult = placeAroundRectangle(
+        center,
+        width,
+        depth,
+        objectAABB,
+        count,
+        {
+          minDistance,
+          maxAttempts: 10,
+          allowReducedCount: placement.allowReducedCount ?? true,
+          seed: seed ?? 1
+        }
+      );
+    } else if (placement.mode === 'around_circle') {
+      const radius = typeof placement.radius === 'string'
+        ? evaluateExpression(placement.radius, decisionValues, builder)
+        : (placement.radius ?? 1);
+
+      const center = placement.center ? new Vec3(
+        evaluatePositionComponent(placement.center.x, builder),
+        evaluatePositionComponent(placement.center.y, builder),
+        evaluatePositionComponent(placement.center.z, builder)
+      ) : new Vec3(0, 0, 0);
+
+      placementResult = placeAroundCircle(
+        center,
+        radius,
+        objectAABB,
+        count,
+        {
+          minDistance,
+          maxAttempts: 10,
+          allowReducedCount: placement.allowReducedCount ?? true,
+          seed: seed ?? 1
+        }
+      );
+    }
+
+    // Compose each placed object
+    if (placementResult && placementResult.placements) {
+      for (let i = 0; i < placementResult.placements.length; i++) {
+        const p = placementResult.placements[i];
+        const instanceName = `${instancePrefix}_${i + 1}`;
+
+        builder.compose(instanceName, subBuilderFn, {
+          offset: { x: p.position.x, y: p.position.y, z: p.position.z },
+          rotation: { x: 0, y: p.rotation, z: 0 },
+          overrides: resolvedOverrides
+        });
       }
 
-      let rotation: { x: number; y: number; z: number } | undefined;
-      if (composition.rotation) {
-        rotation = {
-          x: evaluatePositionComponent(composition.rotation.x, builder),
-          y: evaluatePositionComponent(composition.rotation.y, builder),
-          z: evaluatePositionComponent(composition.rotation.z, builder)
-        };
-      }
-
-      builder.compose(instanceName, subBuilderFn, {
-        offset,
-        rotation,
-        scale: composition.scale,
-        overrides: resolvedOverrides
-      });
+      // TODO: Add placement trace for debugging once TracedBuilder supports custom trace types
+      // For now, placement info is visible via the composed instances (chair_1, chair_2, etc.)
     }
   }
 
@@ -620,7 +832,7 @@ function processGeometry(
 
       // Conditional geometry (legacy 'when' syntax)
       if ('when' in cmd) {
-        if (evaluateCondition(cmd.when, decisionValues)) {
+        if (evaluateCondition(cmd.geometry, decisionValues)) {
           processGeometry(cmd.geometry, builder, decisionValues, materials);
         }
         continue;
@@ -693,6 +905,50 @@ function processGeometry(
           y: String(cmd.position.y),
           z: String(cmd.position.z)
         });
+        continue;
+      }
+
+      // Box - creates a complete box with 8 vertices and 6 faces
+      if ('box' in cmd) {
+        const boxCmd = cmd as {
+          box: { name: string; center: YamlPosition; size: YamlPosition; color?: string };
+        };
+        const boxDef = boxCmd.box;
+        const name = boxDef.name;
+
+        // Evaluate center and size
+        const cx = evaluateExpression(String(boxDef.center.x), decisionValues, builder);
+        const cy = evaluateExpression(String(boxDef.center.y), decisionValues, builder);
+        const cz = evaluateExpression(String(boxDef.center.z), decisionValues, builder);
+        const sx = evaluateExpression(String(boxDef.size.x), decisionValues, builder) / 2;
+        const sy = evaluateExpression(String(boxDef.size.y), decisionValues, builder) / 2;
+        const sz = evaluateExpression(String(boxDef.size.z), decisionValues, builder) / 2;
+
+        // Get color if specified
+        const color = boxDef.color ? resolveColor(boxDef.color, materials) : undefined;
+
+        // Create 8 vertices
+        const v = [
+          `${name}_v0`, `${name}_v1`, `${name}_v2`, `${name}_v3`,
+          `${name}_v4`, `${name}_v5`, `${name}_v6`, `${name}_v7`
+        ];
+        builder.placeVertex(v[0], { x: String(cx - sx), y: String(cy - sy), z: String(cz - sz) });
+        builder.placeVertex(v[1], { x: String(cx + sx), y: String(cy - sy), z: String(cz - sz) });
+        builder.placeVertex(v[2], { x: String(cx + sx), y: String(cy - sy), z: String(cz + sz) });
+        builder.placeVertex(v[3], { x: String(cx - sx), y: String(cy - sy), z: String(cz + sz) });
+        builder.placeVertex(v[4], { x: String(cx - sx), y: String(cy + sy), z: String(cz - sz) });
+        builder.placeVertex(v[5], { x: String(cx + sx), y: String(cy + sy), z: String(cz - sz) });
+        builder.placeVertex(v[6], { x: String(cx + sx), y: String(cy + sy), z: String(cz + sz) });
+        builder.placeVertex(v[7], { x: String(cx - sx), y: String(cy + sy), z: String(cz + sz) });
+
+        // Create 6 faces
+        builder.createFace(`${name}_bottom`, [v[3], v[2], v[1], v[0]], color);
+        builder.createFace(`${name}_top`, [v[4], v[5], v[6], v[7]], color);
+        builder.createFace(`${name}_front`, [v[0], v[1], v[5], v[4]], color);
+        builder.createFace(`${name}_back`, [v[2], v[3], v[7], v[6]], color);
+        builder.createFace(`${name}_left`, [v[3], v[0], v[4], v[7]], color);
+        builder.createFace(`${name}_right`, [v[1], v[2], v[6], v[5]], color);
+
         continue;
       }
 
@@ -933,6 +1189,83 @@ function evaluateCondition(condition: string, values: Map<string, any>): boolean
   }
 
   console.warn(`Unknown condition format: ${condition}`);
+  return false;
+}
+
+/**
+ * Evaluate a composition condition
+ * Supports:
+ * - "$decision_name" - check if decision value is truthy
+ * - "decision_name" - check if decision value is truthy
+ * - "value == something" - equality check
+ * - "value != something" - inequality check
+ * - "value > 0" - numeric comparison
+ * - "value >= 0.5" - numeric comparison
+ */
+function evaluateCompositionCondition(
+  condition: string,
+  values: Map<string, any>,
+  builder: TracedBuilder
+): boolean {
+  // Handle $-prefixed decision references
+  let cleanCondition = condition;
+  if (condition.startsWith('$')) {
+    cleanCondition = condition.slice(1);
+  }
+
+  // Try simple decision lookup first (boolean check)
+  if (values.has(cleanCondition)) {
+    const value = values.get(cleanCondition);
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (typeof value === 'number') {
+      return value > 0;
+    }
+    return Boolean(value);
+  }
+
+  // Try numeric comparisons: "value > 0", "value >= 0.5", "value < 10"
+  const numericMatch = cleanCondition.match(/^(\w+)\s*(>=|<=|>|<)\s*([\d.]+)$/);
+  if (numericMatch) {
+    const [, name, op, numStr] = numericMatch;
+    const leftValue = values.get(name) ?? builder.context.get(name) ?? 0;
+    const rightValue = parseFloat(numStr);
+
+    switch (op) {
+      case '>': return leftValue > rightValue;
+      case '>=': return leftValue >= rightValue;
+      case '<': return leftValue < rightValue;
+      case '<=': return leftValue <= rightValue;
+    }
+  }
+
+  // Try equality/inequality: "style == modern", "type != round"
+  const eqMatch = cleanCondition.match(/^(\w+)\s*==\s*["']?(\w+)["']?$/);
+  if (eqMatch) {
+    const [, name, expected] = eqMatch;
+    const value = values.get(name) ?? builder.context.get(name);
+    return value === expected;
+  }
+
+  const neqMatch = cleanCondition.match(/^(\w+)\s*!=\s*["']?(\w+)["']?$/);
+  if (neqMatch) {
+    const [, name, expected] = neqMatch;
+    const value = values.get(name) ?? builder.context.get(name);
+    return value !== expected;
+  }
+
+  // Try builder context (measurements)
+  try {
+    const result = builder.context.get(cleanCondition);
+    if (result !== undefined) {
+      return Boolean(result);
+    }
+  } catch {
+    // Ignore
+  }
+
+  console.warn(`Unknown composition condition format: ${condition}`);
   return false;
 }
 

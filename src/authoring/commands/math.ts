@@ -10,7 +10,7 @@
 
 import { CommandNamespace, CommandHandler, CommandContext, CommandResult } from '../command-registry';
 import { ParsedCommand, getArg } from '../command-parser';
-import { evaluate, validate, getAvailableFunctions, getAvailableConstants } from '../../core/MathService';
+import { evaluate, validate, getAvailableFunctions, getAvailableConstants, perlin2d, perlin3d, fbm, coordinateHash } from '../../core/MathService';
 
 const handlers: CommandHandler[] = [
   {
@@ -134,6 +134,88 @@ const handlers: CommandHandler[] = [
             'e': "Euler's number ≈ 2.71828...",
             'tau': '2π ≈ 6.28318...'
           }
+        }
+      };
+    }
+  },
+
+  {
+    action: 'noise',
+    description: 'Generate Perlin noise value at coordinates',
+    usage: 'math.noise x=<x> y=<y> [z=<z>] [seed=<seed>]',
+    execute: async (cmd: ParsedCommand, _ctx: CommandContext): Promise<CommandResult> => {
+      const x = parseFloat(cmd.options['x'] || '0');
+      const y = parseFloat(cmd.options['y'] || '0');
+      const z = cmd.options['z'] !== undefined ? parseFloat(cmd.options['z']) : undefined;
+      const seed = parseInt(cmd.options['seed'] || '0', 10);
+
+      if (isNaN(x) || isNaN(y)) {
+        return { success: false, error: 'Invalid coordinates. Usage: math.noise x=1.5 y=2.3' };
+      }
+
+      const value = z !== undefined ? perlin3d(x, y, z, seed) : perlin2d(x, y, seed);
+
+      return {
+        success: true,
+        data: {
+          x, y, z,
+          seed,
+          value,
+          normalized: (value + 1) / 2  // Map [-1,1] to [0,1]
+        }
+      };
+    }
+  },
+
+  {
+    action: 'fbm',
+    description: 'Generate Fractal Brownian Motion (layered noise)',
+    usage: 'math.fbm x=<x> y=<y> [seed=<seed>] [octaves=4] [persistence=0.5]',
+    execute: async (cmd: ParsedCommand, _ctx: CommandContext): Promise<CommandResult> => {
+      const x = parseFloat(cmd.options['x'] || '0');
+      const y = parseFloat(cmd.options['y'] || '0');
+      const seed = parseInt(cmd.options['seed'] || '0', 10);
+      const octaves = parseInt(cmd.options['octaves'] || '4', 10);
+      const persistence = parseFloat(cmd.options['persistence'] || '0.5');
+
+      if (isNaN(x) || isNaN(y)) {
+        return { success: false, error: 'Invalid coordinates. Usage: math.fbm x=1.5 y=2.3' };
+      }
+
+      const value = fbm(x, y, seed, octaves, persistence);
+
+      return {
+        success: true,
+        data: {
+          x, y,
+          seed,
+          octaves,
+          persistence,
+          value,
+          normalized: (value + 1) / 2
+        }
+      };
+    }
+  },
+
+  {
+    action: 'hash',
+    description: 'Generate deterministic hash from coordinates (for seeding)',
+    usage: 'math.hash seed=<seed> x=<x> [y=<y>] [z=<z>]',
+    execute: async (cmd: ParsedCommand, _ctx: CommandContext): Promise<CommandResult> => {
+      const seed = parseInt(cmd.options['seed'] || '0', 10);
+      const x = parseFloat(cmd.options['x'] || '0');
+      const y = parseFloat(cmd.options['y'] || '0');
+      const z = parseFloat(cmd.options['z'] || '0');
+
+      const value = coordinateHash(seed, x, y, z);
+
+      return {
+        success: true,
+        data: {
+          seed, x, y, z,
+          value,
+          asInt: Math.floor(value * 0x7FFFFFFF)  // Convert to integer seed
         }
       };
     }

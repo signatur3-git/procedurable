@@ -561,6 +561,236 @@ Builders should eventually output more than a render mesh.
 
 ---
 
+### Category 18: Retopology & Mesh Quality
+
+> Procedural geometry often produces suboptimal topology. Retopology creates animation-friendly meshes.
+
+#### 18.1 Quad remesh
+**What it does:** Convert arbitrary mesh to clean quad-dominant topology
+**Used in:** Post-boolean cleanup, subdivision prep, character bodies
+**Status:** ⬜ Not built (Phase 3)
+**Complexity:** XL
+
+#### 18.2 Edge loop insertion / sliding
+**What it does:** Add edge loops at specific locations for deformation
+**Used in:** Joint areas (elbows, knees), animation-ready topology
+**Status:** ⬜ Not built (Phase 3)
+
+#### 18.3 Topology transfer / projection
+**What it does:** Project high-res detail onto low-res base mesh
+**Used in:** LOD creation, normal map baking source
+**Status:** ⬜ Not built (Phase 3)
+
+---
+
+### Category 19: Mesh Repair & Validation
+
+> Boolean ops and complex geometry can produce invalid meshes.
+
+#### 19.1 Hole detection & filling
+**What it does:** Find boundary edges and fill holes
+**Used in:** Post-boolean cleanup, watertight meshes
+**Status:** ⬜ Not built (needed with P2-M5 CSG)
+
+#### 19.2 Non-manifold detection & repair
+**What it does:** Find and fix edges with >2 faces, isolated vertices
+**Used in:** Mesh validation before export
+**Status:** ⬜ Not built
+
+#### 19.3 Normal repair / consistency
+**What it does:** Ensure all face normals point outward consistently
+**Status:** ⬜ Partial (we calculate normals but don't repair flipped faces)
+
+#### 19.4 Degenerate face removal
+**What it does:** Remove zero-area triangles, colinear edges
+**Status:** ⬜ Not built
+
+---
+
+### Category 20: Blend Shapes & Interpolation
+
+> Enable smooth transitions between mesh variants (ethnicities, expressions, body types).
+
+#### 20.1 Morph target storage
+**What it does:** Store multiple vertex position sets for same topology mesh
+**Used in:** Facial expressions, body type morphs, ethnicity blending
+**Status:** ⬜ Not built (Phase 2.5 - before Characters)
+**Dependencies:** Mesh must have stable vertex indices
+
+#### 20.2 Blend shape interpolation
+**What it does:** Linearly interpolate between morph targets
+**Used in:** Ethnicity slider (0.0 = archetype A, 1.0 = archetype B)
+**Status:** ⬜ Not built
+
+#### 20.3 Corrective blend shapes
+**What it does:** Apply corrections when multiple morphs combine
+**Status:** ⬜ Not built (Phase 3)
+
+**Design Decision:**
+- **Option A (Recommended):** Store archetype meshes with identical topology, interpolate vertices
+  - Pros: Simple math, glTF morph target compatible
+  - Cons: Requires identical vertex count/order
+- **Option B:** Store parametric modifiers, regenerate mesh
+  - Pros: More flexible
+  - Cons: Topology may change, harder to blend
+
+---
+
+### Category 21: Rigging & Skeletal Systems (Phase 3)
+
+> Enable deformation and posing of meshes.
+
+#### 21.1 Skeleton definition
+**What it does:** Define bone hierarchy with transforms
+**Status:** ⬜ Not built (Phase 3)
+**Phase 2 Foundation:** Add bone indices + weights to Vertex class now.
+
+#### 21.2 Automatic weight painting
+**What it does:** Assign vertex weights to bones based on proximity
+**Status:** ⬜ Not built (Phase 3)
+
+#### 21.3 Skinning deformation (LBS / DQS)
+**What it does:** Deform mesh based on bone transforms + weights
+**Status:** ⬜ Not built (Phase 3)
+
+#### 21.4 Inverse kinematics (IK)
+**What it does:** Compute bone chain to reach target position
+**Status:** ⬜ Not built (Phase 3)
+
+---
+
+### Phase 2 Foundation for Phase 3
+Must be designed/stubbed in Phase 2:
+1. Extended Vertex class with optional bone/weight/tangent/uv fields
+2. Mesh.morphTargets storage (Map<string, Vec3[]>)
+3. Mesh.skeleton reference (null until Phase 3)
+4. Material.density property (for mass calculation)
+5. Volume calculation for closed meshes
+
+---
+
+### Category 21: Fields (Scalar & Vector)
+
+Continuous value functions over space for natural variation.
+
+#### 21.1 Scalar Fields
+**What it does:** `f(x,y,z) -> number` functions
+**Used in:** Terrain height, moisture, temperature, density masks
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION (field definitions in YAML)
+**Dependencies:** Math functions, noise
+
+#### 21.2 Vector Fields
+**What it does:** `f(x,y,z) -> Vec2/Vec3` functions
+**Used in:** Wind direction, river flow, hair orientation
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Scalar fields
+
+#### 21.3 Field Composition
+**What it does:** Combine fields (add, multiply, remap, clamp)
+**Used in:** Biome blending, masked scattering
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Field types
+
+#### 21.4 Field Sampling
+**What it does:** Query field values at specific points
+**Used in:** Terrain generation, scatter placement
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Field composition
+
+---
+
+### Category 22: Scatter & Point Sampling
+
+Distributing points/objects naturally.
+
+#### 22.1 Poisson Disk Sampling
+**What it does:** Generate points with minimum distance constraint
+**Used in:** Natural object placement (trees, rocks, clutter)
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Random, spatial queries
+
+#### 22.2 Field-Driven Scatter
+**What it does:** Density controlled by scalar field
+**Used in:** Forests avoid slopes, rocks near ridges
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Fields, Poisson disk
+
+#### 22.3 Collision-Aware Scatter
+**What it does:** Avoid overlapping with existing objects
+**Used in:** Set dressing, furniture placement
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** AABB, spatial indexing
+
+---
+
+### Category 23: Instancing & Performance
+
+Efficient rendering of many objects.
+
+#### 23.1 Instance Representation
+**What it does:** Store transforms + builder refs instead of merged meshes
+**Used in:** Large scenes, repeated elements
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Composition system
+
+#### 23.2 Instance Rendering
+**What it does:** Dashboard support for non-merged instances
+**Used in:** Visualizing scattered objects
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Instance representation
+
+#### 23.3 Instance Culling
+**What it does:** Hide instances outside view/camera
+**Used in:** Performance in large worlds
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Instance rendering
+
+---
+
+### Category 24: Chunking & Streaming
+
+Dividing worlds into manageable pieces.
+
+#### 24.1 Coordinate-Based Seeding
+**What it does:** Deterministic seed from world coordinates
+**Used in:** Reproducible chunks, infinite worlds
+**Status:** ✅ Built (`coordinateHash()` in MathService)
+**DSL:** ⬜ NEEDS DSL COMMAND
+**Dependencies:** Hash function
+
+#### 24.2 Chunk Contract
+**What it does:** Query-based generation API
+**Used in:** `getChunk(cx, cy, lod)`, `sampleHeight(x,z)`
+**Status:** ⬜ Not built (P2-M2c design)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Coordinate seeding
+
+#### 24.3 Chunk Management
+**What it does:** Load/unload regions, cache eviction
+**Used in:** Memory management for large worlds
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Chunk contract
+
+#### 24.4 Seamless Boundaries
+**What it does:** Ensure chunk edges match perfectly
+**Used in:** Terrain continuity, road connections
+**Status:** ⬜ Not built (P2-M2c)
+**DSL:** ⬜ NEEDS IMPLEMENTATION
+**Dependencies:** Chunk management
+
+---
+
 ## Status Summary
 
 ### Built & Exposed via DSL (✅)
@@ -580,26 +810,46 @@ Builders should eventually output more than a render mesh.
 14. Composition (via YAML compose)
 
 ### Built but NOT Exposed via DSL (🔧)
-1. **Icosphere** - `Subdivision.ts` (useful primitive, not yet YAML)
-2. **Sphere** - `MeshOperations.ts` (not direct YAML)
+1. **Icosphere** - `Subdivision.ts`
+2. **Sphere** - `MeshOperations.ts`
 3. **Human Proportions** - `PersonBuilder.ts`
 4. **Limb Segments** - `Sweep.ts`
 
-### Not Built (⬜) (selected high-impact items)
+### Not Built - Phase 2 (⬜)
 - UV generation + unwrap + packing
 - Bevel/chamfer + normals control
-- 2D shapes + 2D boolean (still the major next geometry block)
+- 2D shapes + 2D boolean
 - Scatter/packing + collision avoidance
-- 3D boolean CSG
+- 3D boolean CSG + mesh repair
 - Deformers (bend/twist/taper/noise)
 - LOD/decimation
 - glTF export + colliders + sockets
+- Blend shapes / morph targets
+
+### Not Built - Phase 3 (⬜)
+- Retopology (quad remesh, edge loops)
+- Rigging (skeleton, weights, skinning, IK)
+- Animation (keyframes, clips, curves)
+- Physics (mass, dynamics, multibody, baking)
+
+### Phase 2 Foundation for Phase 3
+Must be designed/stubbed in Phase 2:
+1. Extended Vertex class with optional bone/weight/tangent/uv fields
+2. Mesh.morphTargets storage (Map<string, Vec3[]>)
+3. Mesh.skeleton reference (null until Phase 3)
+4. Material.density property (for mass calculation)
+5. Volume calculation for closed meshes
 
 ---
 
 ## Recommendations (updated)
 
-1. **2D Shapes next** (P2-M2): unlocks gears, signage, moldings.
-2. Add **UVs + bevel + normals** before serious hard-surface domains (devices, architecture).
-3. Add **constraints/packing** early for believable scenes (fix chair overlap class of problems).
-4. Treat export artifacts (glTF/colliders/sockets) as first-class builder outputs (Phase 2.5+).
+1. **Constraints/Packing next** (P2-M2): fixes scene quality.
+2. **2D Shapes** (P2-M3): unlocks gears, signage, moldings.
+3. **UVs + bevel + normals** before hard-surface domains.
+4. **Mesh repair** alongside CSG (P2-M5).
+5. **Blend shapes** before Characters (P2-M9).
+6. **Extend Vertex/Mesh classes** early with optional Phase 3 fields.
+7. **Rigging + Animation + Physics** are Phase 3.
+8. Design all structures to be **glTF-export compatible**.
+9. **P2-M2c World Foundations** as critical path for believable scenes/worlds.

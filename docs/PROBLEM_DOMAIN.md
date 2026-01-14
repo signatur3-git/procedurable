@@ -80,6 +80,98 @@ Over time, builders may output additional artifacts:
 - **Collision meshes** (simple shapes)
 - **LOD meshes** (multiple poly budgets)
 - **Semantic tags** for parts/faces/regions
+- **Morph targets** (blend shapes for variation interpolation)
+- **Skeleton reference** (Phase 3: rigging)
+- **Animation clips** (Phase 3: keyframe data)
+
+---
+
+## Explicit Non-Goals (Phase 2)
+
+To maintain focus, the following are explicitly OUT OF SCOPE for Phase 2:
+
+1. **Real-time physics simulation** - We may bake physics to keyframes in Phase 3
+2. **Skeletal animation playback** - Rigging is Phase 3; Phase 2 outputs static meshes
+3. **Procedural facial expressions** - Phase 3 via blend shapes + rigging
+4. **Real-time mesh editing** - Builders regenerate from seed; no live manipulation
+5. **External asset import** - We generate procedurally; no FBX/OBJ import
+6. **Game engine runtime** - Export formats (glTF) enable integration; runtime is out of scope
+7. **Full cloth simulation** - Phase 2 uses static drape approximation only
+
+---
+
+## Professional Polish Principles
+
+> What distinguishes seasoned seniors from hobbyists? Attention to detail that creates "magical" content.
+
+### The Soul of Content: Beyond Generic Slop
+
+**Hobbyist Approach:** "Slap material on a ball and apply some smear" → Generic, forgettable, CG-obvious
+**Professional Approach:** Every element tells a story, feels authentic, invites closer inspection
+
+### What Makes Content "Magical"?
+
+1. **Contextual Authenticity**
+   - Manufacturing marks (injection molding lines, wood grain direction)
+   - Use-wear patterns (scuffs where hands grip, polish where surfaces meet)
+   - Environmental integration (dust in corners, light bounce realism)
+
+2. **Proportion Mastery**
+   - Ergonomic perfection (comfortable reach, natural balance)
+   - Visual weight distribution (heavy elements look heavy)
+   - Scale relationships that feel "right" to human intuition
+
+3. **Material Truthfulness**
+   - Proper density/behavior (wood bends, metal dents, fabric drapes)
+   - Aging that makes sense (sun fading, wear accumulation)
+   - Surface variation (imperfections that prove it's real)
+
+4. **Storytelling Details**
+   - Objects that suggest narrative (personalized items, functional wear)
+   - Cultural/period authenticity (joinery techniques, fastener choices)
+   - Personality through variation (no two identical, but cohesive family)
+
+5. **Presentation Excellence**
+   - Lighting that flatters (rim lights, bounce fill, motivated shadows)
+   - Camera angles that reveal (hero shots, detail closeups, environmental context)
+   - Staging that communicates use (arranged for function, not just display)
+
+### Attention to Detail: Professional Habits
+
+**Seasoned Artists Add:**
+- **Micro-details**: Screw heads, fabric weave, subtle asymmetries
+- **Manufacturing realism**: Tool marks, assembly evidence, material waste
+- **Environmental storytelling**: Weathering, usage patterns, contextual clues
+- **Performance consideration**: LOD transitions, texture density, memory efficiency
+- **Iterative refinement**: Generate → critique → adjust → repeat
+
+**Hobbyists Skip:**
+- Surface finish variation
+- Functional constraints
+- Environmental integration
+- Performance optimization
+- User experience polish
+
+### Demo-Worthy Capabilities
+
+To showcase our system as world-class:
+
+1. **Hero Shots**: Single objects with dramatic lighting, multiple angles
+2. **Scene Context**: Objects in meaningful environments (not floating)
+3. **Variation Galleries**: Same seed family showing controlled randomness
+4. **Material Studies**: Closeups showing material complexity
+5. **Performance Demos**: Large scenes with smooth interaction
+6. **Comparison Views**: Side-by-side showing iteration improvement
+
+### Quality Bar Elevation
+
+**Before:** "Looks like a chair" → Generic blob
+**After:** "Looks like a chair I'd buy, use daily, and remember fondly"
+
+Each domain below now includes:
+- **Professional Polish**: Specific details that elevate quality
+- **Attention to Detail**: What seasoned artists add
+- **Demo-worthy Features**: Ways to showcase capabilities
 
 ---
 
@@ -103,6 +195,20 @@ Over time, builders may output additional artifacts:
 
 **Quality Bar:** Navigable layout; no impossible doors
 
+**Professional Polish:**
+- Door swings that don't intersect walls
+- Natural light placement (windows oriented correctly)
+- Furniture arrangement that suggests function (desk near outlets, bed in quiet corner)
+
+**Attention to Detail:**
+- Baseboards, crown molding variations
+- Electrical outlets positioned realistically
+- Wall texture variation (plaster vs drywall vs paneling)
+
+**Demo-worthy Features:**
+- Walkthrough videos showing spatial relationships
+- Lighting studies showing natural illumination
+
 **Tools Needed:** composition, constraints, (later) 3D boolean for openings
 
 ---
@@ -119,6 +225,20 @@ Over time, builders may output additional artifacts:
 - Material palette and style
 
 **Quality Bar:** Cohesive and plausible spacing
+
+**Professional Polish:**
+- Street lighting that creates pools of illumination
+- Vegetation that respects sunlight/shadow patterns
+- Signage that tells neighborhood stories
+
+**Attention to Detail:**
+- Manhole covers, utility boxes, street markings
+- Weathering on outdoor surfaces (rust, moss, fading)
+- Seasonal variations (fallen leaves, snow accumulation)
+
+**Demo-worthy Features:**
+- Time-of-day lighting transitions
+- Crowd simulation integration potential
 
 **Tools Needed:** instancing/scatter, constraints, composition
 
@@ -152,6 +272,23 @@ Over time, builders may output additional artifacts:
 
 **Quality Bar:** Proportions look correct, shelves level, materials consistent
 
+**Professional Polish:**
+- Adjustable shelf heights with visible peg holes
+- Books with realistic spine variations (thickness, color, wear)
+- Dust accumulation on upper shelves
+- Subtle wood grain direction consistency
+
+**Attention to Detail:**
+- Shelf sag under book weight (slight deformation)
+- Manufacturing marks on joinery (dowel holes, screw heads)
+- Book titles that tell micro-stories (personal library)
+- Cable management cutouts in back panel
+
+**Demo-worthy Features:**
+- Closeup shots of book details and shelf joinery
+- Time-lapse of shelf adjustment mechanism
+- Material study showing wood grain and finish variation
+
 **Tools Needed:** ✅ Loft, ✅ Composition, ✅ Materials
 
 ---
@@ -170,6 +307,23 @@ Over time, builders may output additional artifacts:
 - Material and finish
 
 **Quality Bar:** Ergonomic proportions, drawers look functional
+
+**Professional Polish:**
+- Drawer pulls that match hardware style
+- Keyboard tray integration options
+- Cable grommets in work surface
+- Monitor arm mounting points
+
+**Attention to Detail:**
+- Drawer runners with realistic extension limits
+- Pencil grooves and wear marks on surface
+- Power outlet cutouts positioned ergonomically
+- Joinery details (dovetails, mortise-and-tenon)
+
+**Demo-worthy Features:**
+- Drawer opening/closing animations
+- Ergonomic measurement overlays
+- Material closeups showing finish and hardware
 
 **Tools Needed:** ✅ Loft, ✅ Composition, ⬜ Boolean (drawer cutouts)
 
@@ -190,6 +344,23 @@ Over time, builders may output additional artifacts:
 
 **Quality Bar:** Recognizable as a bed, proportions match standard sizes
 
+**Professional Polish:**
+- Mattress ticking with realistic fabric texture
+- Bedding that shows natural drape and folds
+- Storage drawers under bed with smooth slides
+- Headboard lighting integration
+
+**Attention to Detail:**
+- Slat spacing that prevents mattress sag
+- Bedding wrinkles that suggest recent use
+- Dust ruffles with proper overhang
+- Frame joinery with visible fasteners
+
+**Demo-worthy Features:**
+- Bed-making sequence showing fabric behavior
+- Size comparison overlays (twin vs king)
+- Closeup of headboard upholstery details
+
 **Tools Needed:** ✅ Loft, ✅ Composition, ✅ Materials, ⬜ Soft body (bedding drape)
 
 ---
@@ -208,6 +379,23 @@ Over time, builders may output additional artifacts:
 - Fabric/leather material
 
 **Quality Bar:** Looks comfortable and proportioned
+
+**Professional Polish:**
+- Cushion tufting with realistic button patterns
+- Welt cord details on seams
+- Leg attachment with visible screws/bolts
+- Fabric that shows directional nap
+
+**Attention to Detail:**
+- Cushion compression showing use patterns
+- Piping that follows complex curves perfectly
+- Wood frame with authentic finish variations
+- Springs/coils subtly visible through fabric
+
+**Demo-worthy Features:**
+- Cushion compression tests (before/after sitting)
+- Fabric closeups showing weave and texture
+- Style comparison gallery (modern vs traditional)
 
 **Tools Needed:** ✅ Loft, ✅ Subdivision (cushion softness), ✅ Materials
 
@@ -231,6 +419,23 @@ Over time, builders may output additional artifacts:
 
 **Quality Bar:** Smooth curves, holds water visually
 
+**Professional Polish:**
+- Glaze drips and pooling at the base
+- Subtle surface imperfections from kiln firing
+- Interior lip detail for pouring
+- Weight distribution that feels balanced when held
+
+**Attention to Detail:**
+- Foot ring that prevents scratching surfaces
+- Wall thickness variation (thinner at neck)
+- Manufacturing marks (potter's wheel ridges, trimming lines)
+- Material-appropriate translucency/reflectivity
+
+**Demo-worthy Features:**
+- Water fill animation showing liquid behavior
+- Rotation reveals profile elegance
+- Material comparison (ceramic vs crystal)
+
 **Tools Needed:** ✅ Lathe, ✅ Profiles, ✅ Materials
 
 ---
@@ -247,6 +452,23 @@ Over time, builders may output additional artifacts:
 - Glass color (clear, green, brown, blue)
 
 **Quality Bar:** Recognizable bottle type
+
+**Professional Polish:**
+- Punt (bottom indentation) for stability
+- Neck finish appropriate for cap type
+- Label positioning with realistic adhesion
+- Glass thickness variation for authenticity
+
+**Attention to Detail:**
+- Mold seams running vertically
+- Air bubbles trapped in glass
+- Cap threads that match industry standards
+- Weight distribution for pouring stability
+
+**Demo-worthy Features:**
+- Pouring simulation with realistic liquid flow
+- Label closeup showing printing quality
+- Type comparison gallery (wine vs beer bottles)
 
 **Tools Needed:** ✅ Lathe, ✅ Profiles, ✅ Materials (glass shader)
 
@@ -265,298 +487,30 @@ Over time, builders may output additional artifacts:
 
 **Quality Bar:** Looks like it could hold liquid
 
+**Professional Polish:**
+- Handle attachment that feels comfortable to grip
+- Rim thickness appropriate for drinking
+- Base that sits stably without wobbling
+- Interior glaze that suggests liquid capacity
+
+**Attention to Detail:**
+- Finger impressions in handle clay
+- Glaze drips on exterior
+- Foot ring for surface protection
+- Material-specific acoustic properties
+
+**Demo-worthy Features:**
+- Handle grip comfort visualization
+- Liquid capacity demonstrations
+- Material warmth/coolness indications
+
 **Tools Needed:** ✅ Lathe, ✅ Sweep (handles), ✅ Materials
 
 ---
 
-## Domain 3: Architecture
+## Domain 8: Characters (NEW)
 
-### Target Builders
-
-#### 3.1 Simple Room
-**Visual Requirements:**
-- Floor, walls, ceiling
-- Door opening(s)
-- Window opening(s)
-- Baseboards, crown molding (optional)
-
-**Variation Axes:**
-- Room dimensions
-- Door/window count and placement
-- Wall color/material
-- Floor material
-
-**Quality Bar:** Architecturally plausible proportions
-
-**Tools Needed:** ⬜ Extrusion, ⬜ Boolean CSG (openings), ✅ Materials
-
----
-
-#### 3.2 Door
-**Visual Requirements:**
-- Door panel with detail
-- Frame
-- Handle/knob
-
-**Variation Axes:**
-- Style (flat, paneled, glass insert)
-- Size (interior, exterior, double)
-- Material (wood, metal, glass)
-
-**Quality Bar:** Looks like a real door
-
-**Tools Needed:** ⬜ Extrusion, ⬜ Boolean (panels), ✅ Materials
-
----
-
-#### 3.3 Window
-**Visual Requirements:**
-- Glass pane(s)
-- Frame
-- Mullions (optional grid)
-- Sill
-
-**Variation Axes:**
-- Style (single, double-hung, casement)
-- Pane count
-- Frame material
-
-**Quality Bar:** Glass reads as transparent/reflective
-
-**Tools Needed:** ⬜ Extrusion, ⬜ Boolean, ✅ Materials (glass)
-
----
-
-#### 3.4 Staircase
-**Visual Requirements:**
-- Treads and risers
-- Stringers (side supports)
-- Handrail and balusters
-
-**Variation Axes:**
-- Step count (floor height)
-- Width
-- Style (open, closed, spiral)
-- Material
-
-**Quality Bar:** Correct rise/run ratios, looks climbable
-
-**Tools Needed:** ⬜ Repeat + Transform, ✅ Sweep (handrails), ✅ Materials
-
----
-
-## Domain 4: Botanical
-
-### Target Builders
-
-#### 4.1 Simple Tree
-**Visual Requirements:**
-- Trunk with bark texture
-- Branching structure
-- Foliage mass (simplified or individual leaves)
-
-**Variation Axes:**
-- Species (oak, pine, birch, palm)
-- Age/size
-- Season (full, autumn, bare)
-- Health (full, sparse)
-
-**Quality Bar:** Recognizable tree silhouette, natural randomness
-
-**Tools Needed:** ⬜ L-system/branching, ⬜ Sweep (trunk/branches), ⬜ Instancing (leaves), ✅ Materials
-
----
-
-#### 4.2 Potted Plant
-**Visual Requirements:**
-- Pot/planter
-- Soil visible
-- Plant (various types)
-
-**Variation Axes:**
-- Pot style and size
-- Plant type (succulent, fern, flowering)
-- Fullness
-
-**Quality Bar:** Looks alive, pot and plant match scale
-
-**Tools Needed:** ✅ Lathe (pot), ⬜ Branching (stems), ✅ Materials
-
----
-
-#### 4.3 Flower
-**Visual Requirements:**
-- Stem
-- Leaves
-- Petals arranged around center
-- Center (stamen, pistil)
-
-**Variation Axes:**
-- Species (rose, daisy, tulip)
-- Color
-- Bloom stage (bud, open, wilting)
-
-**Quality Bar:** Recognizable flower type
-
-**Tools Needed:** ✅ Sweep (stem), ⬜ Radial instancing, ⬜ Petal shapes, ✅ Materials
-
----
-
-## Domain 5: Mechanical / Industrial
-
-### Target Builders
-
-#### 5.1 Gear
-**Visual Requirements:**
-- Toothed wheel
-- Central bore
-- Correct involute tooth profile (simplified OK)
-
-**Variation Axes:**
-- Tooth count
-- Module (tooth size)
-- Width
-- Material (steel, brass, plastic)
-
-**Quality Bar:** Teeth look like they could mesh
-
-**Tools Needed:** ⬜ 2D shapes, ⬜ Extrusion, ⬜ Radial array, ✅ Materials
-
----
-
-#### 5.2 Pipe / Tube Assembly
-**Visual Requirements:**
-- Cylindrical sections
-- Elbows, T-junctions
-- Flanges, valves (optional)
-
-**Variation Axes:**
-- Diameter
-- Route/path
-- Fitting types
-- Material (copper, PVC, steel)
-
-**Quality Bar:** Looks plumbed correctly
-
-**Tools Needed:** ⬜ Sweep along path, ⬜ Fittings library, ✅ Materials
-
----
-
-#### 5.3 Simple Machine (Pulley, Lever)
-**Visual Requirements:**
-- Functional-looking mechanism
-- Mounting points
-- Moving parts visually distinct
-
-**Variation Axes:**
-- Size
-- Material
-- Wear/age
-
-**Quality Bar:** Looks like it could work
-
-**Tools Needed:** ⬜ Lathe, ⬜ Boolean, ⬜ Composition, ✅ Materials
-
----
-
-## Domain 6: Signage & Text
-
-### Target Builders
-
-#### 6.1 Wall Sign / Plaque
-**Visual Requirements:**
-- Background panel
-- Raised or engraved text/symbols
-- Mounting hardware (optional)
-
-**Variation Axes:**
-- Text content
-- Font style
-- Material (wood, metal, plastic)
-- Shape (rectangle, oval, custom)
-
-**Quality Bar:** Text is legible, material looks authentic
-
-**Tools Needed:** ⬜ 2D text to path, ⬜ Extrusion, ⬜ Boolean (engraving), ✅ Materials
-
----
-
-#### 6.2 Standing Sign
-**Visual Requirements:**
-- Sign panel
-- Post/stand
-- Optional lighting
-
-**Variation Axes:**
-- Height
-- Sign content
-- Style (rustic, modern, vintage)
-
-**Quality Bar:** Proportions correct, stable-looking
-
-**Tools Needed:** ⬜ 2D text, ⬜ Extrusion, ⬜ Composition, ✅ Materials
-
----
-
-## Domain 7: Clothing & Fabric
-
-### Target Builders
-
-#### 7.1 Simple Shirt (T-shirt)
-**Visual Requirements:**
-- Body tube
-- Sleeves
-- Neckline
-- Hem details
-
-**Variation Axes:**
-- Size (fitted, loose)
-- Sleeve length
-- Neckline type (crew, v-neck)
-- Color/pattern
-
-**Quality Bar:** Looks wearable, drapes naturally
-
-**Tools Needed:** ⬜ 2D patterns, ⬜ Cloth drape, ⬜ Seams, ✅ Materials (fabric)
-
----
-
-#### 7.2 Pants / Trousers
-**Visual Requirements:**
-- Two leg tubes
-- Waistband
-- Pockets (optional)
-- Fly front
-
-**Variation Axes:**
-- Fit (slim, regular, wide)
-- Length
-- Style (jeans, dress, casual)
-
-**Quality Bar:** Proportioned to human, looks wearable
-
-**Tools Needed:** ⬜ 2D patterns, ⬜ Cloth drape, ⬜ Seams, ✅ Materials
-
----
-
-#### 7.3 Hat / Cap
-**Visual Requirements:**
-- Crown
-- Brim (optional)
-- Band (optional)
-
-**Variation Axes:**
-- Style (baseball cap, fedora, beanie)
-- Size
-- Material
-
-**Quality Bar:** Fits on head, style is recognizable
-
-**Tools Needed:** ✅ Subdivision, ✅ Lathe, ✅ Materials
-
----
-
-## Domain 8: Characters (Capstone)
+> These builders create character models with adjustable features to cover a range of human and animal forms.
 
 ### Target Builders
 
@@ -573,11 +527,33 @@ Over time, builders may output additional artifacts:
 - Height
 - Gender expression
 - Age indicators
-- Pose (standing, sitting)
+- Pose (standing, sitting) - Phase 2: static only; Phase 3: rigged posing
+- **Ethnicity** - Implemented via blend shapes between archetype meshes
+  - Archetypes maintain identical topology for interpolation
+  - Slider-based blending (e.g., 0.0–1.0 between two archetypes)
+  - See SOLUTION_DOMAIN Category 20 for implementation approach
 
 **Quality Bar:** Professional-quality humanoid, not uncanny valley
 
-**Tools Needed:** ALL - Subdivision, Sweep, Materials, Composition, Cloth (clothes)
+**Professional Polish:**
+- Facial asymmetry that makes characters unique
+- Skin texture with realistic pore patterns and subtle veins
+- Hair that responds to airflow and styling
+- Clothing that fits body contours naturally
+
+**Attention to Detail:**
+- Knuckle wrinkles and finger joint articulation
+- Eyelash shadows and eye reflection complexity
+- Tooth variations and dental work indications
+- Fingernail details and cuticle realism
+
+**Demo-worthy Features:**
+- Facial expression range demonstrations
+- Body type morphing sequences
+- Ethnicity blend explorations
+- Clothing fit and drape studies
+
+**Tools Needed:** ALL - Subdivision, Sweep, Materials, Composition, Cloth (clothes), Blend Shapes
 
 ---
 
@@ -594,6 +570,24 @@ Over time, builders may output additional artifacts:
 - Colors
 
 **Quality Bar:** Appealing, consistent style
+
+**Professional Polish:**
+- Silhouette that reads clearly from distance
+- Feature exaggeration that conveys emotion
+- Color palette that supports character personality
+- Proportions that communicate age/gender clearly
+
+**Attention to Detail:**
+- Eye shapes that suggest emotional range
+- Clothing details that indicate character background
+- Accessory integration that feels natural
+- Pose language that tells stories
+
+**Demo-worthy Features:**
+- Emotional expression library
+- Style comparison galleries
+- Character personality studies
+- Animation pose tests (future)
 
 **Tools Needed:** ✅ Subdivision, ✅ Materials, less anatomical precision
 
@@ -614,119 +608,22 @@ Over time, builders may output additional artifacts:
 
 **Quality Bar:** Recognizable species, appealing
 
+**Professional Polish:**
+- Muscle definition that suggests movement capability
+- Fur direction and length variation by body region
+- Eye reflection and pupil response to light
+- Species-specific behavioral posture cues
+
+**Attention to Detail:**
+- Paw pad textures and claw details
+- Whisker placement and ear mobility
+- Breed-specific markings and patterns
+- Age indicators (graying fur, joint wear)
+
+**Demo-worthy Features:**
+- Species comparison galleries
+- Breed variation studies
+- Fur detail closeups
+- Movement pose explorations
+
 **Tools Needed:** ✅ Subdivision, ✅ Sweep, ⬜ Fur/hair system (later), ✅ Materials
-
----
-
-## Domain 9: Set Dressing & Clutter (NEW)
-
-> Small objects that make scenes believable.
-
-### Target Builders
-
-#### 9.1 Tabletop Clutter Set
-**Visual Requirements:**
-- Group of small objects (cups, plates, cutlery, napkin)
-- Coherent style set (same family)
-
-**Variation Axes:**
-- Density (minimal → messy)
-- Object families (matching set)
-- Wear/cleanliness
-
-**Quality Bar:** No intersections; objects rest on surfaces
-
-**Tools Needed:** instancing/scatter with collision avoidance, composition
-
----
-
-#### 9.2 Books / Papers
-**Visual Requirements:**
-- Stacks, piles, shelf fill
-- Randomness but stable
-
-**Variation Axes:**
-- Stack height, lean, disorder
-- Variation in thickness/size
-
-**Quality Bar:** Looks like gravity applies
-
-**Tools Needed:** constraints/packing, simple deformation (bend)
-
----
-
-## Domain 10: Devices & Electronics (NEW)
-
-### Target Builders
-
-#### 10.1 Desk Lamp
-**Visual Requirements:**
-- Base + arm + shade
-- Plausible joint structure
-
-**Variation Axes:**
-- Style (anglepoise, modern)
-- Shade size
-- Arm segments
-
-**Quality Bar:** Stable; joint structure plausible
-
-**Tools Needed:** sweep, lathe, constraints, materials (metal/plastic)
-
----
-
-#### 10.2 Monitor / TV (simplified)
-**Visual Requirements:**
-- Bezel + screen + stand
-- Back housing thickness
-
-**Variation Axes:**
-- Size, aspect ratio
-- Stand style
-
-**Quality Bar:** Clean hard-surface edges (needs bevel later)
-
-**Tools Needed:** bevel/chamfer, normals control, materials
-
----
-
-## Domain 11: Vehicles (Optional / Later)
-
-### Target Builders
-
-#### 11.1 Bicycle (stylized)
-**Visual Requirements:**
-- Frame, wheels, handlebars
-
-**Variation Axes:**
-- Frame style, wheel size
-
-**Quality Bar:** Recognizable silhouette
-
-**Tools Needed:** sweep, instancing, constraints
-
----
-
-## Domain 12: Soft Goods (NEW)
-
-### Target Builders
-
-#### 12.1 Curtain / Blanket (static drape)
-**Visual Requirements:**
-- Hanging cloth folds (approx)
-
-**Variation Axes:**
-- Fold density, length
-
-**Quality Bar:** Looks like fabric, not rigid sheet
-
-**Tools Needed:** deformers, static drape, collisions
-
----
-
-## Notes on Priority Ranking
-
-The priority ranking below focuses on **tool unlocks**, but scene cohesion and decision taxonomy should be validated for each new builder:
-- Does it reuse families?
-- Does it produce plausible spacing?
-- Does it expose decisions for overrides?

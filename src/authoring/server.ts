@@ -24,6 +24,7 @@ import { systemNamespace } from './commands/system';
 import { mathNamespace } from './commands/math';
 import { materialCommands } from './commands/material';
 import { parseAndExecuteBuilder, parseYamlWithLibrary } from '../builder/YamlBuilderParser';
+import { TracedOutput } from '../builder/TracedBuilder';
 
 // Import only builders that can't be YAML yet
 // Person requires advanced geometry (subdivision, lathe) - Phase 2
@@ -140,29 +141,16 @@ async function runYamlBuilder(name: string, seed: number, overrides?: Record<str
         return buildLeg;
       }
 
-      // For Table and DiningChair, we need to run the YAML version
-      // Since compose() expects sync function, we pre-load the YAML builders
-      // and return a wrapper that runs parseAndExecuteBuilder synchronously
-      // NOTE: This requires the sub-builder YAML to be loaded beforehand
-      // For now, we return a function that will attempt YAML resolution
-      if (subName === 'Table' || subName === 'DiningChair') {
-        // Create a sync wrapper that loads and runs the YAML builder
-        // This works because parseAndExecuteBuilder is actually sync after YAML parse
+      // Check if this builder is in the YAML cache
+      const cachedBuilder = yamlBuilderCache.get(subName);
+      if (cachedBuilder) {
+        // Create a sync wrapper that runs the cached YAML builder
         return (subSeed: number, subOverrides?: Record<string, any>) => {
-          // We need to load the YAML synchronously - use cached version
-          const cachedBuilder = yamlBuilderCache.get(subName);
-          if (!cachedBuilder) {
-            // compose() cannot handle null builders; fail loudly so the user sees it.
-            throw new Error(`Sub-builder ${subName} not in cache`);
-          }
-
           return parseAndExecuteBuilder(cachedBuilder, {
             seed: subSeed,
             overrides: subOverrides,
-            builderResolver: (nestedName) => {
-              if (nestedName === 'Leg') return buildLeg;
-              return null;
-            }
+            // Recursive resolver for nested compositions
+            builderResolver: createBuilderResolver()
           });
         };
       }
@@ -172,26 +160,49 @@ async function runYamlBuilder(name: string, seed: number, overrides?: Record<str
   });
 }
 
+/**
+ * Create a builder resolver function for nested compositions
+ */
+function createBuilderResolver(): (name: string) => ((seed: number, overrides?: Record<string, any>) => TracedOutput) | null {
+  return (subName: string) => {
+    if (subName === 'Leg') {
+      return buildLeg;
+    }
+
+    const cachedBuilder = yamlBuilderCache.get(subName);
+    if (cachedBuilder) {
+      return (subSeed: number, subOverrides?: Record<string, any>) => {
+        return parseAndExecuteBuilder(cachedBuilder, {
+          seed: subSeed,
+          overrides: subOverrides,
+          builderResolver: createBuilderResolver()
+        });
+      };
+    }
+
+    return null;
+  };
+}
+
 // Cache for pre-loaded YAML builder definitions
 const yamlBuilderCache = new Map<string, any>();
 
 /**
  * Pre-load YAML builder definitions for composition support
+ * Now dynamically loads all available YAML builders
  */
 async function preloadYamlBuilders(): Promise<void> {
-  const buildersToPreload = ['Table', 'DiningChair', 'Leg'];
+  // Get all available builders from storage
+  const listResult = await storage.list();
 
-  for (const name of buildersToPreload) {
+  for (const builderInfo of listResult.builders) {
     try {
-      const exists = await storage.exists(name);
-      if (exists) {
-        const stored = await storage.get(name);
-        const definition = await parseYamlWithLibrary(stored.content);
-        yamlBuilderCache.set(name, definition);
-        console.log(`  Pre-loaded YAML builder: ${name}`);
-      }
-    } catch (e) {
-      // Builder doesn't exist in YAML, that's ok
+      const stored = await storage.get(builderInfo.name);
+      const definition = await parseYamlWithLibrary(stored.content);
+      yamlBuilderCache.set(builderInfo.name, definition);
+      console.log(`  Pre-loaded YAML builder: ${builderInfo.name}`);
+    } catch (e: any) {
+      console.warn(`  Failed to pre-load ${builderInfo.name}: ${e.message}`);
     }
   }
 }

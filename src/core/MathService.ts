@@ -224,6 +224,160 @@ export class MathContext {
 }
 
 // ============================================================================
+// NOISE FUNCTIONS
+// ============================================================================
+
+/**
+ * Simple hash function for coordinate-based seeding
+ * Produces deterministic pseudo-random value from coordinates
+ */
+export function coordinateHash(seed: number, x: number, y: number = 0, z: number = 0): number {
+  // Simple hash combining seed and coordinates
+  let h = seed;
+  h = ((h << 5) + h) ^ (Math.floor(x * 1000) & 0xFFFF);
+  h = ((h << 5) + h) ^ (Math.floor(y * 1000) & 0xFFFF);
+  h = ((h << 5) + h) ^ (Math.floor(z * 1000) & 0xFFFF);
+  // Convert to 0-1 range
+  return ((h & 0x7FFFFFFF) % 10000) / 10000;
+}
+
+// Permutation table for Perlin noise (fixed for reproducibility)
+const PERM = new Uint8Array(512);
+const GRAD3 = [
+  [1,1,0], [-1,1,0], [1,-1,0], [-1,-1,0],
+  [1,0,1], [-1,0,1], [1,0,-1], [-1,0,-1],
+  [0,1,1], [0,-1,1], [0,1,-1], [0,-1,-1]
+];
+
+// Initialize permutation table
+function initPerm(seed: number = 0): void {
+  const p = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) p[i] = i;
+
+  // Fisher-Yates shuffle with seed
+  let s = seed;
+  for (let i = 255; i > 0; i--) {
+    s = (s * 1103515245 + 12345) & 0x7FFFFFFF;
+    const j = s % (i + 1);
+    [p[i], p[j]] = [p[j], p[i]];
+  }
+
+  for (let i = 0; i < 512; i++) {
+    PERM[i] = p[i & 255];
+  }
+}
+initPerm(0);
+
+function fade(t: number): number {
+  return t * t * t * (t * (t * 6 - 15) + 10);
+}
+
+function grad3(hash: number, x: number, y: number, z: number): number {
+  const g = GRAD3[hash % 12];
+  return g[0] * x + g[1] * y + g[2] * z;
+}
+
+/**
+ * 2D Perlin noise
+ * Returns value in range [-1, 1]
+ */
+export function perlin2d(x: number, y: number, seed: number = 0): number {
+  if (seed !== 0) initPerm(seed);
+
+  const X = Math.floor(x) & 255;
+  const Y = Math.floor(y) & 255;
+
+  const xf = x - Math.floor(x);
+  const yf = y - Math.floor(y);
+
+  const u = fade(xf);
+  const v = fade(yf);
+
+  const aa = PERM[PERM[X] + Y];
+  const ab = PERM[PERM[X] + Y + 1];
+  const ba = PERM[PERM[X + 1] + Y];
+  const bb = PERM[PERM[X + 1] + Y + 1];
+
+  const gradAA = grad3(aa, xf, yf, 0);
+  const gradBA = grad3(ba, xf - 1, yf, 0);
+  const gradAB = grad3(ab, xf, yf - 1, 0);
+  const gradBB = grad3(bb, xf - 1, yf - 1, 0);
+
+  const lerpX1 = gradAA + u * (gradBA - gradAA);
+  const lerpX2 = gradAB + u * (gradBB - gradAB);
+
+  return lerpX1 + v * (lerpX2 - lerpX1);
+}
+
+/**
+ * 3D Perlin noise
+ * Returns value in range [-1, 1]
+ */
+export function perlin3d(x: number, y: number, z: number, seed: number = 0): number {
+  if (seed !== 0) initPerm(seed);
+
+  const X = Math.floor(x) & 255;
+  const Y = Math.floor(y) & 255;
+  const Z = Math.floor(z) & 255;
+
+  const xf = x - Math.floor(x);
+  const yf = y - Math.floor(y);
+  const zf = z - Math.floor(z);
+
+  const u = fade(xf);
+  const v = fade(yf);
+  const w = fade(zf);
+
+  const aaa = PERM[PERM[PERM[X] + Y] + Z];
+  const aba = PERM[PERM[PERM[X] + Y + 1] + Z];
+  const aab = PERM[PERM[PERM[X] + Y] + Z + 1];
+  const abb = PERM[PERM[PERM[X] + Y + 1] + Z + 1];
+  const baa = PERM[PERM[PERM[X + 1] + Y] + Z];
+  const bba = PERM[PERM[PERM[X + 1] + Y + 1] + Z];
+  const bab = PERM[PERM[PERM[X + 1] + Y] + Z + 1];
+  const bbb = PERM[PERM[PERM[X + 1] + Y + 1] + Z + 1];
+
+  const gradAAA = grad3(aaa, xf, yf, zf);
+  const gradBAA = grad3(baa, xf - 1, yf, zf);
+  const gradABA = grad3(aba, xf, yf - 1, zf);
+  const gradBBA = grad3(bba, xf - 1, yf - 1, zf);
+  const gradAAB = grad3(aab, xf, yf, zf - 1);
+  const gradBAB = grad3(bab, xf - 1, yf, zf - 1);
+  const gradABB = grad3(abb, xf, yf - 1, zf - 1);
+  const gradBBB = grad3(bbb, xf - 1, yf - 1, zf - 1);
+
+  const lerpX1 = gradAAA + u * (gradBAA - gradAAA);
+  const lerpX2 = gradABA + u * (gradBBA - gradABA);
+  const lerpX3 = gradAAB + u * (gradBAB - gradAAB);
+  const lerpX4 = gradABB + u * (gradBBB - gradABB);
+
+  const lerpY1 = lerpX1 + v * (lerpX2 - lerpX1);
+  const lerpY2 = lerpX3 + v * (lerpX4 - lerpX3);
+
+  return lerpY1 + w * (lerpY2 - lerpY1);
+}
+
+/**
+ * Fractal Brownian Motion (layered noise)
+ * Returns value in approximate range [-1, 1]
+ */
+export function fbm(x: number, y: number, seed: number = 0, octaves: number = 4, persistence: number = 0.5): number {
+  let total = 0;
+  let amplitude = 1;
+  let frequency = 1;
+  let maxValue = 0;
+
+  for (let i = 0; i < octaves; i++) {
+    total += perlin2d(x * frequency, y * frequency, seed) * amplitude;
+    maxValue += amplitude;
+    amplitude *= persistence;
+    frequency *= 2;
+  }
+
+  return total / maxValue;
+}
+
+// ============================================================================
 // DEFAULT EXPORT
 // ============================================================================
 
@@ -236,6 +390,11 @@ export const MathService = {
   getAvailableFunctions,
   getAvailableConstants,
   MathContext,
+  // Noise functions
+  coordinateHash,
+  perlin2d,
+  perlin3d,
+  fbm,
 };
 
 export default MathService;

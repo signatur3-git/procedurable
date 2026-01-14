@@ -3,6 +3,22 @@
 > This document is the source of truth for what we're building and in what order.
 > We follow this plan. We don't freestyle. We only deviate for serious blockers.
 
+## Related Documents
+
+**Artist Perspective (What to Build):**
+- `PROBLEM_DOMAIN.md` - Target builders and their requirements
+- `SOLUTION_DOMAIN.md` - Geometry tools inventory
+- `ALIGNMENT_MATRIX.md` - Builder × Tool mapping
+
+**Programmer Perspective (How to Author):**
+- `AUTHORING_PROBLEM_DOMAIN.md` - Builder authoring challenges
+- `AUTHORING_SOLUTION_DOMAIN.md` - Authoring infrastructure inventory
+- `AUTHORING_ALIGNMENT_MATRIX.md` - Feature prioritization
+
+**Scale & Algorithms (How to Think Big):**
+- `PROCEDURAL_TECHNIQUES.md` - Noise, patterns, layout algorithms
+- `SCALE_AMBITION.md` - Infinite worlds, Doom levels, architecture
+
 ---
 
 # PHASE 1: Infrastructure (MCP + Authoring Server)
@@ -197,36 +213,147 @@ Exposing them via DSL/YAML unlocks ~15 builders with minimal new code.
 
 ---
 
-### P2-M2: Scene Constraints & Packing ⬜
+### P2-M2: Scene Constraints & Packing ✅
 **Required for**: DiningScene quality (no overlaps), set dressing, environments
-**Status**: ⬜ Not Started
+**Status**: ✅ COMPLETE
 
 > Rationale: This is the single fastest path to believable scenes and fixes the recurring
 > "chairs overlap / orientation wrong" class of issues. It also becomes the foundation
 > for clutter placement and later environment builders.
 
-#### Step 1: Spatial Primitives
-- [ ] AABB bounds for meshes and sub-meshes (per composed sub-builder)
-- [ ] Distance checks (AABB overlap, min distance)
-- [ ] Simple ray cast against planes (for "rest this prop on table")
+#### Step 1: Spatial Primitives ✅ COMPLETE
+- [x] AABB class with overlap, distance, padding methods (`src/core/AABB.ts`)
+- [x] Mesh.getAABB() method for computing bounds
+- [x] XZ-plane distance checks for floor placement
 
-#### Step 2: Packing / Placement API
-- [ ] Add a reusable placement helper (library, not builder-specific)
-- [ ] Inputs: candidates (transforms), minDistance, attempts, seed
-- [ ] Output: chosen transforms that satisfy constraints
+#### Step 2: Packing / Placement API ✅ COMPLETE
+- [x] `placeAroundRectangle()` - chairs around rectangular tables (`src/builder/Placement.ts`)
+- [x] `placeAroundCircle()` - chairs around round tables
+- [x] Collision avoidance with minDistance parameter
+- [x] Centered candidate positions along each side
+- [x] allowReducedCount option when space runs out
 
-#### Step 3: DiningScene Fixes (Acceptance Test)
-- [ ] Ensure chairs never overlap (min distance based on chair width)
-- [ ] Ensure chairs face the table center (round & rectangular cases)
-- [ ] Ensure number of chairs respects available space (reduce chair count when needed)
+#### Step 3: YAML Integration ✅ COMPLETE
+- [x] `YamlPlacement` interface in YamlBuilderParser
+- [x] `placement:` section in YAML schema
+- [x] Automatic AABB computation from sample build
+- [x] DiningSceneV2.yaml using placement system
 
-#### Step 4: Debug/Inspection
-- [ ] Add traces for placement decisions (why a chair was rejected)
-- [ ] Optional: expose a `measurement` for min chair spacing for debugging
+#### Step 4: DiningScene Fixes (Acceptance Test) ✅ COMPLETE
+- [x] Test seeds 1-50: no chair overlaps
+- [x] Chairs face table center correctly
+- [x] Reduced count when space insufficient (expected behavior)
+
+#### Step 5: Debug/Inspection
+- [x] Composed instances visible in traces (chair_1, chair_2, etc.)
+- [ ] Optional: Add placement stats trace (requested vs placed count)
+
+**Exit Criteria**: ✅ MET
+- DiningSceneV2 seeds 1-50: no chair overlaps, chairs oriented correctly
+- Placement logic is reusable for future clutter/environment builders
+
+**Note**: When requested chair count exceeds available space, the placement
+system reduces the count rather than overlapping chairs. This is the intended
+behavior with `allowReducedCount: true`.
+
+---
+
+### P2-M2b: Authoring Infrastructure 🟡
+**Required for**: All future milestones, better debugging, optional parts
+**Status**: 🟡 In Progress - Steps 1-2 complete, noise added
+**Reference**: See `AUTHORING_ALIGNMENT_MATRIX.md` for full analysis
+
+> These are foundational improvements to the builder authoring system that
+> unblock patterns needed by multiple geometry milestones.
+
+#### Step 1: Conditional Composition ✅ COMPLETE
+- [x] Add `if:` wrapper for compose entries
+- [x] Syntax: `compose: { cushion: { if: "$include_cushion", builder: Cushion } }`
+- [x] Evaluate condition from decisions/measurements
+- [x] Support: boolean checks, comparisons (>, <, >=, <=), equality (==, !=)
+- [x] Dynamic builder resolver (all YAML builders available for composition)
+- [x] Unblocks: Optional parts pattern (stretchers, arms, decorations)
+
+#### Step 2: Iterative Composition ✅ COMPLETE
+- [x] Add `repeat:` field to YamlComposition interface
+- [x] Syntax: `repeat: { count: 4, as: "i" }`
+- [x] Index available in expressions for offset: `x: "i * spacing"`
+- [x] Generate unique instance names: `leg_0`, `leg_1`, etc.
+- [x] Unblocks: Arrays/grids (teeth, slats, fence posts)
+
+#### Step 2b: Noise Infrastructure ✅ COMPLETE
+- [x] Add Perlin noise (2D and 3D) to MathService
+- [x] Add FBM (fractal brownian motion) for layered noise
+- [x] Add coordinateHash for deterministic coordinate-based seeding
+- [x] DSL commands: `math.noise`, `math.fbm`, `math.hash`
+- [x] Unblocks: Terrain, organic variation, infinite worlds
+
+#### Step 3: Conditional Expressions
+- [ ] Add `if(condition, then, else)` function to MathService
+- [ ] Condition syntax: `is_round`, `value > 0.5`, `style == "modern"`
+- [ ] Unblocks: Complex derived values
+
+#### Step 4: Better Error Context
+- [ ] Include YAML path in error messages
+- [ ] Format: "Error at decisions.chair_count: min must be <= max"
+- [ ] Track source locations during YAML parsing
 
 **Exit Criteria**:
-- DiningScene seeds 1-50: no chair overlaps, chairs oriented correctly
-- Placement logic is reusable for future clutter/environment builders
+- Can create builders with optional parts via `if:` in compose
+- Can create arrays via `repeat:` construct
+- Error messages point to YAML location
+- All existing builders still work
+
+---
+
+### P2-M2c: World Foundations (Fields + Scatter + Instancing + Chunk Contract) ⬜
+**Required for**: Natural scenes, large worlds, streaming generation, believable clutter
+**Status**: ⬜ Not Started
+**Reference**: `AUTHORING_PROBLEM_DOMAIN.md` (Level 7), `AUTHORING_SOLUTION_DOMAIN.md` (Fields/Search)
+
+> Goal: Add the minimum foundation needed to generate *world-scale* content from a single seed
+> without rewriting the system later.
+>
+> This milestone intentionally focuses on **representations and determinism** (fields / instances)
+> rather than building a full terrain engine.
+
+#### Step 1: Scalar Field Abstraction (MVP)
+- [ ] Introduce a minimal `ScalarField` concept (callable `sample(x,y,z)`)
+- [ ] Provide built-in adapters:
+  - [ ] `field.constant(value)`
+  - [ ] `field.noise2d(seed, frequency, amplitude)` (wraps MathService perlin/fbm)
+  - [ ] `field.remap(field, inMin, inMax, outMin, outMax)`
+  - [ ] `field.clamp(field, min, max)`
+- [ ] DSL command group: `field.*` (optional in Phase 2 if YAML-only is cleaner)
+
+#### Step 2: Scatter / Point Sampling (Poisson Disk)
+- [ ] Implement Bridson Poisson disk sampling (2D) for scatter points within bounds
+- [ ] Support field-driven density masks (thin adapter):
+  - [ ] “higher density where mask(x,z) is high”
+- [ ] Output: a list of points + optional orientation (future: flow field)
+
+#### Step 3: Instancing Output (Non-merged meshes)
+- [ ] Define an output representation for **instances**:
+  - [ ] `{ builder: "Tree", transform: {pos, rot, scale}, overrides }`
+- [ ] Dashboard support: render instances without merging into one mesh
+- [ ] Rationale: required for large scenes (memory/perf) and scattering
+
+#### Step 4: Chunk / Query Contract (Design-first)
+- [ ] Define a minimal *query-based* contract (no full streaming implementation yet):
+  - [ ] `world.sampleHeight x=<x> z=<z> seed=<seed>`
+  - [ ] `world.instances bounds=<...> seed=<seed> lod=<n>`
+- [ ] Document boundary consistency patterns (padding/border overlap)
+
+#### Step 5: Demo Builder (WorldSlice)
+- [ ] Create `WorldSlice.yaml` demo:
+  - [ ] uses field(noise) as terrain height
+  - [ ] uses poisson scatter for trees/rocks
+  - [ ] returns instances
+
+**Exit Criteria**:
+- Deterministic results by coordinate (same worldSeed + coords → same outputs)
+- Can scatter thousands of instances without merging meshes
+- A clear contract exists for eventual chunk streaming + LOD
 
 ---
 
@@ -526,6 +653,47 @@ Exposing them via DSL/YAML unlocks ~15 builders with minimal new code.
 
 ---
 
+# PHASE 3: Animation & Physics (Future)
+
+> Goal: Enable rigged characters, keyframe animation, and physics-based procedural animation.
+> Depends on Phase 2 foundation work.
+
+## Phase 3 Prerequisites (MUST be done in Phase 2)
+
+These foundation items must be implemented in Phase 2, even if the features aren't used yet:
+
+1. **Extended Vertex class** - Add optional fields:
+   - `normal?: Vec3`
+   - `uv?: Vec2`, `uv2?: Vec2`
+   - `boneIndices?: number[4]`, `boneWeights?: number[4]`
+   - `tangent?: Vec4`
+
+2. **Mesh.morphTargets** - `Map<string, Vec3[]>` for blend shapes
+   - Used by Characters (P2-M9) for ethnicity/body type interpolation
+   - glTF morph target compatible
+
+3. **Mesh.skeleton** - Reference to bone hierarchy (null until Phase 3)
+
+4. **Material.density** - For future mass calculation
+
+5. **Volume calculation** - For closed meshes (stability checks now, physics later)
+
+6. **glTF-compatible structures** - All internal data maps cleanly to export
+
+## Phase 3 Milestones (not yet planned in detail)
+
+| Milestone | Description | Dependencies |
+|-----------|-------------|--------------|
+| P3-M1 | Rigging (skeleton definition, weights, LBS skinning) | Extended Vertex, P2-M9 Characters |
+| P3-M2 | Animation (keyframes, clips, interpolation curves) | P3-M1 Rigging |
+| P3-M3 | Physics Integration (rapier.js, rigid body, bake to keyframes) | P3-M2 Animation |
+| P3-M4 | Procedural Animation (walk cycles, ragdoll, secondary motion) | P3-M3 Physics |
+
+**Note:** Physics will likely use an external library (rapier.js recommended).
+We bake physics to keyframes rather than real-time simulation.
+
+---
+
 ## Rules
 
 1. **Follow the plan** - Don't add features not in the current milestone
@@ -536,6 +704,8 @@ Exposing them via DSL/YAML unlocks ~15 builders with minimal new code.
 6. **Expose before building** - DSL-expose built tools before writing new ones
 7. **Domain-driven tools** - Build tools by implementing real builders
 8. **PersonBuilder is capstone** - It comes last, uses everything
+9. **All DSL commands require integration tests** - No shipping untested commands
+10. **Phase 3 foundation in Phase 2** - Design structures for future rigging/animation/physics
 
 ---
 
@@ -544,18 +714,27 @@ Exposing them via DSL/YAML unlocks ~15 builders with minimal new code.
 | # | Milestone | Status | Domains Unlocked |
 |---|-----------|--------|------------------|
 | P2-M1 | Procedural Materials (Steps 1-3) | ✅ COMPLETE | All (enhanced) |
-| **P2-M1b** | **Expose Built Tools** | 🟡 **Steps 1-4 Done** | **Vessels, Pipes, Organic** |
-| P2-M2 | Scene Constraints & Packing | ⬜ | DiningScene Quality |
+| P2-M1b | Expose Built Tools | 🟡 IN PROGRESS | Vessels, Pipes, Organic |
+| P2-M2 | Scene Constraints & Packing | ✅ COMPLETE | DiningScene Quality |
+| **P2-M2b** | **Authoring Infrastructure** | 🟡 **Steps 1-2, Noise Done** | **Conditional/Iterative/Noise** |
+| **P2-M2c** | **World Foundations** | ⬜ **Not Started** | **Natural Scenes, Large Worlds** |
+| **P2-M2d** | **Agent Authoring Layer** | ⬜ **Not Started** | **Enables agent-driven content creation and validation.** |
 | P2-M3 | 2D Shapes & Extrusion | ⬜ | Mechanical, Signage |
 | P2-M4 | Text & Advanced 2D | ⬜ | Full Signage |
-| P2-M5 | 3D Boolean CSG | ⬜ | Architecture |
+| P2-M5 | 3D Boolean CSG + Mesh Repair | ⬜ | Architecture |
 | P2-M6 | Botanical Systems | ⬜ | Trees, Plants |
 | P2-M7 | Advanced Materials | ⬜ | All (polished) |
 | P2-M8 | Cloth & Soft Bodies | ⬜ | Clothing |
 | P2-M9 | Characters (Capstone) | ⬜ | People, Animals |
 | P2-M10 | Renderer Package | ⬜ | Deployment |
+| --- | --- | --- | --- |
+| P3-M1 | Rigging | ⬜ Future | Posed Characters |
+| P3-M2 | Animation | ⬜ Future | Animated Characters |
+| P3-M3 | Physics Integration | ⬜ Future | Dynamics |
+| P3-M4 | Procedural Animation | ⬜ Future | Walk Cycles, Ragdoll |
 
-**Total: 25 target builders, 10 milestones, ~12 tool categories**
+**Phase 2: 26 target builders, 11 milestones, ~16 tool categories**
+**Phase 3: 4 milestones (rigging, animation, physics, procedural animation)**
 
 **New Builders Created in P2-M1b:**
 - Vase.yaml (lathe) - 192 vertices
@@ -594,5 +773,99 @@ Exposing them via DSL/YAML unlocks ~15 builders with minimal new code.
   - Step 4: Subdivision DSL ✅ COMPLETE - Cushion.yaml works (98 vertices, 96 faces)
   - Updated DSL_COMMANDS.md with new YAML geometry commands
   - All tools now exposed: Loft ✅, Lathe ✅, Sweep ✅, Spline ✅, Subdivision ✅
-- **Next: P2-M1b Step 5** - Integration tests & cleanup
+- **Added Phase 3 section:** Rigging, Animation, Physics (future)
+- **Added Phase 2 Foundation for Phase 3:** Extended Vertex, morphTargets, skeleton
+- **P2-M2 Implementation Started:**
+  - Created `src/core/AABB.ts` - Axis-aligned bounding box with overlap/distance checks
+  - Created `src/builder/Placement.ts` - Constraint-based placement system
+  - Added `Mesh.getAABB()` method
+  - Added `YamlPlacement` interface and `placement:` YAML section
+  - Created `DiningSceneV2.yaml` using new placement system
+  - Placement supports: around_rectangle, around_circle modes
+  - Collision avoidance with minDistance parameter
+- **P2-M2 COMPLETE:**
+  - Fixed spacing calculation in Placement.ts (centered candidates per side)
+  - Fixed ESM imports (replaced require() with ES imports)
+  - Replaced old DiningScene.yaml with placement-based version
+  - Tested seeds 1-50: no overlaps, correct orientation
+  - `allowReducedCount` works correctly when space is insufficient
+- **Authoring Domain Analysis:**
+  - Created `AUTHORING_PROBLEM_DOMAIN.md` - Builder authoring challenges
+  - Created `AUTHORING_SOLUTION_DOMAIN.md` - Authoring infrastructure inventory
+  - Created `AUTHORING_ALIGNMENT_MATRIX.md` - Feature prioritization
+  - Added P2-M2b milestone for authoring infrastructure improvements
+  - Identified critical gaps: conditional composition, iterative composition, error context
+- **Expanded Vision - Scale & Algorithms:**
+  - Created `PROCEDURAL_TECHNIQUES.md` - Catalog of PCG algorithms:
+    - Noise (Perlin, FBM), Voronoi, Poisson disk, L-Systems, WFC, Cellular automata
+    - Space partitioning (chunks, quadtrees, BSP)
+    - Streaming/infinite generation patterns
+    - Level generation (mission graphs, inside-out)
+  - Created `SCALE_AMBITION.md` - Architecture for large-scale generation:
+    - What it takes to build a Doom level generator
+    - What it takes to build an infinite world
+    - Inside-out generation (characters first, then architecture)
+    - Chunk-based streaming, lazy evaluation, LOD
+  - Updated AUTHORING_SOLUTION_DOMAIN.md with new categories:
+    - Category 9: Noise & Pattern Generation
+    - Category 10: Scale & Streaming
+    - Category 11: Layout & Level Generation
+  - Updated DOMAIN_BUILDERS.md coverage matrix
+- **Key Insight:** We need noise functions and coordinate-based seeding
+  as foundational infrastructure before tackling larger scenes
+- **P2-M2b Step 1 Implemented:**
+  - Added `if:` field to YamlComposition interface
+  - Implemented `evaluateCompositionCondition()` function
+  - Supports: `$decision_name`, comparisons (`>`, `<`, `>=`, `<=`), equality (`==`, `!=`)
+  - Added `box:` geometry command for convenient box creation
+  - Updated builderResolver to dynamically load all YAML builders
+  - Tested with ConditionalTest builder - works correctly!
+- **P2-M2b Step 2 Implemented:**
+  - Added `repeat:` field to YamlComposition interface
+  - Refactored composition processing into `composeInstance()` helper
+  - Repeat creates instances with names like `leg_0`, `leg_1`, etc.
+  - Index variable available in expressions for offsets
+- **P2-M2b Noise Infrastructure:**
+  - Added Perlin noise (2D, 3D) to MathService
+  - Added FBM (fractal brownian motion) for layered noise
+  - Added coordinateHash for deterministic coordinate-based seeding
+  - Added DSL commands: `math.noise`, `math.fbm`, `math.hash`
+- **Next:** P2-M2c (World Foundations) or P2-M2d (Agent Authoring)
 
+---
+## M6: The Agent-Authoring Layer (NEW)
+
+> **Goal:** Enable an AI agent to autonomously discover, utilize, and validate the procedural capabilities of the system. This is the bridge between having a toolbox and having a virtual artist.
+
+This milestone focuses on the "meta" capabilities that allow an agent to reason about and interact with the builder ecosystem.
+
+### Key Features
+
+#### 1. **System Introspection and Discoverability**
+- **`system.list_builders()`**: Agent can see all available builders (`DiningChair`, `Table`, etc.).
+- **`builder.get_interface('DiningChair')`**: Agent can query a builder's "API," learning its parameters, decision points, and variation axes (e.g., `style: [modern, rustic]`, `seat_height: range(0.4, 0.6)`).
+- **`system.list_tools()`**: Agent can see available low-level geometry commands (`loft`, `extrude`, `bevel`).
+
+#### 2. **Semantic Scene Graph and Querying**
+- **Problem**: An agent needs to understand the scene functionally, not just as a list of meshes.
+- **Solution**: Introduce a semantic layer. Instead of just a mesh, a builder's output is a tree of named, tagged parts.
+  - `DiningChair` -> `[ { part: 'leg', tag: 'structure' }, { part: 'seat', tag: 'surface' } ]`
+- **`scene.query_by_tag('surface')`**: Agent can find all seating surfaces to check for clearance.
+- **`scene.query_by_part('leg')`**: Agent can find all legs to apply a material change.
+
+#### 3. **Builder Validation and Feedback**
+- **Problem**: How does an agent know if it's doing a good job?
+- **Solution**: A robust, queryable validation system.
+- **`builder.validate()`**: Runs a suite of checks.
+- **`validation.get_results()`**: Returns structured feedback the agent can parse:
+  - `[{ check: 'stability', status: 'fail', reason: 'Center of mass is outside support polygon.' }]`
+  - `[{ check: 'ergonomics', status: 'pass', metric: 'seat_height', value: 0.45 }]`
+  - `[{ check: 'aesthetics', status: 'warning', reason: 'Color contrast ratio is low.' }]` (Future goal)
+
+#### 4. **Explicit Goal-Seeking Primitives**
+- **Problem**: An agent shouldn't have to manually position everything.
+- **Solution**: High-level commands that encode artistic intent.
+- **`scene.place_around('Table-1', 'DiningChair', { count: 4, spacing: 0.5 })`**: A constraint-based command that the system solves.
+- **`scene.add_clutter('Table-1:surface', 'Mug', { density: 0.3 })`**: Scatters objects on a tagged surface, avoiding collisions.
+
+---

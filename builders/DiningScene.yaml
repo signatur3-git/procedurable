@@ -1,157 +1,64 @@
-# DiningScene.yaml - Table with chairs arranged around it
-# Simplified version that handles rectangular tables with fixed positions
-
+# DiningSceneV2.yaml - Table with chairs using constraint-based placement
 version: "1.0"
 name: DiningScene
-description: Table with chairs arranged around it
-author: procedurable
-tags: [furniture, dining, scene]
-
-# =============================================================================
-# DECISIONS
-# =============================================================================
+description: Table with chairs - no overlaps
 decisions:
   chair_count:
     type: count
     min: 2
     max: 6
-
   table_style:
     type: choice
     options: [rectangular, round]
-    weights: [0.7, 0.3]
-
-  arrangement:
-    type: choice
-    options: [around, pairs]
-    weights: [0.7, 0.3]
-
-  # Chair style - made once at scene level for consistency
   chair_back_style:
     type: choice
     options: [solid, slat, ladder]
-    weights: [0.4, 0.35, 0.25]
-
   chair_leg_style:
     type: choice
     options: [round, square, tapered]
-    weights: [0.4, 0.3, 0.3]
-
   chair_seat_shape:
     type: choice
     options: [square, rounded, contoured]
-    weights: [0.3, 0.4, 0.3]
-
   chair_has_stretchers:
     type: boolean
     probability: 0.4
-
   chair_leg_taper:
     type: number
     min: 0.7
     max: 0.9
-
   chair_back_recline:
     type: number
     min: 3.0
     max: 7.0
-
   chair_seat_curve:
     type: number
     min: 0.005
     max: 0.015
-
-  chair_slat_count:
-    type: count
-    min: 3
-    max: 5
-
   table_width_var:
     type: number
     min: -0.2
     max: 0.3
-
   table_depth_var:
     type: number
     min: -0.1
     max: 0.2
-
-# =============================================================================
-# MEASUREMENTS
-# =============================================================================
 measurements:
   table_width:
     base: 1.2
     variation: table_width_var
-    source: "Table width with variation"
-
   table_depth:
     base: 0.8
     variation: table_depth_var
-    source: "Table depth with variation"
-
   chair_width:
-    value: 0.50
-    source: "Approximate chair width"
-
+    value: 0.45
   chair_depth:
-    value: 0.50
-    source: "Approximate chair depth"
-
-  chair_spacing:
-    value: 0.20
-    source: "Distance from table edge to chair"
-
+    value: 0.45
   min_chair_gap:
-    value: 0.20
-    source: "Minimum gap between chairs"
-
-# =============================================================================
-# DERIVED VALUES
-# =============================================================================
+    value: 0.05
 derived:
-  half_table_width: "table_width / 2"
-  half_table_depth: "table_depth / 2"
-
-  # Chair position distances
-  chair_z_front: "half_table_depth + chair_depth / 2 + chair_spacing"
-  chair_z_back: "-(half_table_depth + chair_depth / 2 + chair_spacing)"
-  chair_x_left: "-(half_table_width + chair_depth / 2 + chair_spacing)"
-  chair_x_right: "half_table_width + chair_depth / 2 + chair_spacing"
-
-  # For round tables
   table_radius: "table_width / 2"
-  chair_radius: "table_radius + chair_depth / 2 + chair_spacing"
-
-  # Angle calculations for circular arrangement (4 chairs)
-  angle_0: "0"
-  angle_1: "pi / 2"
-  angle_2: "pi"
-  angle_3: "3 * pi / 2"
-
-  chair_0_x: "cos(angle_0) * chair_radius"
-  chair_0_z: "sin(angle_0) * chair_radius"
-  chair_0_rot: "-pi / 2 - angle_0"
-
-  chair_1_x: "cos(angle_1) * chair_radius"
-  chair_1_z: "sin(angle_1) * chair_radius"
-  chair_1_rot: "-pi / 2 - angle_1"
-
-  chair_2_x: "cos(angle_2) * chair_radius"
-  chair_2_z: "sin(angle_2) * chair_radius"
-  chair_2_rot: "-pi / 2 - angle_2"
-
-  chair_3_x: "cos(angle_3) * chair_radius"
-  chair_3_z: "sin(angle_3) * chair_radius"
-  chair_3_rot: "-pi / 2 - angle_3"
-
-# =============================================================================
-# COMPOSITION
-# Note: YAML composition doesn't support dynamic chair counts yet
-# This is a simplified 4-chair arrangement
-# =============================================================================
+  min_chair_distance: "chair_width + min_chair_gap"
 compose:
-  # Table at center
   table:
     builder: Table
     offset: { x: 0, y: 0, z: 0 }
@@ -159,76 +66,24 @@ compose:
       table_style: $table_style
       table_width: $table_width
       table_depth: $table_depth
-
-  # Chair 1 - Front right (for rectangular) or position 0 (for round)
-  chair_1:
-    builder: DiningChair
-    offset: { x: "chair_width / 2", y: 0, z: "chair_z_front" }
-    rotation: { x: 0, y: "pi", z: 0 }
-    overrides:
-      back_style: $chair_back_style
-      leg_style: $chair_leg_style
-      seat_shape: $chair_seat_shape
-      has_stretchers: $chair_has_stretchers
-      leg_taper: $chair_leg_taper
-      back_recline: $chair_back_recline
-      seat_curve: $chair_seat_curve
-      slat_count: $chair_slat_count
-      width_variation: 0
-      depth_variation: 0
-      back_height_variation: 0
-
-  # Chair 2 - Front left
-  chair_2:
-    builder: DiningChair
-    offset: { x: "-chair_width / 2", y: 0, z: "chair_z_front" }
-    rotation: { x: 0, y: "pi", z: 0 }
-    overrides:
-      back_style: $chair_back_style
-      leg_style: $chair_leg_style
-      seat_shape: $chair_seat_shape
-      has_stretchers: $chair_has_stretchers
-      leg_taper: $chair_leg_taper
-      back_recline: $chair_back_recline
-      seat_curve: $chair_seat_curve
-      slat_count: $chair_slat_count
-      width_variation: 0
-      depth_variation: 0
-      back_height_variation: 0
-
-  # Chair 3 - Back right
-  chair_3:
-    builder: DiningChair
-    offset: { x: "chair_width / 2", y: 0, z: "chair_z_back" }
-    rotation: { x: 0, y: 0, z: 0 }
-    overrides:
-      back_style: $chair_back_style
-      leg_style: $chair_leg_style
-      seat_shape: $chair_seat_shape
-      has_stretchers: $chair_has_stretchers
-      leg_taper: $chair_leg_taper
-      back_recline: $chair_back_recline
-      seat_curve: $chair_seat_curve
-      slat_count: $chair_slat_count
-      width_variation: 0
-      depth_variation: 0
-      back_height_variation: 0
-
-  # Chair 4 - Back left
-  chair_4:
-    builder: DiningChair
-    offset: { x: "-chair_width / 2", y: 0, z: "chair_z_back" }
-    rotation: { x: 0, y: 0, z: 0 }
-    overrides:
-      back_style: $chair_back_style
-      leg_style: $chair_leg_style
-      seat_shape: $chair_seat_shape
-      has_stretchers: $chair_has_stretchers
-      leg_taper: $chair_leg_taper
-      back_recline: $chair_back_recline
-      seat_curve: $chair_seat_curve
-      slat_count: $chair_slat_count
-      width_variation: 0
-      depth_variation: 0
-      back_height_variation: 0
-
+placement:
+  mode: around_rectangle
+  center: { x: 0, y: 0, z: 0 }
+  width: table_width
+  depth: table_depth
+  builder: DiningChair
+  count: chair_count
+  minDistance: min_chair_distance
+  allowReducedCount: true
+  instancePrefix: chair
+  overrides:
+    back_style: $chair_back_style
+    leg_style: $chair_leg_style
+    seat_shape: $chair_seat_shape
+    has_stretchers: $chair_has_stretchers
+    leg_taper: $chair_leg_taper
+    back_recline: $chair_back_recline
+    seat_curve: $chair_seat_curve
+    width_variation: 0
+    depth_variation: 0
+    back_height_variation: 0
