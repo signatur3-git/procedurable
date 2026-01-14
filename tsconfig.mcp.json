@@ -1,0 +1,24 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "outDir": "./dist-mcp",
+    "rootDir": "./src",
+    "declaration": false,
+    "declarationMap": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": [
+    "src/mcp/**/*",
+    "src/builder/**/*",
+    "src/core/**/*",
+    "src/geometry/**/*",
+    "src/cad/**/*",
+    "src/validation/**/*",
+    "src/archetypes/**/*"
+  ],
+  "exclude": ["node_modules", "dist", "dist-mcp"]
+}
+

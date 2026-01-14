@@ -1,0 +1,118 @@
+# Mug.yaml - Mug using lathe body + sweep handle
+# Demonstrates P2-M1b Step 3: Sweep DSL + combined lathe/sweep
+
+version: "1.0"
+name: Mug
+description: Coffee mug with lathed body and swept handle
+author: procedurable
+tags: [vessels, lathe, sweep, P2-M1b]
+
+# =============================================================================
+# DECISIONS
+# =============================================================================
+decisions:
+  mug_style:
+    type: choice
+    options: [classic, modern, tall]
+    weights: [0.4, 0.35, 0.25]
+
+# =============================================================================
+# MEASUREMENTS
+# =============================================================================
+measurements:
+  mug_height:
+    value: 0.10
+    source: "Total mug height"
+
+  mug_radius:
+    value: 0.04
+    source: "Outer radius of mug"
+
+  wall_thickness:
+    value: 0.004
+    source: "Wall thickness"
+
+  base_height:
+    value: 0.008
+    source: "Base/foot height"
+
+  lip_flare:
+    value: 0.003
+    source: "Lip flares outward slightly"
+
+  handle_radius:
+    value: 0.006
+    source: "Handle cross-section radius"
+
+# =============================================================================
+# DERIVED
+# =============================================================================
+derived:
+  inner_radius: "mug_radius - wall_thickness"
+  lip_radius: "mug_radius + lip_flare"
+
+  # Handle path control points
+  handle_y_start: "mug_height * 0.7"
+  handle_y_end: "mug_height * 0.2"
+  handle_y_mid: "(handle_y_start + handle_y_end) / 2"
+  handle_x_offset: "mug_radius + 0.03"
+
+# =============================================================================
+# PROFILES - 2D cross-sections
+# =============================================================================
+profiles:
+  # Mug body profile (outer wall only)
+  mug_profile:
+    type: polygon
+    closed: false
+    points:
+      - { x: 0, y: 0 }
+      - { x: "mug_radius", y: 0 }
+      - { x: "mug_radius", y: "base_height" }
+      - { x: "mug_radius", y: "mug_height - 0.01" }
+      - { x: "lip_radius", y: "mug_height" }
+      - { x: 0, y: "mug_height" }
+
+  # Handle cross-section
+  handle_profile:
+    type: ellipse
+    radiusX: "handle_radius"
+    radiusY: "handle_radius * 0.7"
+    segments: 8
+
+# =============================================================================
+# SPLINES - 3D paths for sweep
+# =============================================================================
+splines:
+  handle_path:
+    type: catmull-rom
+    tension: 0.5
+    points:
+      - { x: "mug_radius", y: "handle_y_start", z: 0 }
+      - { x: "handle_x_offset", y: "handle_y_mid + 0.01", z: 0 }
+      - { x: "mug_radius", y: "handle_y_end", z: 0 }
+
+# =============================================================================
+# MATERIALS
+# =============================================================================
+materials:
+  ceramic:
+    color: "#e8ddd0"
+
+# =============================================================================
+# GEOMETRY
+# =============================================================================
+geometry:
+  # Main mug body via lathe
+  - lathe: mug_body
+    profile: mug_profile
+    segments: 24
+    color: $ceramic
+
+  # Handle via sweep
+  - sweep: mug_handle
+    profile: handle_profile
+    path: handle_path
+    segments: 12
+    color: $ceramic
+

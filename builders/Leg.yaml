@@ -1,0 +1,89 @@
+# Leg.yaml - Simple table/chair leg builder
+# Demonstrates basic YAML builder format
+
+version: "1.0"
+name: Leg
+description: Simple cylindrical or tapered furniture leg
+author: procedurable
+tags: [furniture, component]
+
+# =============================================================================
+# DECISIONS
+# =============================================================================
+decisions:
+  style:
+    type: choice
+    options: [round, square, tapered]
+    weights: [0.4, 0.3, 0.3]
+
+  taper_ratio:
+    type: number
+    min: 0.6
+    max: 0.9
+    # Only used when style is 'tapered'
+
+# =============================================================================
+# MEASUREMENTS
+# =============================================================================
+measurements:
+  height:
+    value: 0.45
+    source: "Default furniture leg height"
+
+  top_radius:
+    value: 0.025
+    source: "Top radius of leg"
+
+  bottom_radius:
+    value: 0.025
+    source: "Bottom radius (same as top for non-tapered)"
+    conditional:
+      - if: style == "tapered"
+        value: "top_radius * taper_ratio"
+
+  segments:
+    value: 8
+    source: "Circle segments"
+    conditional:
+      - if: style == "square"
+        value: 4
+
+# =============================================================================
+# DERIVED
+# =============================================================================
+derived: {}
+
+# =============================================================================
+# GEOMETRY
+# =============================================================================
+geometry:
+  # Top circle at origin height
+  - circle: top
+    center: { x: 0, y: "height", z: 0 }
+    radius: top_radius
+    segments: 8
+    purpose: structural
+    normal: [0, 1, 0]
+
+  # Bottom circle at floor
+  - circle: bottom
+    center: { x: 0, y: 0, z: 0 }
+    radius: bottom_radius
+    segments: 8
+    purpose: structural
+    normal: [0, 1, 0]
+
+  # Loft between circles
+  - loft: shaft
+    from: bottom
+    to: top
+
+  # Cap the ends
+  - cap: top_cap
+    loop: top
+    flip: false
+
+  - cap: bottom_cap
+    loop: bottom
+    flip: true
+

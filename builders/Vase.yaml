@@ -1,0 +1,99 @@
+# Vase.yaml - Simple vase using lathe operation
+# Demonstrates P2-M1b Step 2: Lathe DSL
+
+version: "1.0"
+name: Vase
+description: Simple vase created by lathing a 2D profile
+author: procedurable
+tags: [vessels, lathe, P2-M1b]
+
+# =============================================================================
+# DECISIONS
+# =============================================================================
+decisions:
+  vase_style:
+    type: choice
+    options: [classic, modern, bulbous]
+    weights: [0.4, 0.3, 0.3]
+
+  height_variation:
+    type: number
+    min: -0.05
+    max: 0.05
+
+# =============================================================================
+# MEASUREMENTS
+# =============================================================================
+measurements:
+  vase_height:
+    base: 0.25
+    variation: height_variation
+    source: "Total vase height"
+
+  base_radius:
+    value: 0.04
+    source: "Radius at base"
+
+  body_radius:
+    value: 0.08
+    source: "Maximum body radius"
+
+  neck_radius:
+    value: 0.03
+    source: "Neck radius at top"
+
+  lip_radius:
+    value: 0.04
+    source: "Lip radius (slightly wider than neck)"
+
+# =============================================================================
+# DERIVED
+# =============================================================================
+derived:
+  # Heights for profile points (from bottom to top)
+  h0: "0"                      # Base bottom
+  h1: "vase_height * 0.05"     # Base top
+  h2: "vase_height * 0.35"     # Body widest point
+  h3: "vase_height * 0.7"      # Neck start
+  h4: "vase_height * 0.9"      # Neck
+  h5: "vase_height"            # Lip top
+
+# =============================================================================
+# PROFILES - 2D shapes for lathing
+# =============================================================================
+profiles:
+  vase_profile:
+    type: polygon
+    closed: false
+    points:
+      # Bottom center (on axis)
+      - { x: 0, y: 0 }
+      # Base
+      - { x: "base_radius", y: "h0" }
+      - { x: "base_radius", y: "h1" }
+      # Body curve outward
+      - { x: "body_radius", y: "h2" }
+      # Neck curves inward
+      - { x: "neck_radius", y: "h3" }
+      - { x: "neck_radius", y: "h4" }
+      # Lip flares slightly
+      - { x: "lip_radius", y: "h5" }
+      # Top center (on axis) - for closed top
+      - { x: 0, y: "h5" }
+
+# =============================================================================
+# MATERIALS
+# =============================================================================
+materials:
+  ceramic:
+    color: "#d4c4b0"  # Warm ceramic beige
+
+# =============================================================================
+# GEOMETRY
+# =============================================================================
+geometry:
+  - lathe: vase_body
+    profile: vase_profile
+    segments: 24
+    color: $ceramic
+

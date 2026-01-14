@@ -1,0 +1,204 @@
+# Table.yaml - Complete dining table with rectangular or round style
+# Demonstrates: if/else blocks, repeat construct, composition, trig expressions
+
+version: "1.0"
+name: Table
+description: Dining table with rectangular or round top and composed legs
+author: procedurable
+tags: [furniture, dining, table]
+
+# =============================================================================
+# DECISIONS
+# =============================================================================
+decisions:
+  table_style:
+    type: choice
+    options: [rectangular, round]
+    weights: [0.7, 0.3]
+
+  leg_style:
+    type: choice
+    options: [round, square, tapered]
+    weights: [0.4, 0.3, 0.3]
+
+  width_variation:
+    type: number
+    min: -0.2
+    max: 0.2
+
+  depth_variation:
+    type: number
+    min: -0.1
+    max: 0.1
+
+  height_variation:
+    type: number
+    min: -0.05
+    max: 0.05
+
+  thickness_variation:
+    type: number
+    min: -0.005
+    max: 0.01
+
+  inset_variation:
+    type: number
+    min: -0.02
+    max: 0.02
+
+# =============================================================================
+# MEASUREMENTS
+# =============================================================================
+measurements:
+  table_width:
+    base: 1.2
+    variation: width_variation
+    source: "Standard dining table width"
+
+  table_depth:
+    base: 0.8
+    variation: depth_variation
+    source: "Standard dining table depth"
+
+  table_height:
+    base: 0.75
+    variation: height_variation
+    source: "Standard dining table height"
+
+  top_thickness:
+    base: 0.03
+    variation: thickness_variation
+    source: "Tabletop thickness"
+
+  leg_inset:
+    base: 0.08
+    variation: inset_variation
+    source: "Distance legs are inset from edge"
+
+  table_segments:
+    value: 16
+    source: "Circle segments for round table"
+
+# =============================================================================
+# DERIVED VALUES
+# =============================================================================
+derived:
+  half_width: "table_width / 2"
+  half_depth: "table_depth / 2"
+  leg_height: "table_height - top_thickness"
+
+  # For rectangular table
+  leg_x: "half_width - leg_inset"
+  leg_z: "half_depth - leg_inset"
+  neg_leg_x: "-leg_x"
+  neg_leg_z: "-leg_z"
+
+  # For round table
+  table_radius: "table_width / 2"
+  leg_radius: "table_radius - leg_inset"
+  leg_angle_step: "pi / 2"  # 4 legs at 90 degree intervals
+
+# =============================================================================
+# GEOMETRY
+# =============================================================================
+geometry:
+  # Rectangular tabletop
+  - if: table_style == "rectangular"
+    then:
+      # Top vertices
+      - vertex: top_fl
+        position: { x: "-half_width", y: "table_height", z: "half_depth" }
+      - vertex: top_fr
+        position: { x: "half_width", y: "table_height", z: "half_depth" }
+      - vertex: top_br
+        position: { x: "half_width", y: "table_height", z: "-half_depth" }
+      - vertex: top_bl
+        position: { x: "-half_width", y: "table_height", z: "-half_depth" }
+
+      # Bottom vertices
+      - vertex: bot_fl
+        position: { x: "-half_width", y: "leg_height", z: "half_depth" }
+      - vertex: bot_fr
+        position: { x: "half_width", y: "leg_height", z: "half_depth" }
+      - vertex: bot_br
+        position: { x: "half_width", y: "leg_height", z: "-half_depth" }
+      - vertex: bot_bl
+        position: { x: "-half_width", y: "leg_height", z: "-half_depth" }
+
+      # Faces
+      - face: top_face
+        vertices: [top_fl, top_fr, top_br, top_bl]
+      - face: bottom_face
+        vertices: [bot_bl, bot_br, bot_fr, bot_fl]
+      - face: front_face
+        vertices: [top_fl, bot_fl, bot_fr, top_fr]
+      - face: right_face
+        vertices: [top_fr, bot_fr, bot_br, top_br]
+      - face: back_face
+        vertices: [top_br, bot_br, bot_bl, top_bl]
+      - face: left_face
+        vertices: [top_bl, bot_bl, bot_fl, top_fl]
+
+    else:
+      # Round tabletop using circle loops and loft
+      - circle: top_edge
+        center: { x: 0, y: "table_height", z: 0 }
+        radius: "table_radius"
+        segments: table_segments
+        purpose: structural
+        normal: [0, 1, 0]
+
+      - circle: bottom_edge
+        center: { x: 0, y: "leg_height", z: 0 }
+        radius: "table_radius"
+        segments: table_segments
+        purpose: structural
+        normal: [0, 1, 0]
+
+      - loft: top_rim
+        from: bottom_edge
+        to: top_edge
+
+      - cap: top_cap
+        loop: top_edge
+        flip: false
+
+      - cap: bottom_cap
+        loop: bottom_edge
+        flip: true
+
+# =============================================================================
+# COMPOSITION - Four legs using Leg sub-builder
+# For rectangular: legs at corners using leg_x, leg_z
+# For round: uses same corner positions (visually acceptable)
+# =============================================================================
+
+compose:
+  leg_fl:
+    builder: Leg
+    offset: { x: "neg_leg_x", y: 0, z: "leg_z" }
+    overrides:
+      style: $leg_style
+      height: $leg_height
+
+  leg_fr:
+    builder: Leg
+    offset: { x: "leg_x", y: 0, z: "leg_z" }
+    overrides:
+      style: $leg_style
+      height: $leg_height
+
+  leg_br:
+    builder: Leg
+    offset: { x: "leg_x", y: 0, z: "neg_leg_z" }
+    overrides:
+      style: $leg_style
+      height: $leg_height
+
+  leg_bl:
+    builder: Leg
+    offset: { x: "neg_leg_x", y: 0, z: "neg_leg_z" }
+    overrides:
+      style: $leg_style
+      height: $leg_height
+

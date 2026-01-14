@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "procedurable": {
+      "command": "npx",
+      "args": ["tsx", "src/mcp/server.ts"],
+      "cwd": "D:\\workspaces\\procedurable"
+    }
+  }
+}
+

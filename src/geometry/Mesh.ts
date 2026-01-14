@@ -42,6 +42,7 @@ export class Mesh {
     return new Mesh(this.vertices, triangulatedFaces);
   }
 
+
   calculateNormals(): void {
     const normals = this.vertices.map(() => Vec3.zero());
     for (const face of this.faces) {
@@ -65,9 +66,10 @@ export class Mesh {
     return edge1.cross(edge2).normalize();
   }
 
-  getBounds(): { min: Vec3; max: Vec3 } {
+  getBounds(): { min: Vec3; max: Vec3; center: Vec3; size: Vec3 } {
     if (this.vertices.length === 0) {
-      return { min: Vec3.zero(), max: Vec3.zero() };
+      const zero = Vec3.zero();
+      return { min: zero, max: zero, center: zero, size: zero };
     }
     const min = this.vertices[0].position.clone();
     const max = this.vertices[0].position.clone();
@@ -80,12 +82,22 @@ export class Mesh {
       max.y = Math.max(max.y, pos.y);
       max.z = Math.max(max.z, pos.z);
     }
-    return { min, max };
+    const center = new Vec3(
+      (min.x + max.x) / 2,
+      (min.y + max.y) / 2,
+      (min.z + max.z) / 2
+    );
+    const size = new Vec3(
+      max.x - min.x,
+      max.y - min.y,
+      max.z - min.z
+    );
+    return { min, max, center, size };
   }
 
   getCenter(): Vec3 {
     const bounds = this.getBounds();
-    return bounds.min.add(bounds.max).div(2);
+    return bounds.center;
   }
 
   toIndexedGeometry(): {

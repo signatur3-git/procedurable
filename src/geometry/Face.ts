@@ -1,11 +1,22 @@
-﻿export class Face {
-  public indices: number[];
+﻿/**
+ * RGB color in 0-1 range
+ */
+export interface FaceColor {
+  r: number;
+  g: number;
+  b: number;
+}
 
-  constructor(indices: number[]) {
+export class Face {
+  public indices: number[];
+  public color?: FaceColor;  // Optional per-face color
+
+  constructor(indices: number[], color?: FaceColor) {
     if (indices.length < 3) {
       throw new Error('Face must have at least 3 vertices');
     }
     this.indices = indices;
+    this.color = color;
   }
 
   isTriangle(): boolean {
@@ -27,12 +38,12 @@
         this.indices[0],
         this.indices[i],
         this.indices[i + 1]
-      ]));
+      ], this.color));  // Preserve color in triangulated faces
     }
     return triangles;
   }
 
   clone(): Face {
-    return new Face([...this.indices]);
+    return new Face([...this.indices], this.color ? { ...this.color } : undefined);
   }
 }

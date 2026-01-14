@@ -1,0 +1,380 @@
+# DiningChair - Full featured dining chair with procedural variety
+# YAML builder definition (replaces TypeScript ChairBuilder)
+
+version: "1.0"
+name: DiningChair
+description: Standard dining chair with seat, legs, and back
+author: procedurable
+tags: [furniture, seating, dining]
+
+# =============================================================================
+# DECISIONS - Virtual artist choices
+# =============================================================================
+decisions:
+  leg_style:
+    type: choice
+    options: [round, square, tapered, turned]
+    weights: [0.4, 0.2, 0.3, 0.1]
+
+  back_style:
+    type: choice
+    options: [solid, slat, ladder, spindle]
+    weights: [0.3, 0.3, 0.25, 0.15]
+
+  seat_shape:
+    type: choice
+    options: [square, rounded, contoured]
+    weights: [0.5, 0.35, 0.15]
+
+  leg_taper:
+    type: number
+    min: 0.6
+    max: 1.0
+
+  back_recline:
+    type: number
+    min: 3
+    max: 8
+
+  seat_curve:
+    type: number
+    min: 0
+    max: 0.02
+
+  has_stretchers:
+    type: boolean
+    probability: 0.6
+
+  stretcher_height:
+    type: number
+    min: 0.08
+    max: 0.15
+
+  slat_count:
+    type: count
+    min: 3
+    max: 5
+    condition: back_style == "slat"
+
+  ladder_rung_count:
+    type: count
+    min: 2
+    max: 4
+    condition: back_style == "ladder"
+
+  spindle_count:
+    type: count
+    min: 5
+    max: 9
+    condition: back_style == "spindle"
+
+  width_variation:
+    type: number
+    min: -0.03
+    max: 0.03
+
+  depth_variation:
+    type: number
+    min: -0.02
+    max: 0.02
+
+  back_height_variation:
+    type: number
+    min: 0
+    max: 0.1
+
+# =============================================================================
+# MEASUREMENTS - All dimensions in meters
+# =============================================================================
+measurements:
+  seat_width:
+    base: 0.42
+    variation: width_variation
+    source: "Standard dining chair width with variation"
+
+  seat_depth:
+    base: 0.38
+    variation: depth_variation
+    source: "Standard dining chair depth with variation"
+
+  seat_height:
+    value: 0.45
+    source: "Ergonomic seating height"
+
+  seat_thickness:
+    value: 0.025
+    source: "Typical plywood/solid wood thickness"
+
+  leg_radius:
+    value: 0.02
+    source: "Round leg radius"
+    conditional:
+      - if: leg_style == "square"
+        value: 0.018
+
+  leg_inset:
+    value: 0.03
+    source: "Structural inset from edge"
+
+  leg_segments:
+    value: 8
+    conditional:
+      - if: leg_style == "square"
+        value: 4
+
+  leg_taper_ratio:
+    value: leg_taper
+    source: "Leg taper (top radius / bottom radius)"
+
+  back_height:
+    base: 0.35
+    variation: back_height_variation
+    source: "Chair back height above seat with variation"
+
+  back_thickness:
+    value: 0.02
+    source: "Back panel/slat thickness"
+
+  back_angle:
+    value: back_recline
+    source: "Recline angle from decision"
+
+  stretcher_height_m:
+    value: stretcher_height
+    source: "Stretcher height from floor"
+
+  stretcher_radius:
+    value: 0.008
+    source: "Stretcher rod radius"
+
+# =============================================================================
+# DERIVED VALUES - Computed from measurements
+# =============================================================================
+derived:
+  half_width: "seat_width / 2"
+  half_depth: "seat_depth / 2"
+  seat_top: "seat_height + seat_thickness"
+  leg_x_outer: "half_width - leg_inset"
+  leg_z_outer: "half_depth - leg_inset"
+  leg_top_radius: "leg_radius * leg_taper_ratio"
+  # Back angle offset (sin of angle * height)
+  back_offset: "0.12 * back_height"  # Approximation for ~7 degree average
+
+# =============================================================================
+# GEOMETRY - Vertices, loops, faces, lofts
+# =============================================================================
+geometry:
+  # -------------------------------------------------------------------------
+  # SEAT - Box shape
+  # -------------------------------------------------------------------------
+
+  # Bottom vertices
+  - vertex: seat_bl_b
+    position: { x: "-half_width", y: "seat_height", z: "-half_depth" }
+  - vertex: seat_br_b
+    position: { x: "half_width", y: "seat_height", z: "-half_depth" }
+  - vertex: seat_fr_b
+    position: { x: "half_width", y: "seat_height", z: "half_depth" }
+  - vertex: seat_fl_b
+    position: { x: "-half_width", y: "seat_height", z: "half_depth" }
+
+  # Top vertices
+  - vertex: seat_bl_t
+    position: { x: "-half_width", y: "seat_top", z: "-half_depth" }
+  - vertex: seat_br_t
+    position: { x: "half_width", y: "seat_top", z: "-half_depth" }
+  - vertex: seat_fr_t
+    position: { x: "half_width", y: "seat_top", z: "half_depth" }
+  - vertex: seat_fl_t
+    position: { x: "-half_width", y: "seat_top", z: "half_depth" }
+
+  # Seat faces
+  - face: seat_bottom
+    vertices: [seat_bl_b, seat_fl_b, seat_fr_b, seat_br_b]
+  - face: seat_top
+    vertices: [seat_bl_t, seat_br_t, seat_fr_t, seat_fl_t]
+  - face: seat_back
+    vertices: [seat_bl_b, seat_br_b, seat_br_t, seat_bl_t]
+  - face: seat_front
+    vertices: [seat_fl_b, seat_fl_t, seat_fr_t, seat_fr_b]
+  - face: seat_left
+    vertices: [seat_bl_b, seat_bl_t, seat_fl_t, seat_fl_b]
+  - face: seat_right
+    vertices: [seat_br_b, seat_fr_b, seat_fr_t, seat_br_t]
+
+  # -------------------------------------------------------------------------
+  # LEGS - Four cylindrical/tapered legs
+  # -------------------------------------------------------------------------
+
+  # Back-left leg
+  - circle: leg_bl_bottom
+    center: { x: "-leg_x_outer", y: 0, z: "-leg_z_outer" }
+    radius: leg_radius
+    segments: leg_segments
+    purpose: structural
+    normal: [0, 1, 0]
+  - circle: leg_bl_top
+    center: { x: "-leg_x_outer", y: "seat_height", z: "-leg_z_outer" }
+    radius: leg_top_radius
+    segments: leg_segments
+    purpose: structural
+    normal: [0, 1, 0]
+  - loft: leg_bl_surface
+    from: leg_bl_bottom
+    to: leg_bl_top
+  - cap: leg_bl_cap
+    loop: leg_bl_bottom
+    flip: true
+
+  # Back-right leg
+  - circle: leg_br_bottom
+    center: { x: "leg_x_outer", y: 0, z: "-leg_z_outer" }
+    radius: leg_radius
+    segments: leg_segments
+    purpose: structural
+    normal: [0, 1, 0]
+  - circle: leg_br_top
+    center: { x: "leg_x_outer", y: "seat_height", z: "-leg_z_outer" }
+    radius: leg_top_radius
+    segments: leg_segments
+    purpose: structural
+    normal: [0, 1, 0]
+  - loft: leg_br_surface
+    from: leg_br_bottom
+    to: leg_br_top
+  - cap: leg_br_cap
+    loop: leg_br_bottom
+    flip: true
+
+  # Front-left leg
+  - circle: leg_fl_bottom
+    center: { x: "-leg_x_outer", y: 0, z: "leg_z_outer" }
+    radius: leg_radius
+    segments: leg_segments
+    purpose: structural
+    normal: [0, 1, 0]
+  - circle: leg_fl_top
+    center: { x: "-leg_x_outer", y: "seat_height", z: "leg_z_outer" }
+    radius: leg_top_radius
+    segments: leg_segments
+    purpose: structural
+    normal: [0, 1, 0]
+  - loft: leg_fl_surface
+    from: leg_fl_bottom
+    to: leg_fl_top
+  - cap: leg_fl_cap
+    loop: leg_fl_bottom
+    flip: true
+
+  # Front-right leg
+  - circle: leg_fr_bottom
+    center: { x: "leg_x_outer", y: 0, z: "leg_z_outer" }
+    radius: leg_radius
+    segments: leg_segments
+    purpose: structural
+    normal: [0, 1, 0]
+  - circle: leg_fr_top
+    center: { x: "leg_x_outer", y: "seat_height", z: "leg_z_outer" }
+    radius: leg_top_radius
+    segments: leg_segments
+    purpose: structural
+    normal: [0, 1, 0]
+  - loft: leg_fr_surface
+    from: leg_fr_bottom
+    to: leg_fr_top
+  - cap: leg_fr_cap
+    loop: leg_fr_bottom
+    flip: true
+
+  # -------------------------------------------------------------------------
+  # BACK - Simple solid back panel
+  # -------------------------------------------------------------------------
+
+  - vertex: back_bl_b
+    position: { x: "-half_width", y: "seat_top", z: "-half_depth" }
+  - vertex: back_br_b
+    position: { x: "half_width", y: "seat_top", z: "-half_depth" }
+  - vertex: back_bl_t
+    position: { x: "-half_width", y: "seat_top + back_height", z: "-half_depth - back_offset" }
+  - vertex: back_br_t
+    position: { x: "half_width", y: "seat_top + back_height", z: "-half_depth - back_offset" }
+
+  - face: back_front
+    vertices: [back_bl_b, back_br_b, back_br_t, back_bl_t]
+
+  # -------------------------------------------------------------------------
+  # STRETCHERS - Conditional horizontal bars
+  # -------------------------------------------------------------------------
+
+  - when: has_stretchers
+    geometry:
+      # Front stretcher
+      - circle: stretcher_front_l
+        center: { x: "-leg_x_outer", y: "stretcher_height_m", z: "leg_z_outer" }
+        radius: stretcher_radius
+        segments: 6
+        purpose: structural
+        normal: [1, 0, 0]
+      - circle: stretcher_front_r
+        center: { x: "leg_x_outer", y: "stretcher_height_m", z: "leg_z_outer" }
+        radius: stretcher_radius
+        segments: 6
+        purpose: structural
+        normal: [1, 0, 0]
+      - loft: stretcher_front
+        from: stretcher_front_l
+        to: stretcher_front_r
+
+      # Back stretcher
+      - circle: stretcher_back_l
+        center: { x: "-leg_x_outer", y: "stretcher_height_m", z: "-leg_z_outer" }
+        radius: stretcher_radius
+        segments: 6
+        purpose: structural
+        normal: [1, 0, 0]
+      - circle: stretcher_back_r
+        center: { x: "leg_x_outer", y: "stretcher_height_m", z: "-leg_z_outer" }
+        radius: stretcher_radius
+        segments: 6
+        purpose: structural
+        normal: [1, 0, 0]
+      - loft: stretcher_back
+        from: stretcher_back_l
+        to: stretcher_back_r
+
+      # Left stretcher
+      - circle: stretcher_left_f
+        center: { x: "-leg_x_outer", y: "stretcher_height_m", z: "leg_z_outer" }
+        radius: stretcher_radius
+        segments: 6
+        purpose: structural
+        normal: [0, 0, -1]
+      - circle: stretcher_left_b
+        center: { x: "-leg_x_outer", y: "stretcher_height_m", z: "-leg_z_outer" }
+        radius: stretcher_radius
+        segments: 6
+        purpose: structural
+        normal: [0, 0, -1]
+      - loft: stretcher_left
+        from: stretcher_left_f
+        to: stretcher_left_b
+
+      # Right stretcher
+      - circle: stretcher_right_f
+        center: { x: "leg_x_outer", y: "stretcher_height_m", z: "leg_z_outer" }
+        radius: stretcher_radius
+        segments: 6
+        purpose: structural
+        normal: [0, 0, -1]
+      - circle: stretcher_right_b
+        center: { x: "leg_x_outer", y: "stretcher_height_m", z: "-leg_z_outer" }
+        radius: stretcher_radius
+        segments: 6
+        purpose: structural
+        normal: [0, 0, -1]
+      - loft: stretcher_right
+        from: stretcher_right_f
+        to: stretcher_right_b
+
+
+

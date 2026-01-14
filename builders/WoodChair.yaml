@@ -1,0 +1,220 @@
+# WoodChair.yaml - Chair with decision-driven wood colors
+# Demonstrates P2-M1 Step 2: Material Decisions
+
+version: "1.0"
+name: WoodChair
+description: Chair with wood type decision that affects colors
+author: procedurable
+tags: [furniture, materials, decisions]
+
+# =============================================================================
+# DECISIONS - Virtual artist choices
+# =============================================================================
+decisions:
+  wood_type:
+    type: choice
+    options: [oak, walnut, cherry, pine, mahogany, maple]
+    weights: [0.25, 0.2, 0.15, 0.2, 0.1, 0.1]
+
+  finish:
+    type: choice
+    options: [natural, stained_dark, painted_white]
+    weights: [0.6, 0.3, 0.1]
+
+# =============================================================================
+# MATERIALS - Decision-driven colors
+# =============================================================================
+materials:
+  # Main wood color - responds to wood_type decision
+  chair_wood:
+    color:
+      default: wood_oak
+      when:
+        - if: wood_type == walnut
+          value: wood_walnut
+        - if: wood_type == cherry
+          value: wood_cherry
+        - if: wood_type == pine
+          value: wood_pine
+        - if: wood_type == mahogany
+          value: wood_mahogany
+        - if: wood_type == maple
+          value: wood_maple
+        - if: finish == painted_white
+          value: fabric_cream
+
+# =============================================================================
+# MEASUREMENTS
+# =============================================================================
+measurements:
+  seat_width:
+    value: 0.42
+  seat_depth:
+    value: 0.40
+  seat_height:
+    value: 0.45
+  seat_thickness:
+    value: 0.025
+  leg_radius:
+    value: 0.022
+
+# =============================================================================
+# DERIVED
+# =============================================================================
+derived:
+  half_width: "seat_width / 2"
+  half_depth: "seat_depth / 2"
+  leg_inset: "0.04"
+  leg_x: "half_width - leg_inset"
+  leg_z: "half_depth - leg_inset"
+  leg_height: "seat_height - seat_thickness"
+
+# =============================================================================
+# GEOMETRY
+# =============================================================================
+geometry:
+  # Seat vertices - top
+  - vertex: seat_fl_t
+    position: { x: "-half_width", y: "seat_height", z: "half_depth" }
+  - vertex: seat_fr_t
+    position: { x: "half_width", y: "seat_height", z: "half_depth" }
+  - vertex: seat_br_t
+    position: { x: "half_width", y: "seat_height", z: "-half_depth" }
+  - vertex: seat_bl_t
+    position: { x: "-half_width", y: "seat_height", z: "-half_depth" }
+
+  # Seat vertices - bottom
+  - vertex: seat_fl_b
+    position: { x: "-half_width", y: "seat_height - seat_thickness", z: "half_depth" }
+  - vertex: seat_fr_b
+    position: { x: "half_width", y: "seat_height - seat_thickness", z: "half_depth" }
+  - vertex: seat_br_b
+    position: { x: "half_width", y: "seat_height - seat_thickness", z: "-half_depth" }
+  - vertex: seat_bl_b
+    position: { x: "-half_width", y: "seat_height - seat_thickness", z: "-half_depth" }
+
+  # Seat faces - all use the same wood color
+  - face: seat_top
+    vertices: [seat_fl_t, seat_fr_t, seat_br_t, seat_bl_t]
+    color: $chair_wood
+
+  - face: seat_bottom
+    vertices: [seat_bl_b, seat_br_b, seat_fr_b, seat_fl_b]
+    color: $chair_wood
+
+  - face: seat_front
+    vertices: [seat_fl_t, seat_fl_b, seat_fr_b, seat_fr_t]
+    color: $chair_wood
+
+  - face: seat_back
+    vertices: [seat_br_t, seat_br_b, seat_bl_b, seat_bl_t]
+    color: $chair_wood
+
+  - face: seat_left
+    vertices: [seat_bl_t, seat_bl_b, seat_fl_b, seat_fl_t]
+    color: $chair_wood
+
+  - face: seat_right
+    vertices: [seat_fr_t, seat_fr_b, seat_br_b, seat_br_t]
+    color: $chair_wood
+
+  # Legs - front left
+  - circle: leg_fl_top
+    center: { x: "-leg_x", y: "leg_height", z: "leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    purpose: structural
+    normal: [0, 1, 0]
+
+  - circle: leg_fl_bottom
+    center: { x: "-leg_x", y: 0, z: "leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    purpose: structural
+    normal: [0, -1, 0]
+
+  - loft: leg_fl_surface
+    from: leg_fl_top
+    to: leg_fl_bottom
+    color: $chair_wood
+
+  - cap: leg_fl_cap
+    loop: leg_fl_bottom
+    flip: true
+    color: $chair_wood
+
+  # Legs - front right
+  - circle: leg_fr_top
+    center: { x: "leg_x", y: "leg_height", z: "leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    purpose: structural
+    normal: [0, 1, 0]
+
+  - circle: leg_fr_bottom
+    center: { x: "leg_x", y: 0, z: "leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    purpose: structural
+    normal: [0, -1, 0]
+
+  - loft: leg_fr_surface
+    from: leg_fr_top
+    to: leg_fr_bottom
+    color: $chair_wood
+
+  - cap: leg_fr_cap
+    loop: leg_fr_bottom
+    flip: true
+    color: $chair_wood
+
+  # Legs - back right
+  - circle: leg_br_top
+    center: { x: "leg_x", y: "leg_height", z: "-leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    purpose: structural
+    normal: [0, 1, 0]
+
+  - circle: leg_br_bottom
+    center: { x: "leg_x", y: 0, z: "-leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    purpose: structural
+    normal: [0, -1, 0]
+
+  - loft: leg_br_surface
+    from: leg_br_top
+    to: leg_br_bottom
+    color: $chair_wood
+
+  - cap: leg_br_cap
+    loop: leg_br_bottom
+    flip: true
+    color: $chair_wood
+
+  # Legs - back left
+  - circle: leg_bl_top
+    center: { x: "-leg_x", y: "leg_height", z: "-leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    purpose: structural
+    normal: [0, 1, 0]
+
+  - circle: leg_bl_bottom
+    center: { x: "-leg_x", y: 0, z: "-leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    purpose: structural
+    normal: [0, -1, 0]
+
+  - loft: leg_bl_surface
+    from: leg_bl_top
+    to: leg_bl_bottom
+    color: $chair_wood
+
+  - cap: leg_bl_cap
+    loop: leg_bl_bottom
+    flip: true
+    color: $chair_wood
+

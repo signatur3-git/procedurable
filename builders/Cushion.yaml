@@ -1,0 +1,97 @@
+# Cushion.yaml - Soft cushion using subdivision
+# Demonstrates P2-M1b Step 4: Subdivision DSL
+
+version: "1.0"
+name: Cushion
+description: Soft cushion created by subdividing a box
+author: procedurable
+tags: [furniture, subdivision, P2-M1b]
+
+# =============================================================================
+# DECISIONS
+# =============================================================================
+decisions:
+  cushion_shape:
+    type: choice
+    options: [square, rectangle]
+    weights: [0.5, 0.5]
+
+# =============================================================================
+# MEASUREMENTS
+# =============================================================================
+measurements:
+  width:
+    value: 0.40
+    source: "Cushion width"
+
+  depth:
+    value: 0.40
+    source: "Cushion depth"
+
+  height:
+    value: 0.10
+    source: "Cushion height/thickness"
+
+# =============================================================================
+# DERIVED
+# =============================================================================
+derived:
+  half_width: "width / 2"
+  half_depth: "depth / 2"
+  half_height: "height / 2"
+
+# =============================================================================
+# MATERIALS
+# =============================================================================
+materials:
+  fabric:
+    color: "#6b8e9f"  # Soft blue fabric
+
+# =============================================================================
+# GEOMETRY - Create box control cage then subdivide
+# =============================================================================
+geometry:
+  # Bottom vertices
+  - vertex: v0
+    position: { x: "-half_width", y: "-half_height", z: "-half_depth" }
+  - vertex: v1
+    position: { x: "half_width", y: "-half_height", z: "-half_depth" }
+  - vertex: v2
+    position: { x: "half_width", y: "-half_height", z: "half_depth" }
+  - vertex: v3
+    position: { x: "-half_width", y: "-half_height", z: "half_depth" }
+
+  # Top vertices
+  - vertex: v4
+    position: { x: "-half_width", y: "half_height", z: "-half_depth" }
+  - vertex: v5
+    position: { x: "half_width", y: "half_height", z: "-half_depth" }
+  - vertex: v6
+    position: { x: "half_width", y: "half_height", z: "half_depth" }
+  - vertex: v7
+    position: { x: "-half_width", y: "half_height", z: "half_depth" }
+
+  # Faces (CCW winding for outward normals)
+  - face: bottom
+    vertices: [v0, v3, v2, v1]
+    color: $fabric
+  - face: top
+    vertices: [v4, v5, v6, v7]
+    color: $fabric
+  - face: front
+    vertices: [v3, v7, v6, v2]
+    color: $fabric
+  - face: back
+    vertices: [v0, v1, v5, v4]
+    color: $fabric
+  - face: left
+    vertices: [v0, v4, v7, v3]
+    color: $fabric
+  - face: right
+    vertices: [v1, v2, v6, v5]
+    color: $fabric
+
+  # Subdivide to make it soft and rounded
+  - subdivide: smooth
+    iterations: 2
+

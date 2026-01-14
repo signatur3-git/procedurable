@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Procedurable Dashboard</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #0d1117;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+
+    .dashboard {
+      display: flex;
+      height: 100vh;
+    }
+
+    /* Left sidebar */
+    .sidebar {
+      width: 280px;
+      background: #161b22;
+      border-right: 1px solid #30363d;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .sidebar h1 {
+      color: #58a6ff;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .sidebar h1::before {
+      content: "🔧";
+    }
+
+    /* Connection status */
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #21262d;
+      border-radius: 6px;
+      font-size: 13px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #da3633;
+    }
+
+    .status-dot.connected {
+      background: #3fb950;
+    }
+
+    /* Builder selector */
+    .builder-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .builder-section label {
+      font-size: 12px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .builder-select {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e0e0e0;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .builder-select:hover {
+      border-color: #58a6ff;
+    }
+
+    /* Seed range control */
+    .seed-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .seed-inputs {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .seed-input {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e0e0e0;
+      padding: 8px 10px;
+      border-radius: 6px;
+      width: 80px;
+      font-size: 14px;
+    }
+
+    /* Run button */
+    .run-btn {
+      background: #238636;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .run-btn:hover {
+      background: #2ea043;
+    }
+
+    .run-btn:disabled {
+      background: #21262d;
+      color: #8b949e;
+      cursor: not-allowed;
+    }
+
+    /* Info panel */
+    .info-panel {
+      flex: 1;
+      overflow-y: auto;
+      font-size: 13px;
+    }
+
+    .info-panel h3 {
+      color: #8b949e;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .info-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .info-key {
+      color: #8b949e;
+    }
+
+    .info-value {
+      color: #58a6ff;
+      font-family: monospace;
+    }
+
+    /* Main grid area */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 20px;
+      gap: 20px;
+    }
+
+    .grid-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .grid-title {
+      font-size: 16px;
+      color: #8b949e;
+    }
+
+    /* Single seed view */
+    .seed-grid {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 0;
+    }
+
+    .seed-nav {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 0;
+    }
+
+    .nav-btn {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #e0e0e0;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: all 0.2s;
+    }
+
+    .nav-btn:hover:not(:disabled) {
+      border-color: #58a6ff;
+      background: #30363d;
+    }
+
+    .nav-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .seed-display {
+      font-family: monospace;
+      font-size: 18px;
+      color: #58a6ff;
+      min-width: 120px;
+      text-align: center;
+    }
+
+    .single-view {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+
+    .main-canvas-container {
+      flex: 1;
+      position: relative;
+    }
+
+    .grid-cell {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #161b22;
+      border: 2px solid #30363d;
+      border-radius: 8px;
+      overflow: hidden;
+      transition: border-color 0.2s;
+    }
+
+    .grid-cell:hover {
+      border-color: #58a6ff;
+      transform: scale(1.01);
+    }
+
+    .grid-cell.selected {
+      border-color: #58a6ff;
+      box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.3);
+    }
+
+    .grid-cell.loading::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(13, 17, 23, 0.7);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .cell-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .cell-overlay {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 8px 10px;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+    }
+
+    .cell-seed {
+      font-family: monospace;
+      color: #58a6ff;
+    }
+
+    .cell-stats {
+      color: #8b949e;
+    }
+
+    /* Right detail panel */
+    .detail-panel {
+      width: 320px;
+      background: #161b22;
+      border-left: 1px solid #30363d;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      overflow-y: auto;
+    }
+
+    .detail-panel h2 {
+      font-size: 16px;
+      color: #58a6ff;
+      border-bottom: 1px solid #30363d;
+      padding-bottom: 10px;
+    }
+
+    .detail-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .detail-section h3 {
+      font-size: 11px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .decision-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 6px 10px;
+      background: #21262d;
+      border-radius: 4px;
+      font-size: 13px;
+    }
+
+    .decision-key {
+      color: #e0e0e0;
+    }
+
+    .decision-value {
+      padding: 2px 8px;
+      background: #30363d;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #7ee787;
+    }
+
+    .decision-source {
+      font-size: 10px;
+      color: #8b949e;
+      margin-left: 6px;
+    }
+
+    .measurement-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 4px 0;
+      font-size: 13px;
+    }
+
+    .measurement-key {
+      color: #8b949e;
+    }
+
+    .measurement-value {
+      font-family: monospace;
+      color: #f0883e;
+    }
+
+    /* Log panel at bottom */
+    .log-panel {
+      height: 120px;
+      background: #0d1117;
+      border-top: 1px solid #30363d;
+      padding: 10px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 12px;
+    }
+
+    .log-entry {
+      padding: 2px 0;
+      color: #8b949e;
+    }
+
+    .log-entry.info {
+      color: #58a6ff;
+    }
+
+    .log-entry.success {
+      color: #3fb950;
+    }
+
+    .log-entry.error {
+      color: #f85149;
+    }
+
+    /* Empty state */
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #8b949e;
+      font-size: 14px;
+      gap: 8px;
+    }
+
+    .empty-state::before {
+      content: "📦";
+      font-size: 32px;
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    <!-- Left Sidebar -->
+    <aside class="sidebar">
+      <h1>Procedurable</h1>
+
+      <div class="status">
+        <span class="status-dot" id="status-dot"></span>
+        <span id="status-text">Disconnected</span>
+      </div>
+
+      <div class="builder-section">
+        <label>Active Builder</label>
+        <select class="builder-select" id="builder-select">
+          <option value="">Select a builder...</option>
+        </select>
+      </div>
+
+      <div class="seed-section">
+        <label>Current Seed</label>
+        <div class="seed-inputs">
+          <input type="number" class="seed-input" id="current-seed" value="1" min="1">
+        </div>
+      </div>
+
+      <button class="run-btn" id="run-btn" disabled>Run Builder</button>
+
+      <div class="info-panel" id="info-panel">
+        <div class="empty-state">
+          Select a builder to begin
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Canvas -->
+    <main class="main-content">
+      <div class="grid-header">
+        <span class="grid-title" id="grid-title">No builder selected</span>
+      </div>
+
+      <div class="seed-grid" id="seed-grid">
+        <div class="seed-nav">
+          <button class="nav-btn" id="prev-btn" disabled>← Previous</button>
+          <span class="seed-display" id="seed-display">Seed: --</span>
+          <button class="nav-btn" id="next-btn" disabled>Next →</button>
+          <button class="nav-btn" id="random-btn" disabled>🎲 Random</button>
+        </div>
+        <div class="single-view">
+          <div class="main-canvas-container">
+            <div class="grid-cell" id="main-cell">
+              <canvas class="cell-canvas" id="main-canvas"></canvas>
+              <div class="cell-overlay" id="main-overlay">
+                <span class="cell-seed">Seed: --</span>
+                <span class="cell-stats">--</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="log-panel" id="log-panel">
+        <div class="log-entry info">Dashboard initialized. Waiting for connection...</div>
+      </div>
+    </main>
+
+    <!-- Right Detail Panel -->
+    <aside class="detail-panel" id="detail-panel">
+      <h2>Inspection</h2>
+      <div class="empty-state" id="inspection-empty">
+        Click a cell to inspect
+      </div>
+      <div id="inspection-content" style="display: none;"></div>
+
+      <!-- Command Console Widget -->
+      <div class="command-console">
+        <h2>Agent Commands</h2>
+        <div class="console-output" id="console-output">
+          <div class="console-entry hint">Waiting for agent commands...</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <style>
+    /* Command Console Styles */
+    .command-console {
+      margin-top: 20px;
+      border-top: 1px solid #30363d;
+      padding-top: 16px;
+    }
+
+    .command-console h2 {
+      font-size: 14px;
+      color: #f0883e;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .command-console h2::before {
+      content: "⌘";
+    }
+
+    .console-output {
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      padding: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 12px;
+    }
+
+    .console-entry {
+      padding: 4px 0;
+      border-bottom: 1px solid #21262d;
+    }
+
+    .console-entry:last-child {
+      border-bottom: none;
+    }
+
+    .console-entry.hint {
+      color: #8b949e;
+      font-style: italic;
+    }
+
+    .console-entry .cmd-time {
+      color: #8b949e;
+      margin-right: 8px;
+    }
+
+    .console-entry .cmd-text {
+      color: #7ee787;
+    }
+
+    .console-entry .cmd-result {
+      color: #58a6ff;
+      margin-left: 20px;
+      display: block;
+      font-size: 11px;
+    }
+
+    .console-entry.error .cmd-text {
+      color: #f85149;
+    }
+
+    .console-entry.error .cmd-result {
+      color: #f85149;
+    }
+  </style>
+
+  <script type="module" src="/src/dashboard/main.ts"></script>
+</body>
+</html>
+
