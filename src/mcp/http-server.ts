@@ -34,6 +34,11 @@ function log(msg: string) {
 // Store last run for inspection (shared across all sessions)
 let lastRun: TracedOutput | null = null;
 
+// Hot reload status
+let isReloading = false;
+let lastReloadEvent: { builder: string; timestamp: string } | null = null;
+let webhookId: string | null = null;
+
 // Store active transports by session ID
 const transports = new Map<string, SSEServerTransport>();
 
@@ -122,6 +127,38 @@ const TOOLS = [
 
 const AUTHORING_SERVER_URL = 'http://127.0.0.1:4200';
 
+/**
+ * Helper to retry fetch requests with exponential backoff
+ * Useful for handling brief unavailability during hot reloads
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3,
+  initialDelay: number = 100
+): Promise<Response> {
+  let lastError: any;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      return response;
+    } catch (error: any) {
+      lastError = error;
+
+      // If this isn't the last attempt, wait before retrying
+      if (attempt < maxRetries - 1) {
+        const delay = initialDelay * Math.pow(2, attempt); // Exponential backoff
+        console.error(`[mcp-http] Fetch failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  // All retries exhausted
+  throw lastError;
+}
+
 // Helper to call authoring server
 async function callAuthoringServer(path: string, method: 'GET' | 'POST' = 'GET', body?: any): Promise<any> {
   try {
@@ -132,7 +169,7 @@ async function callAuthoringServer(path: string, method: 'GET' | 'POST' = 'GET',
     if (body) {
       options.body = JSON.stringify(body);
     }
-    const response = await fetch(`${AUTHORING_SERVER_URL}${path}`, options);
+    const response = await fetchWithRetry(`${AUTHORING_SERVER_URL}${path}`, options);
     if (!response.ok) {
       throw new Error(`Authoring server error: ${response.status}`);
     }
@@ -153,7 +190,11 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
             status: "ok",
             transport: "sse",
             runsInMemory: lastRun ? 1 : 0,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            hotReload: isReloading ? {
+              status: 'reloading',
+              lastEvent: lastReloadEvent
+            } : undefined
           }),
         }],
       };
@@ -166,12 +207,33 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
           isError: true,
         };
       }
+
+      // Warn if server is hot reloading
+      if (isReloading && lastReloadEvent) {
+        log(`⚠ Executing commands during hot reload of: ${lastReloadEvent.builder}`);
+      }
+
       try {
         const result = await callAuthoringServer('/api/execute', 'POST', { commands });
         return {
           content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         };
       } catch (err: any) {
+        // Check if this might be a hot reload issue
+        if (isReloading && lastReloadEvent) {
+          return {
+            content: [{
+              type: "text",
+              text: JSON.stringify({
+                error: err.message,
+                hint: `The authoring server is currently reloading builder: ${lastReloadEvent.builder}. This should complete in a moment. The request will be automatically retried.`,
+                hotReload: lastReloadEvent
+              }, null, 2)
+            }],
+            isError: true,
+          };
+        }
+
         return {
           content: [{ type: "text", text: err.message }],
           isError: true,
@@ -376,6 +438,72 @@ function createServer(): Server {
 const app = express();
 app.use(express.json());
 
+// Webhook endpoint to receive hot reload notifications from authoring server
+app.post('/webhook/hot-reload', (req, res) => {
+  const event = req.body;
+
+  if (event.type === 'hot_reload') {
+    isReloading = true;
+    lastReloadEvent = {
+      builder: event.builder,
+      timestamp: event.timestamp
+    };
+    log(`🔄 Hot reload detected: ${event.builder} (${event.event})`);
+
+    // Clear reloading flag after a short delay
+    setTimeout(() => {
+      isReloading = false;
+      log(`✓ Hot reload complete for: ${event.builder}`);
+    }, 2000);
+  }
+
+  res.json({ received: true });
+});
+
+/**
+ * Register this MCP server with the authoring server to receive hot reload notifications
+ */
+async function registerWebhook(): Promise<void> {
+  try {
+    const response = await fetch(`${AUTHORING_SERVER_URL}/api/webhooks/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: `http://127.0.0.1:${PORT}/webhook/hot-reload`,
+        name: 'MCP HTTP Server'
+      })
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      webhookId = result.id;
+      log(`✓ Registered webhook with authoring server: ${webhookId}`);
+    } else {
+      log(`⚠ Failed to register webhook: ${response.status}`);
+    }
+  } catch (err: any) {
+    log(`⚠ Could not register webhook: ${err.message}`);
+  }
+}
+
+/**
+ * Unregister webhook on shutdown
+ */
+async function unregisterWebhook(): Promise<void> {
+  if (!webhookId) return;
+
+  try {
+    await fetch(`${AUTHORING_SERVER_URL}/api/webhooks/unregister`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: webhookId })
+    });
+    log(`✓ Unregistered webhook: ${webhookId}`);
+  } catch (err: any) {
+    log(`⚠ Failed to unregister webhook: ${err.message}`);
+  }
+}
+
 // Handle direct JSON-RPC POST to /mcp (Streamable HTTP transport)
 // This is what GitHub Copilot uses
 app.post('/mcp', async (req, res) => {
@@ -483,15 +611,34 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     sessions: transports.size,
     sessionIds: Array.from(transports.keys()),
-    transport: 'sse'
+    transport: 'sse',
+    webhookRegistered: webhookId !== null,
+    hotReload: isReloading ? lastReloadEvent : null
   });
 });
 
 // Start server
-app.listen(PORT, '127.0.0.1', () => {
+app.listen(PORT, '127.0.0.1', async () => {
   log(`HTTP MCP server running at http://127.0.0.1:${PORT}`);
   log(`SSE endpoint: http://127.0.0.1:${PORT}/mcp`);
   log(`Message endpoint: http://127.0.0.1:${PORT}/mcp/message`);
+  log(`Webhook endpoint: http://127.0.0.1:${PORT}/webhook/hot-reload`);
   log(`Health check: http://127.0.0.1:${PORT}/health`);
   log(`Tools: ${TOOLS.map(t => t.name).join(', ')}`);
+
+  // Register webhook with authoring server
+  await registerWebhook();
+});
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  log('Shutting down gracefully...');
+  await unregisterWebhook();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  log('Shutting down gracefully...');
+  await unregisterWebhook();
+  process.exit(0);
 });

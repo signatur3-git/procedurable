@@ -590,6 +590,177 @@ List all available mathematical constants.
 
 ---
 
+## YAML Geometry Commands (P2-M1b)
+
+> **Note:** These commands are used within YAML builder definitions, not via the HTTP API.
+> They are documented here for reference when authoring builders.
+
+### Lathe Operation
+
+Create rotational geometry by revolving a 2D profile around an axis.
+
+**YAML Syntax:**
+```yaml
+geometry:
+  - lathe: vase_body
+    profile: vase_profile  # Reference to a profile defined in profiles: section
+    segments: 24           # Number of segments around axis (more = smoother)
+    angle: 360             # Degrees to revolve (360 = full circle)
+    axis: y                # Axis to revolve around (x, y, or z)
+    material: clay         # Optional material reference
+```
+
+**Example (Vase.yaml):**
+```yaml
+profiles:
+  vase_profile:
+    type: polygon
+    closed: false
+    points:
+      - { x: "base_radius", y: 0 }
+      - { x: "body_radius", y: "vase_height * 0.5" }
+      - { x: "neck_radius", y: "vase_height * 0.8" }
+      - { x: "lip_radius", y: "vase_height" }
+
+geometry:
+  - lathe: vase_body
+    profile: vase_profile
+    segments: 24
+```
+
+**Typical vertex/face counts:**
+- Vase with 4-point profile × 24 segments = ~192 vertices, ~168 faces
+
+### Sweep Operation
+
+Extrude a 2D profile along a 3D path (spline) to create tubes, handles, pipes.
+
+**YAML Syntax:**
+```yaml
+geometry:
+  - sweep: handle
+    profile: handle_cross_section  # 2D profile to extrude
+    path: handle_spline            # 3D spline path reference
+    segments: 16                   # Segments along path
+    twist: 0                       # Optional twist in degrees
+    scale: 1.0                     # Optional scale along path
+    material: ceramic              # Optional material reference
+```
+
+**Example (Mug.yaml handle):**
+```yaml
+profiles:
+  handle_cross_section:
+    type: circle
+    radius: "handle_radius"
+    segments: 8
+
+splines:
+  handle_spline:
+    type: bezier
+    points:
+      - { x: "mug_radius", y: "handle_y_start", z: 0 }
+      - { x: "handle_x_offset", y: "handle_y_mid", z: 0 }
+      - { x: "handle_x_offset", y: "handle_y_mid", z: 0 }
+      - { x: "mug_radius", y: "handle_y_end", z: 0 }
+
+geometry:
+  - sweep: handle
+    profile: handle_cross_section
+    path: handle_spline
+    segments: 16
+```
+
+**Typical vertex/face counts:**
+- Circular profile (8 segments) × path (16 segments) = ~128 vertices per sweep
+
+### Subdivide Operation
+
+Smooth a mesh by subdividing faces (Catmull-Clark subdivision).
+
+**YAML Syntax:**
+```yaml
+geometry:
+  # First create base geometry (box, loft, etc.)
+  - box: cushion_base
+    size: { x: "width", y: "height", z: "depth" }
+  
+  # Then subdivide to create smooth, organic shape
+  - subdivide: cushion_smooth
+    iterations: 2  # More iterations = smoother (1-3 typical)
+```
+
+**Example (Cushion.yaml):**
+```yaml
+geometry:
+  # Create a simple box
+  - vertex: corner_fbl
+    position: { x: "-half_width", y: "-half_height", z: "-half_depth" }
+  # ... more vertices ...
+  
+  # Create faces from vertices
+  - face: bottom
+    vertices: [corner_fbl, corner_fbr, corner_brr, corner_brl]
+  # ... more faces ...
+  
+  # Subdivide for soft, organic look
+  - subdivide: smooth
+    iterations: 2
+```
+
+**Typical vertex/face counts:**
+- Box (8 vertices, 6 faces) → Subdivide ×2 = ~98 vertices, ~96 faces
+
+### Conditional Geometry
+
+Use `when:` to include geometry only if a decision is true.
+
+**YAML Syntax:**
+```yaml
+geometry:
+  - when: has_stretchers  # Boolean decision name
+    geometry:
+      # Geometry to include only if has_stretchers is true
+      - circle: stretcher_front_l
+        center: { x: "-leg_x", y: "stretcher_height", z: "leg_z" }
+        radius: "stretcher_radius"
+```
+
+### Profiles Section
+
+Define 2D profiles for use with lathe and sweep operations.
+
+**YAML Syntax:**
+```yaml
+profiles:
+  profile_name:
+    type: circle | ellipse | rect | polygon
+    # For circle:
+    radius: expression
+    segments: 8
+    # For polygon:
+    closed: true | false
+    points:
+      - { x: expression, y: expression }
+      - { x: expression, y: expression }
+```
+
+### Splines Section
+
+Define 3D paths for use with sweep operations.
+
+**YAML Syntax:**
+```yaml
+splines:
+  spline_name:
+    type: bezier | linear
+    points:
+      - { x: expression, y: expression, z: expression }
+      - { x: expression, y: expression, z: expression }
+```
+
+---
+
 ## WebSocket Events
 
 The authoring server also broadcasts events via WebSocket on port 4200:

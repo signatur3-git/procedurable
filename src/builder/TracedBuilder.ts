@@ -203,6 +203,17 @@ export interface TracedOutput {
   decisions: Map<string, TracedDecision>;  // All "virtual artist" choices
   loops: Map<string, { indices: number[]; purpose: LoopPurpose }>;
   subBuilders: Map<string, TracedOutput>;  // Composed sub-builders
+  instances?: Array<{  // NEW: Instance data for efficient rendering
+    id: string;
+    builderName: string;
+    transform: {
+      position: { x: number; y: number; z: number };
+      rotation?: { x: number; y: number; z: number };
+      scale?: number | { x: number; y: number; z: number };
+    };
+    overrides?: Record<string, any>;
+    seed?: number;
+  }>;
   validation: {
     issues: ValidationIssue[];
     bounds: { min: Vec3; max: Vec3; center: Vec3; size: Vec3 };
@@ -301,13 +312,24 @@ export class TracedBuilder {
   private rng: SeededRandom;
   public context: ExpressionContext;  // Public for YAML parser access
   private mesh: Mesh;
-  private traces: Map<string, TraceEntry>;
-  private measurements: Map<string, { value: number; source?: string }>;
+  public traces: Map<string, TraceEntry>;  // Public for YAML parser access
+  public measurements: Map<string, { value: number; source?: string }>;  // Public for YAML parser access
   private decisions: Map<string, TracedDecision>;
   private decisionOverrides: Map<string, any>;
   private vertices: Map<string, number>;  // name → index
   private loops: Map<string, { indices: number[]; purpose: LoopPurpose }>;
   private subBuilders: Map<string, TracedOutput>;  // Composed sub-builders
+  private instances: Array<{  // Instance data for non-merged compositions (P2-M2c-003)
+    id: string;
+    builderName: string;
+    transform: {
+      position: { x: number; y: number; z: number };
+      rotation?: { x: number; y: number; z: number };
+      scale?: number | { x: number; y: number; z: number };
+    };
+    overrides?: Record<string, any>;
+    seed?: number;
+  }>;
   private startTime: number;
 
   constructor(name: string, seed?: number, overrides?: Record<string, any>) {
@@ -323,6 +345,7 @@ export class TracedBuilder {
     this.vertices = new Map();
     this.loops = new Map();
     this.subBuilders = new Map();
+    this.instances = [];
     this.startTime = Date.now();
   }
 
@@ -876,7 +899,8 @@ export class TracedBuilder {
    * Compose a sub-builder into this builder's mesh
    *
    * The sub-builder runs with a forked RNG for determinism.
-   * Its mesh vertices are merged into this mesh with optional transform.
+   * By default, merges sub-builder mesh into this mesh with transform.
+   * With asInstance=true, stores as instance data without merging (P2-M2c-003).
    * Sub-builder decisions are prefixed with the instance name.
    *
    * @param instanceName - Unique name for this instance (e.g., "head", "left_arm")
@@ -891,6 +915,7 @@ export class TracedBuilder {
       rotation?: { x: number; y: number; z: number };  // Euler angles in radians
       scale?: number;
       overrides?: Record<string, any>;
+      asInstance?: boolean;  // If true, don't merge mesh, output as instance (P2-M2c-003)
     } = {}
   ): this {
     // Fork RNG for deterministic sub-builder seed
@@ -902,9 +927,44 @@ export class TracedBuilder {
     // Store the sub-builder output for inspection
     this.subBuilders.set(instanceName, subOutput);
 
-    // Merge sub-builder mesh into this mesh with transform
     const offset = options.offset ?? { x: 0, y: 0, z: 0 };
     const scale = options.scale ?? 1;
+
+    // If asInstance=true, store instance data instead of merging mesh (P2-M2c-003)
+    if (options.asInstance) {
+      this.instances.push({
+        id: instanceName,
+        builderName: subOutput.builderName,
+        transform: {
+          position: { x: offset.x, y: offset.y, z: offset.z },
+          rotation: options.rotation,
+          scale: scale !== 1 ? scale : undefined
+        },
+        overrides: options.overrides,
+        seed: subSeed
+      });
+
+      // Add composition trace (no mesh merge)
+      this.traces.set(`compose:${instanceName}`, {
+        type: 'modifier',
+        name: instanceName,
+        source: { builderName: this.name },
+        details: {
+          subBuilder: subOutput.builderName,
+          subSeed,
+          offset,
+          rotation: options.rotation,
+          scale,
+          asInstance: true,
+          verticesAdded: 0,
+          facesAdded: 0
+        }
+      });
+
+      return this;
+    }
+
+    // Default behavior: merge sub-builder mesh into this mesh with transform
 
     // Track vertex index mapping (sub-builder index → parent index)
     const vertexMap = new Map<number, number>();
@@ -1114,6 +1174,7 @@ export class TracedBuilder {
       decisions: this.decisions,
       loops: this.loops,
       subBuilders: this.subBuilders,
+      instances: this.instances.length > 0 ? this.instances : undefined,  // Include if any instances
       validation: {
         issues,
         bounds,

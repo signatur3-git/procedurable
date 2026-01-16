@@ -391,6 +391,203 @@ registerTest('material.maps-stats returns statistics', async () => {
 });
 
 // ============================================================================
+// GEOMETRY COMMANDS (P2-M1b)
+// ============================================================================
+
+registerTest('Vase builder uses lathe command', async () => {
+  const result = await executeCommands([
+    'builder.open Vase',
+    'builder.run seed=42'
+  ]);
+  assertOk(result.results[0], 'Open Vase should succeed');
+  assertOk(result.results[1], 'Run Vase should succeed');
+
+  const runData = result.results[1].data;
+  assert(runData.vertices > 100, 'Vase should have many vertices from lathe (expected ~192)');
+  assert(runData.faces > 100, 'Vase should have many faces from lathe (expected ~168)');
+  assert(runData.decisions.vase_style, 'Should have vase_style decision');
+  assert(runData.decisions.vase_style.value, 'vase_style should have a value');
+});
+
+registerTest('Lathe creates rotational geometry', async () => {
+  const result = await executeCommands([
+    'builder.open Vase',
+    'decision.override vase_style classic',
+    'builder.run seed=1',
+    'builder.mesh'
+  ]);
+  assertOk(result.results[2], 'Run should succeed');
+  assertOk(result.results[3], 'Mesh retrieval should succeed');
+
+  const meshData = result.results[3].data;
+  assert(meshData.triangleCount > 0, 'Should have triangulated faces');
+  assert(meshData.vertices.length > 0, 'Should have vertex data');
+  assert(meshData.normals.length > 0, 'Should have normals');
+});
+
+registerTest('Mug builder uses lathe + sweep', async () => {
+  const result = await executeCommands([
+    'builder.open Mug',
+    'builder.run seed=42'
+  ]);
+  assertOk(result.results[0], 'Open Mug should succeed');
+  assertOk(result.results[1], 'Run Mug should succeed');
+
+  const runData = result.results[1].data;
+  assert(runData.vertices > 200, 'Mug should have many vertices (body + handle, expected ~248)');
+  assert(runData.faces > 200, 'Mug should have many faces (expected ~218)');
+  assert(runData.decisions.mug_style, 'Should have style decision');
+});
+
+registerTest('Sweep creates tubes along paths', async () => {
+  const result = await executeCommands([
+    'builder.open Mug',
+    'decision.override mug_style modern',
+    'builder.run seed=1',
+    'builder.measurements'
+  ]);
+  assertOk(result.results[2], 'Run should succeed');
+  assertOk(result.results[3], 'Measurements should succeed');
+
+  const measurements = result.results[3].data.measurements;
+  assert(measurements.handle_radius, 'Should have handle_radius measurement');
+  assert(measurements.mug_height, 'Should have mug_height measurement');
+});
+
+registerTest('Cushion builder uses subdivide command', async () => {
+  const result = await executeCommands([
+    'builder.open Cushion',
+    'builder.run seed=42'
+  ]);
+  assertOk(result.results[0], 'Open Cushion should succeed');
+  assertOk(result.results[1], 'Run Cushion should succeed');
+
+  const runData = result.results[1].data;
+  assert(runData.vertices > 50, 'Cushion should have subdivided vertices (expected ~98)');
+  assert(runData.faces > 50, 'Cushion should have subdivided faces (expected ~96)');
+  assert(runData.decisions.cushion_shape, 'Should have cushion_shape decision');
+});
+
+registerTest('Subdivide creates smooth surfaces', async () => {
+  const result = await executeCommands([
+    'builder.open Cushion',
+    'decision.override cushion_shape square',
+    'builder.run seed=1',
+    'builder.mesh'
+  ]);
+  assertOk(result.results[2], 'Run should succeed');
+  assertOk(result.results[3], 'Mesh retrieval should succeed');
+
+  const meshData = result.results[3].data;
+  // Subdivision should increase vertex count significantly from base box
+  assert(meshData.vertices.length > 200, 'Should have many vertices from subdivision');
+  assert(meshData.normals.length > 0, 'Should have smooth normals');
+});
+
+registerTest('Vase with invalid style fails gracefully', async () => {
+  const result = await executeCommands([
+    'builder.open Vase',
+    'decision.override vase_style invalid_style',
+    'builder.run seed=1'
+  ]);
+  assertOk(result.results[0], 'Open should succeed');
+  // Override with invalid value should be handled
+  assertOk(result.results[1], 'Override should handle invalid value');
+});
+
+// ============================================================================
+// INSTANCING OUTPUT (P2-M2c-003)
+// ============================================================================
+
+registerTest('builder.instances returns instance data', async () => {
+  const result = await executeCommands([
+    'builder.open ForestSlice',
+    'builder.run seed=1',
+    'builder.instances'
+  ]);
+  assertOk(result.results[0], 'Open should succeed');
+  assertOk(result.results[1], 'Run should succeed');
+  assertOk(result.results[2], 'Instances query should succeed');
+
+  const instanceData = result.results[2].data;
+  assert(instanceData.count > 0, 'Should have instances');
+  assert(instanceData.instances.length > 0, 'Should have instances array');
+
+  const firstInstance = instanceData.instances[0];
+  assert(firstInstance.id, 'Instance should have id');
+  assert(firstInstance.builderName === 'TreeScatter', 'Instance should reference TreeScatter');
+  assert(firstInstance.transform, 'Instance should have transform');
+  assert(firstInstance.transform.position, 'Instance should have position');
+  assert(typeof firstInstance.seed === 'number', 'Instance should have seed');
+});
+
+registerTest('DiningScene without asInstance merges geometry', async () => {
+  const result = await executeCommands([
+    'builder.open DiningScene',
+    'builder.run seed=1',
+    'builder.instances'
+  ]);
+  assertOk(result.results[0], 'Open should succeed');
+  assertOk(result.results[1], 'Run should succeed');
+  assertOk(result.results[2], 'Instances query should succeed');
+
+  const instanceData = result.results[2].data;
+  assertEqual(instanceData.count, 0, 'DiningScene should have no instances (all merged)');
+  assert(instanceData.message, 'Should have message explaining no instances');
+});
+
+// ============================================================================
+// CONDITIONAL EXPRESSIONS (P2-M2b-003)
+// ============================================================================
+
+registerTest('ConditionalTest builder uses if() expressions', async () => {
+  const result = await executeCommands([
+    'builder.open ConditionalTest',
+    'builder.run seed=42'
+  ]);
+  assertOk(result.results[0], 'Open ConditionalTest should succeed');
+  assertOk(result.results[1], 'Run ConditionalTest should succeed');
+
+  const runData = result.results[1].data;
+  assert(runData.vertices > 0, 'Should have vertices');
+  assert(runData.decisions.is_round !== undefined, 'Should have is_round decision');
+  assert(runData.decisions.size_category !== undefined, 'Should have size_category decision');
+});
+
+registerTest('Conditional expressions evaluate correctly', async () => {
+  const result = await executeCommands([
+    'builder.open ConditionalTest',
+    'decision.override is_round true',
+    'builder.run seed=1',
+    'builder.measurements'
+  ]);
+  assertOk(result.results[2], 'Run should succeed');
+  assertOk(result.results[3], 'Measurements should succeed');
+
+  const measurements = result.results[3].data.measurements;
+  // When is_round is true, radius should be 0.5 (from if(is_round, 0.5, 0.4))
+  assert(measurements.radius, 'Should have radius measurement');
+  assertEqual(measurements.radius.value, 0.5, 'Radius should be 0.5 when is_round is true');
+});
+
+registerTest('Nested if() expressions work', async () => {
+  const result = await executeCommands([
+    'builder.open ConditionalTest',
+    'builder.run seed=1',
+    'builder.measurements'
+  ]);
+  assertOk(result.results[1], 'Run should succeed');
+  assertOk(result.results[2], 'Measurements should succeed');
+
+  const measurements = result.results[2].data.measurements;
+  // adjusted_size uses if: if(is_round, base_size * pi / 4, base_size)
+  assert(measurements.adjusted_size, 'Should have adjusted_size measurement');
+  // final_radius combines multiple derived values with if
+  assert(measurements.final_radius, 'Should have final_radius measurement');
+  assert(measurements.final_radius.value > 0, 'final_radius should be positive');
+});
+
+// ============================================================================
 // TEST RUNNER
 // ============================================================================
 

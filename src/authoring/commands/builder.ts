@@ -389,6 +389,36 @@ const handlers: CommandHandler[] = [
         }
       };
     }
+  },
+
+  {
+    action: 'instances',
+    description: 'Get instance data from the last run (for non-merged compositions)',
+    usage: 'builder.instances',
+    execute: async (_cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      if (!ctx.lastRun.instances || ctx.lastRun.instances.length === 0) {
+        return {
+          success: true,
+          data: {
+            count: 0,
+            instances: [],
+            message: 'No instances in output (all geometry was merged)'
+          }
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          count: ctx.lastRun.instances.length,
+          instances: ctx.lastRun.instances
+        }
+      };
+    }
   }
 ];
 

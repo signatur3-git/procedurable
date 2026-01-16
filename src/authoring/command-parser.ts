@@ -189,3 +189,13 @@ export function getStringOption(cmd: ParsedCommand, optionName: string): string 
   return cmd.options[optionName];
 }
 
+/**
+ * Helper to get a numeric option by name
+ */
+export function getNumberOption(cmd: ParsedCommand, optionName: string): number | undefined {
+  const value = cmd.options[optionName];
+  if (value === undefined) return undefined;
+  const num = parseFloat(value);
+  return isNaN(num) ? undefined : num;
+}
+

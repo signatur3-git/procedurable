@@ -23,6 +23,7 @@ import { storageNamespace, storage } from './commands/storage';
 import { systemNamespace } from './commands/system';
 import { mathNamespace } from './commands/math';
 import { materialCommands } from './commands/material';
+import { worldNamespace } from './commands/world';
 import { parseAndExecuteBuilder, parseYamlWithLibrary } from '../builder/YamlBuilderParser';
 import { TracedOutput } from '../builder/TracedBuilder';
 
@@ -42,6 +43,7 @@ registry.registerNamespace(storageNamespace);
 registry.registerNamespace(systemNamespace);
 registry.registerNamespace(mathNamespace);
 registry.registerNamespace(materialCommands);
+registry.registerNamespace(worldNamespace);
 
 // Global state
 let activeBuilder: string | null = null;
@@ -54,15 +56,56 @@ const decisionOverrides: Map<string, any> = new Map();
 // WebSocket clients
 const wsClients = new Set<WebSocket>();
 
+// Registered webhook endpoints (MCP servers register here to get reload notifications)
+interface WebhookRegistration {
+  url: string;
+  registeredAt: Date;
+  name?: string;
+}
+const webhooks = new Map<string, WebhookRegistration>();
+
 /**
- * Broadcast an event to all connected WebSocket clients
+ * Notify registered webhooks of an event
  */
-function broadcast(event: any): void {
+async function notifyWebhooks(event: any): Promise<void> {
+  const payload = JSON.stringify(event);
+  const promises: Promise<void>[] = [];
+
+  for (const [id, webhook] of webhooks) {
+    promises.push(
+      fetch(webhook.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: payload,
+      })
+        .then(() => {
+          console.log(`  ✓ Notified webhook: ${webhook.name || id}`);
+        })
+        .catch((err) => {
+          console.error(`  ✗ Failed to notify webhook ${webhook.name || id}: ${err.message}`);
+        })
+    );
+  }
+
+  await Promise.all(promises);
+}
+
+/**
+ * Broadcast an event to all connected WebSocket clients and webhooks
+ */
+async function broadcast(event: any): Promise<void> {
   const message = JSON.stringify(event);
+
+  // Send to WebSocket clients
   for (const client of wsClients) {
     if (client.readyState === WebSocket.OPEN) {
       client.send(message);
     }
+  }
+
+  // Send to webhooks
+  if (webhooks.size > 0) {
+    await notifyWebhooks(event);
   }
 }
 
@@ -99,6 +142,8 @@ async function runBuilder(name: string, seed: number, perRunOverrides?: Record<s
   if (perRunOverrides) {
     Object.assign(allOverrides, perRunOverrides);
   }
+
+  console.log(`🔧 runBuilder: ${name}, seed=${seed}, overrides=`, JSON.stringify(allOverrides));
 
   // If source is explicitly 'yaml', use YAML builder
   if (source === 'yaml') {
@@ -186,6 +231,52 @@ function createBuilderResolver(): (name: string) => ((seed: number, overrides?: 
 
 // Cache for pre-loaded YAML builder definitions
 const yamlBuilderCache = new Map<string, any>();
+
+/**
+ * Invalidate a cached builder definition
+ * Called when a YAML file changes on disk
+ */
+async function invalidateBuilderCache(name: string, event: 'created' | 'modified' | 'deleted'): Promise<void> {
+  if (event === 'deleted') {
+    if (yamlBuilderCache.has(name)) {
+      yamlBuilderCache.delete(name);
+      console.log(`  Cache invalidated (deleted): ${name}`);
+    }
+  } else {
+    // For created or modified, reload the builder
+    try {
+      const stored = await storage.get(name);
+      const definition = await parseYamlWithLibrary(stored.content);
+      yamlBuilderCache.set(name, definition);
+      console.log(`  Cache ${event === 'created' ? 'added' : 'reloaded'}: ${name}`);
+    } catch (e: any) {
+      console.warn(`  Failed to reload ${name}: ${e.message}`);
+      // Remove from cache if we can't load it
+      yamlBuilderCache.delete(name);
+    }
+  }
+
+  // Notify webhooks of hot reload
+  await broadcast({
+    type: 'hot_reload',
+    builder: name,
+    event,
+    timestamp: new Date().toISOString()
+  });
+}
+
+/**
+ * Set up file watcher to invalidate cache on changes
+ */
+function setupCacheInvalidation(): void {
+  storage.watch((name, event) => {
+    console.log(`  File change detected: ${name} (${event})`);
+    invalidateBuilderCache(name, event).catch(err => {
+      console.error(`  Error handling file change for ${name}:`, err);
+    });
+  });
+  console.log('  File watcher connected for hot reload');
+}
 
 /**
  * Pre-load YAML builder definitions for composition support
@@ -347,7 +438,76 @@ app.get('/health', (_req, res) => {
     server: 'authoring',
     port: PORT,
     namespaces: registry.getNamespaces(),
-    wsClients: wsClients.size
+    wsClients: wsClients.size,
+    webhooks: webhooks.size
+  });
+});
+
+/**
+ * POST /api/webhooks/register
+ * Register a webhook to receive hot reload notifications
+ */
+app.post('/api/webhooks/register', (req, res) => {
+  const { url, name } = req.body;
+
+  if (!url || typeof url !== 'string') {
+    res.status(400).json({ error: 'Missing or invalid "url" field' });
+    return;
+  }
+
+  // Generate unique ID
+  const id = `webhook_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  webhooks.set(id, {
+    url,
+    name: name || 'unknown',
+    registeredAt: new Date()
+  });
+
+  console.log(`✓ Webhook registered: ${name || 'unknown'} (${id})`);
+  console.log(`  URL: ${url}`);
+
+  res.json({
+    success: true,
+    id,
+    message: 'Webhook registered successfully'
+  });
+});
+
+/**
+ * POST /api/webhooks/unregister
+ * Unregister a webhook
+ */
+app.post('/api/webhooks/unregister', (req, res) => {
+  const { id } = req.body;
+
+  if (!id || typeof id !== 'string') {
+    res.status(400).json({ error: 'Missing or invalid "id" field' });
+    return;
+  }
+
+  const existed = webhooks.delete(id);
+
+  if (existed) {
+    console.log(`✓ Webhook unregistered: ${id}`);
+    res.json({ success: true, message: 'Webhook unregistered' });
+  } else {
+    res.status(404).json({ error: 'Webhook not found' });
+  }
+});
+
+/**
+ * GET /api/webhooks/list
+ * List all registered webhooks
+ */
+app.get('/api/webhooks/list', (_req, res) => {
+  res.json({
+    webhooks: Array.from(webhooks.entries()).map(([id, wh]) => ({
+      id,
+      url: wh.url,
+      name: wh.name,
+      registeredAt: wh.registeredAt
+    }))
   });
 });
 
@@ -396,6 +556,11 @@ server.listen(PORT, async () => {
   // Pre-load YAML builders for composition support
   console.log('\nPre-loading YAML builders for composition...');
   await preloadYamlBuilders();
-  console.log('Ready!\n');;
+
+  // Set up hot reload - invalidate cache when files change
+  console.log('\nSetting up hot reload...');
+  setupCacheInvalidation();
+
+  console.log('\nReady!\n');
 });
 

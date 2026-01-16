@@ -1,5 +1,9 @@
 # Alignment Matrix - Problems × Solutions
 
+> ⚠️ **NOTE:** This document has been merged into `UNIFIED_ALIGNMENT.md`.
+> See Section 1 of that document for the current Builders × Geometry Tools matrix.
+> This file is kept for reference but may be removed in the future.
+
 > Cross-reference of target builders vs required tools.
 > Reveals optimal build order and gaps in current Phase 2 plan.
 

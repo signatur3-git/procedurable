@@ -290,7 +290,29 @@ derived:
   adjusted: "base_value + (variation * 0.1)"
 ```
 
-Supported operators: `+`, `-`, `*`, `/`, `()`, `sqrt`, `sin`, `cos`, `abs`, `min`, `max`
+**Conditional expressions** using `if()` function:
+```yaml
+derived:
+  # if(condition, then_value, else_value)
+  radius: "if(is_round, 0.5, 0.4)"
+  
+  # Works with comparisons
+  abs_value: "if(x > 0, x, -x)"
+  
+  # Can be nested
+  tier: "if(size > 10, 100, if(size > 5, 50, 0))"
+  
+  # Boolean decisions (0 = false, non-zero = true)
+  leg_radius: "if(has_thick_legs, 0.03, 0.02)"
+```
+
+**Supported operators and functions:**
+- Arithmetic: `+`, `-`, `*`, `/`, `()`
+- Trigonometry: `sin`, `cos`, `tan`, `atan2`
+- Math: `sqrt`, `abs`, `min`, `max`, `floor`, `ceil`, `round`
+- Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=`
+- Conditional: `if(condition, then, else)`
+- Constants: `pi`, `e`, `tau`
 
 ### Geometry Commands
 

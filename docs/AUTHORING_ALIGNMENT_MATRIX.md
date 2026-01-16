@@ -1,5 +1,9 @@
 # Authoring Alignment Matrix
 
+> ⚠️ **NOTE:** This document has been merged into `UNIFIED_ALIGNMENT.md`.
+> See Sections 2-4 of that document for the current authoring matrices.
+> This file is kept for reference but may be removed in the future.
+
 > Maps authoring challenges to required tools/features, helping prioritize infrastructure work.
 
 This matrix shows which **authoring features** are needed for different **builder complexity levels** and **use cases**.
@@ -38,7 +42,7 @@ This matrix shows which **authoring features** are needed for different **builde
 | | | | | | | | |
 | **EXPRESSIONS** | | | | | | | |
 | Math Expressions | ✅ • | ✅ • | ✅ • | ✅ • | ✅ • | ✅ • | ✅ • |
-| Conditional Expressions |  | ⬜ ○ | ⬜ • | ⬜ • | ⬜ • | ⬜ • | ⬜ • |
+| Conditional Expressions |  | ✅ ○ | ✅ • | ✅ • | ✅ • | ✅ • | ✅ • |
 | String Interpolation |  | 🟡 ○ | 🟡 ○ | 🟡 ○ | 🟡 • | 🟡 • | 🟡 • |
 | List Operations |  |  |  | ⬜ ○ | ⬜ • | ⬜ • | ⬜ • |
 | | | | | | | | |
@@ -120,7 +124,7 @@ This matrix shows which **authoring features** are needed for different **builde
 | Feature | Status | Blocks | Effort |
 |---------|--------|--------|--------|
 | **Better Error Context** (YAML path + line numbers) | 🟡 | All authoring | M |
-| **Conditional Expressions** (`if()` in math) | ⬜ | Derived values everywhere | S |
+| **Conditional Expressions** (`if()` in math) | ✅ | Derived values everywhere | S |
 | **Instancing** | ⬜ | Big scenes, batching | M |
 | **Export Pipeline** (glTF at minimum) | ⬜ | All real-world use | L |
 

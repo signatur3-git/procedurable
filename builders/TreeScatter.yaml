@@ -1,0 +1,73 @@
+# TreeScatter.yaml - Demonstrates Poisson disk sampling for natural tree placement
+version: "1.0"
+name: TreeScatter
+description: Forest with naturally scattered trees using Poisson disk sampling
+tags: [demo, world, scatter, poisson]
+
+decisions:
+  tree_count_hint:
+    type: count
+    min: 20
+    max: 60
+    # Note: Actual count determined by Poisson algorithm
+
+  tree_height_variation:
+    type: number
+    min: 0.8
+    max: 1.2
+    default: 1.0
+
+measurements:
+  forest_width:
+    value: 50
+    source: "Forest area width (meters)"
+
+  forest_depth:
+    value: 50
+    source: "Forest area depth (meters)"
+
+  tree_spacing:
+    value: 3.5
+    source: "Minimum distance between trees (meters)"
+
+  base_tree_height:
+    value: 8.0
+    source: "Base height for trees (meters)"
+
+derived:
+  half_width: "forest_width / 2"
+  half_depth: "forest_depth / 2"
+
+geometry:
+  # Ground plane
+  - vertex: ground_bl
+    position: { x: 0, y: 0, z: 0 }
+
+  - vertex: ground_br
+    position: { x: "forest_width", y: 0, z: 0 }
+
+  - vertex: ground_tr
+    position: { x: "forest_width", y: 0, z: "forest_depth" }
+
+  - vertex: ground_tl
+    position: { x: 0, y: 0, z: "forest_depth" }
+
+  - face: ground
+    vertices: [ground_bl, ground_br, ground_tr, ground_tl]
+    color: { r: 0.3, g: 0.5, b: 0.2 }
+
+# Trees scattered using Poisson disk sampling (merged geometry, not instanced)
+placement:
+  mode: scatter_poisson
+  builder: Tree
+  count: "tree_count_hint"
+  width: "forest_width"
+  depth: "forest_depth"
+  center: { x: "half_width", y: 0, z: "half_depth" }  # Center on ground plane
+  minDistance: "tree_spacing"
+  instancePrefix: tree
+  asInstance: false  # Merge into single mesh for standalone scene
+  overrides:
+    trunk_height: "base_tree_height"
+    trunk_width: 0.5
+

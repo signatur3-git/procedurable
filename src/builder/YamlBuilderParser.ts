@@ -6,11 +6,61 @@
 
 import { TracedBuilder, TracedOutput } from './TracedBuilder';
 import { Vec3 } from '../core/Vec3';
+import { Random } from '../core/Random';
 import { evaluate as mathEvaluate } from '../core/MathService';
 import { lathe as latheGeometry, sweep as sweepGeometry, Profile, Profiles } from '../geometry/Sweep';
 import { Spline } from '../core/Spline';
 import { subdivideCatmullClark } from '../geometry/Subdivision';
 import { placeAroundRectangle, placeAroundCircle } from './Placement';
+import { poissonDiskSample, ScatterBounds } from '../core/Scatter';
+
+// ============================================================================
+// PARSING CONTEXT (for better error messages)
+// ============================================================================
+
+/**
+ * Tracks current location in YAML for better error messages
+ */
+class ParsingContext {
+  private stack: string[] = [];
+
+  push(path: string): void {
+    this.stack.push(path);
+  }
+
+  pop(): void {
+    this.stack.pop();
+  }
+
+  getPath(): string {
+    return this.stack.join('.');
+  }
+
+  /**
+   * Wrap an error with the current YAML path
+   */
+  wrapError(error: Error): Error {
+    const path = this.getPath();
+    if (path) {
+      return new Error(`Error at ${path}: ${error.message}`);
+    }
+    return error;
+  }
+
+  /**
+   * Execute a function within a context
+   */
+  within<T>(path: string, fn: () => T): T {
+    this.push(path);
+    try {
+      return fn();
+    } catch (err: any) {
+      throw this.wrapError(err);
+    } finally {
+      this.pop();
+    }
+  }
+}
 
 // ============================================================================
 // YAML SCHEMA TYPES
@@ -41,10 +91,10 @@ export interface YamlBuilderDefinition {
  * Placement configuration for constraint-based object arrangement (P2-M2)
  */
 export interface YamlPlacement {
-  mode: 'around_rectangle' | 'around_circle';
+  mode: 'around_rectangle' | 'around_circle' | 'scatter_poisson';
   center?: YamlPosition;
 
-  // For around_rectangle
+  // For around_rectangle and scatter_poisson
   width?: string | number;
   depth?: string | number;
 
@@ -66,6 +116,9 @@ export interface YamlPlacement {
 
   // Instance name prefix (default: "placed")
   instancePrefix?: string;
+
+  // If true, output as instance data instead of merging mesh (P2-M2c-003)
+  asInstance?: boolean;
 }
 
 /**
@@ -234,6 +287,8 @@ export interface YamlComposition {
     count: number | string;
     as: string;  // Index variable name (e.g., "i")
   };
+  /** If true, output as instance data instead of merging mesh (P2-M2c-003) */
+  asInstance?: boolean;
 }
 
 // ============================================================================
@@ -258,6 +313,9 @@ export function parseAndExecuteBuilder(
 
   const builder = new TracedBuilder(yaml.name, seed, overrides);
 
+  // Create parsing context for better error messages
+  const ctx = new ParsingContext();
+
   // Track decision values for conditional logic
   const decisionValues = new Map<string, any>();
 
@@ -267,38 +325,54 @@ export function parseAndExecuteBuilder(
 
   if (yaml.decisions) {
     for (const [name, decision] of Object.entries(yaml.decisions)) {
-      let value: any;
+      try {
+        ctx.push(`decisions.${name}`);
 
-      // Check condition for count decisions
-      if (decision.type === 'count' && decision.condition) {
-        if (!evaluateCondition(decision.condition, decisionValues)) {
-          continue; // Skip this decision
+        let value: any;
+
+        // Check condition for count decisions
+        if (decision.type === 'count' && decision.condition) {
+          if (!evaluateCondition(decision.condition, decisionValues)) {
+            continue; // Skip this decision
+          }
         }
+
+        switch (decision.type) {
+          case 'choice':
+            value = builder.decide(
+              name,
+              decision.options,
+              decision.weights ?? decision.options.map(() => 1)
+            );
+            break;
+
+          case 'number':
+            // Validate constraints
+            if (decision.min > decision.max) {
+              throw new Error(`min (${decision.min}) must be <= max (${decision.max})`);
+            }
+            value = builder.decideNumber(name, decision.min, decision.max, decision.default);
+            break;
+
+          case 'boolean':
+            value = builder.decideBoolean(name, decision.probability);
+            break;
+
+          case 'count':
+            // Validate constraints
+            if (decision.min > decision.max) {
+              throw new Error(`min (${decision.min}) must be <= max (${decision.max})`);
+            }
+            value = builder.decideCount(name, decision.min, decision.max);
+            break;
+        }
+
+        decisionValues.set(name, value);
+      } catch (err: any) {
+        throw ctx.wrapError(err);
+      } finally {
+        ctx.pop();
       }
-
-      switch (decision.type) {
-        case 'choice':
-          value = builder.decide(
-            name,
-            decision.options,
-            decision.weights ?? decision.options.map(() => 1)
-          );
-          break;
-
-        case 'number':
-          value = builder.decideNumber(name, decision.min, decision.max, decision.default);
-          break;
-
-        case 'boolean':
-          value = builder.decideBoolean(name, decision.probability);
-          break;
-
-        case 'count':
-          value = builder.decideCount(name, decision.min, decision.max);
-          break;
-      }
-
-      decisionValues.set(name, value);
     }
   }
 
@@ -308,39 +382,47 @@ export function parseAndExecuteBuilder(
 
   if (yaml.measurements) {
     for (const [name, measurement] of Object.entries(yaml.measurements)) {
-      let value: number;
+      try {
+        ctx.push(`measurements.${name}`);
 
-      if (measurement.value !== undefined) {
-        // Fixed or expression value
-        value = typeof measurement.value === 'number'
-          ? measurement.value
-          : evaluateExpression(measurement.value, decisionValues, builder);
-      } else if (measurement.base !== undefined) {
-        // Base + variation
-        value = measurement.base;
-        if (measurement.variation) {
-          const variation = decisionValues.get(measurement.variation) ?? 0;
-          value += variation;
+        let value: number;
+
+        if (measurement.value !== undefined) {
+          // Fixed or expression value
+          value = typeof measurement.value === 'number'
+            ? measurement.value
+            : evaluateExpression(measurement.value, decisionValues, builder);
+        } else if (measurement.base !== undefined) {
+          // Base + variation
+          value = measurement.base;
+          if (measurement.variation) {
+            const variation = decisionValues.get(measurement.variation) ?? 0;
+            value += variation;
+          }
+        } else {
+          throw new Error(`Measurement '${name}' has no value or base`);
         }
-      } else {
-        throw new Error(`Measurement '${name}' has no value or base`);
-      }
 
-      // Apply conditionals
-      if (measurement.conditional) {
-        for (const cond of measurement.conditional) {
-          if (evaluateCondition(cond.if, decisionValues)) {
-            value = typeof cond.value === 'number'
-              ? cond.value
-              : evaluateExpression(cond.value, decisionValues, builder);
-            break;
+        // Apply conditionals
+        if (measurement.conditional) {
+          for (const cond of measurement.conditional) {
+            if (evaluateCondition(cond.if, decisionValues)) {
+              value = typeof cond.value === 'number'
+                ? cond.value
+                : evaluateExpression(cond.value, decisionValues, builder);
+              break;
+            }
           }
         }
-      }
 
-      builder.defineMeasurement(name, value, {
-        source: measurement.source
-      });
+        builder.defineMeasurement(name, value, {
+          source: measurement.source
+        });
+      } catch (err: any) {
+        throw ctx.wrapError(err);
+      } finally {
+        ctx.pop();
+      }
     }
   }
 
@@ -375,7 +457,34 @@ export function parseAndExecuteBuilder(
 
   if (yaml.derived) {
     for (const [name, expression] of Object.entries(yaml.derived)) {
-      builder.defineDerived(name, expression);
+      try {
+        ctx.push(`derived.${name}`);
+
+        // Evaluate expression with access to decision values, measurements, and previous derived values
+        const value = evaluateExpression(expression, decisionValues, builder);
+
+        // Store in builder context (for use in subsequent expressions)
+        builder.context.setDerived(name, value);
+
+        // ALSO add to measurements Map so it's accessible via builder.measurements command
+        builder.measurements.set(name, { value, source: `derived: ${expression}` });
+
+        // Add trace
+        builder.traces.set(`derived:${name}`, {
+          type: 'measurement',
+          name,
+          source: { expression: `${name} = ${expression}`, builderName: yaml.name },
+          details: {
+            expression,
+            value,
+            dependencies: [] // TODO: track dependencies if needed
+          }
+        });
+      } catch (err: any) {
+        throw ctx.wrapError(err);
+      } finally {
+        ctx.pop();
+      }
     }
   }
 
@@ -385,9 +494,12 @@ export function parseAndExecuteBuilder(
 
   if (yaml.geometry) {
     try {
-      processGeometry(yaml.geometry, builder, decisionValues, materials);
+      ctx.push('geometry');
+      processGeometry(yaml.geometry, builder, decisionValues, materials, ctx);
     } catch (err: any) {
-      throw new Error(`Geometry processing failed: ${err.message}`);
+      throw ctx.wrapError(err);
+    } finally {
+      ctx.pop();
     }
   }
 
@@ -397,29 +509,32 @@ export function parseAndExecuteBuilder(
 
   if (yaml.compose && options?.builderResolver) {
     for (const [instanceName, composition] of Object.entries(yaml.compose)) {
-      // Check conditional - skip if condition is false
-      if (composition.if !== undefined) {
-        const shouldInclude = evaluateCompositionCondition(composition.if, decisionValues, builder);
-        if (!shouldInclude) {
-          continue; // Skip this composition
+      try {
+        ctx.push(`compose.${instanceName}`);
+
+        // Check conditional - skip if condition is false
+        if (composition.if !== undefined) {
+          const shouldInclude = evaluateCompositionCondition(composition.if, decisionValues, builder);
+          if (!shouldInclude) {
+            continue; // Skip this composition
+          }
         }
-      }
 
-      // Handle repeat - compose multiple instances
-      if (composition.repeat) {
-        const repeatCount = typeof composition.repeat.count === 'number'
-          ? composition.repeat.count
-          : evaluateExpression(String(composition.repeat.count), decisionValues, builder);
-        const indexVar = composition.repeat.as;
+        // Handle repeat - compose multiple instances
+        if (composition.repeat) {
+          const repeatCount = typeof composition.repeat.count === 'number'
+            ? composition.repeat.count
+            : evaluateExpression(String(composition.repeat.count), decisionValues, builder);
+          const indexVar = composition.repeat.as;
 
-        for (let i = 0; i < repeatCount; i++) {
-          // Set index in context for expression evaluation
-          const originalValue = builder.context.get(indexVar);
-          builder.context.setMeasurement(indexVar, i);
-          decisionValues.set(indexVar, i);
+          for (let i = 0; i < repeatCount; i++) {
+            // Set index in context for expression evaluation
+            const originalValue = builder.context.get(indexVar);
+            builder.context.setMeasurement(indexVar, i);
+            decisionValues.set(indexVar, i);
 
-          // Generate unique instance name
-          const iterInstanceName = `${instanceName}_${i}`;
+            // Generate unique instance name
+            const iterInstanceName = `${instanceName}_${i}`;
 
           // Compose this instance
           composeInstance(iterInstanceName, composition, builder, decisionValues, options);
@@ -433,6 +548,11 @@ export function parseAndExecuteBuilder(
       } else {
         // Single composition (no repeat)
         composeInstance(instanceName, composition, builder, decisionValues, options);
+      }
+      } catch (err: any) {
+        throw ctx.wrapError(err);
+      } finally {
+        ctx.pop();
       }
     }
   }
@@ -498,7 +618,8 @@ export function parseAndExecuteBuilder(
       offset,
       rotation,
       scale: composition.scale,
-      overrides: resolvedOverrides
+      overrides: resolvedOverrides,
+      asInstance: composition.asInstance
     });
   }
 
@@ -607,6 +728,47 @@ export function parseAndExecuteBuilder(
           seed: seed ?? 1
         }
       );
+    } else if (placement.mode === 'scatter_poisson') {
+      const width = typeof placement.width === 'string'
+        ? evaluateExpression(placement.width, decisionValues, builder)
+        : (placement.width ?? 1);
+      const depth = typeof placement.depth === 'string'
+        ? evaluateExpression(placement.depth, decisionValues, builder)
+        : (placement.depth ?? 1);
+
+      const center = placement.center ? new Vec3(
+        evaluatePositionComponent(placement.center.x, builder),
+        evaluatePositionComponent(placement.center.y, builder),
+        evaluatePositionComponent(placement.center.z, builder)
+      ) : new Vec3(0, 0, 0);
+
+      // Define scatter bounds
+      const bounds: ScatterBounds = {
+        minX: center.x - width / 2,
+        maxX: center.x + width / 2,
+        minZ: center.z - depth / 2,
+        maxZ: center.z + depth / 2
+      };
+
+      // Use Poisson disk sampling to generate scatter points
+      const scatterPoints = poissonDiskSample(bounds, {
+        seed: seed ?? 1,
+        minDistance
+      });
+
+      // Create deterministic random for rotations (using different seed offset)
+      const rotationRandom = new Random((seed ?? 1) + 12345);
+
+      // Convert scatter points to placement results
+      placementResult = {
+        placements: scatterPoints.slice(0, count).map(point => ({
+          position: new Vec3(point.x, center.y, point.z),
+          rotation: { x: 0, y: rotationRandom.next() * Math.PI * 2, z: 0 }, // Deterministic random Y rotation
+          scale: 1,
+          aabb: objectAABB.translated(new Vec3(point.x, center.y, point.z))
+        })),
+        rejected: Math.max(0, count - scatterPoints.length)
+      };
     }
 
     // Compose each placed object
@@ -617,8 +779,9 @@ export function parseAndExecuteBuilder(
 
         builder.compose(instanceName, subBuilderFn, {
           offset: { x: p.position.x, y: p.position.y, z: p.position.z },
-          rotation: { x: 0, y: p.rotation, z: 0 },
-          overrides: resolvedOverrides
+          rotation: { x: 0, y: p.rotation.y, z: 0 },  // Use p.rotation.y instead of p.rotation
+          overrides: resolvedOverrides,
+          asInstance: placement.asInstance
         });
       }
 
@@ -819,7 +982,8 @@ function processGeometry(
   commands: YamlGeometryCommand[],
   builder: TracedBuilder,
   decisionValues: Map<string, any>,
-  materials: Map<string, { r: number; g: number; b: number }> = new Map()
+  materials: Map<string, { r: number; g: number; b: number }> = new Map(),
+  ctx: ParsingContext = new ParsingContext()
 ): void {
   for (let cmdIndex = 0; cmdIndex < commands.length; cmdIndex++) {
     const cmd = commands[cmdIndex];
@@ -832,8 +996,8 @@ function processGeometry(
 
       // Conditional geometry (legacy 'when' syntax)
       if ('when' in cmd) {
-        if (evaluateCondition(cmd.geometry, decisionValues)) {
-          processGeometry(cmd.geometry, builder, decisionValues, materials);
+        if (evaluateCondition(cmd.when, decisionValues)) {
+          processGeometry(cmd.geometry, builder, decisionValues, materials, ctx);
         }
         continue;
       }
@@ -842,9 +1006,9 @@ function processGeometry(
       if ('if' in cmd) {
         const ifCmd = cmd as { if: string; then: YamlGeometryCommand[]; else?: YamlGeometryCommand[] };
         if (evaluateCondition(ifCmd.if, decisionValues)) {
-          processGeometry(ifCmd.then, builder, decisionValues, materials);
+          processGeometry(ifCmd.then, builder, decisionValues, materials, ctx);
         } else if (ifCmd.else) {
-          processGeometry(ifCmd.else, builder, decisionValues, materials);
+          processGeometry(ifCmd.else, builder, decisionValues, materials, ctx);
         }
         continue;
       }
@@ -881,7 +1045,7 @@ function processGeometry(
           decisionValues.set(indexVar, i);
 
           // Process geometry with index available
-          processGeometry(repeatCmd.geometry, builder, decisionValues, materials);
+          processGeometry(repeatCmd.geometry, builder, decisionValues, materials, ctx);
 
           // Restore original values
           if (originalValue !== undefined) {
@@ -925,7 +1089,7 @@ function processGeometry(
         const sz = evaluateExpression(String(boxDef.size.z), decisionValues, builder) / 2;
 
         // Get color if specified
-        const color = boxDef.color ? resolveColor(boxDef.color, materials) : undefined;
+        const color = boxDef.color ? resolveGeometryColor(boxDef.color, materials) : undefined;
 
         // Create 8 vertices
         const v = [
@@ -1151,7 +1315,14 @@ function processGeometry(
       // Get command type for error message
       const cmdType = Object.keys(cmd)[0] || 'unknown';
       const cmdName = (cmd as any)[cmdType] || '';
-      throw new Error(`Error at geometry command #${cmdIndex + 1} (${cmdType}: ${cmdName}): ${err.message}`);
+
+      // Enhance error with YAML path if available
+      const contextPath = ctx.getPath();
+      const errorMsg = contextPath
+        ? `Error at ${contextPath}[${cmdIndex}] (${cmdType}: ${cmdName}): ${err.message}`
+        : `Error at geometry command #${cmdIndex + 1} (${cmdType}: ${cmdName}): ${err.message}`;
+
+      throw new Error(errorMsg);
     }
   }
 }
@@ -1273,10 +1444,12 @@ function evaluateExpression(expr: string, values: Map<string, any>, builder: Tra
   // Build variables object from decision values and builder context
   const variables: Record<string, number> = {};
 
-  // Add decision values
+  // Add decision values (convert booleans to 1/0 for math expressions)
   for (const [name, value] of values.entries()) {
     if (typeof value === 'number') {
       variables[name] = value;
+    } else if (typeof value === 'boolean') {
+      variables[name] = value ? 1 : 0;  // Convert boolean to number for if() function
     }
   }
 

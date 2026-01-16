@@ -18,6 +18,38 @@ import { TracedOutput } from "../builder/TracedBuilder.js";
 // Store last run for inspection
 let lastRun: TracedOutput | null = null;
 
+/**
+ * Helper to retry fetch requests with exponential backoff
+ * Useful for handling brief unavailability during hot reloads
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3,
+  initialDelay: number = 100
+): Promise<Response> {
+  let lastError: any;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options);
+      return response;
+    } catch (error: any) {
+      lastError = error;
+
+      // If this isn't the last attempt, wait before retrying
+      if (attempt < maxRetries - 1) {
+        const delay = initialDelay * Math.pow(2, attempt); // Exponential backoff
+        console.error(`[mcp] Fetch failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  // All retries exhausted
+  throw lastError;
+}
+
 // Create server instance using the new McpServer API
 const server = new McpServer({
   name: "procedurable",
@@ -303,7 +335,7 @@ server.registerTool(
     const AUTHORING_SERVER_URL = "http://127.0.0.1:4200/api/execute";
 
     try {
-      const response = await fetch(AUTHORING_SERVER_URL, {
+      const response = await fetchWithRetry(AUTHORING_SERVER_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ commands }),
@@ -350,7 +382,7 @@ server.registerTool(
     const AUTHORING_SERVER_URL = "http://127.0.0.1:4200/api/help";
 
     try {
-      const response = await fetch(AUTHORING_SERVER_URL);
+      const response = await fetchWithRetry(AUTHORING_SERVER_URL, { method: "GET" });
       if (!response.ok) {
         return {
           content: [{
@@ -388,7 +420,7 @@ server.registerTool(
     const AUTHORING_SERVER_URL = "http://127.0.0.1:4200/api/state";
 
     try {
-      const response = await fetch(AUTHORING_SERVER_URL);
+      const response = await fetchWithRetry(AUTHORING_SERVER_URL, { method: "GET" });
       if (!response.ok) {
         return {
           content: [{

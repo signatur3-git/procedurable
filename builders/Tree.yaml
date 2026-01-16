@@ -1,0 +1,62 @@
+# Tree.yaml - Single tree (no ground plane) for use in ForestSlice
+version: "1.0"
+name: Tree
+description: Single tree trunk for instancing
+tags: [primitive, instancing]
+
+measurements:
+  trunk_height:
+    value: 8.0
+    source: "Tree trunk height"
+
+  trunk_width:
+    value: 0.5
+    source: "Tree trunk width (diameter)"
+
+geometry:
+  # Simple box trunk
+  - vertex: t_bl_b
+    position: { x: "-trunk_width/2", y: 0, z: "-trunk_width/2" }
+  - vertex: t_br_b
+    position: { x: "trunk_width/2", y: 0, z: "-trunk_width/2" }
+  - vertex: t_tr_b
+    position: { x: "trunk_width/2", y: 0, z: "trunk_width/2" }
+  - vertex: t_tl_b
+    position: { x: "-trunk_width/2", y: 0, z: "trunk_width/2" }
+
+  - vertex: t_bl_t
+    position: { x: "-trunk_width/2", y: "trunk_height", z: "-trunk_width/2" }
+  - vertex: t_br_t
+    position: { x: "trunk_width/2", y: "trunk_height", z: "-trunk_width/2" }
+  - vertex: t_tr_t
+    position: { x: "trunk_width/2", y: "trunk_height", z: "trunk_width/2" }
+  - vertex: t_tl_t
+    position: { x: "-trunk_width/2", y: "trunk_height", z: "trunk_width/2" }
+
+  # Bottom face
+  - face: trunk_bottom
+    vertices: [t_bl_b, t_br_b, t_tr_b, t_tl_b]
+    color: { r: 0.4, g: 0.3, b: 0.2 }
+
+  # Top face
+  - face: trunk_top
+    vertices: [t_bl_t, t_tl_t, t_tr_t, t_br_t]
+    color: { r: 0.4, g: 0.3, b: 0.2 }
+
+  # Side faces
+  - face: trunk_front
+    vertices: [t_bl_b, t_br_b, t_br_t, t_bl_t]
+    color: { r: 0.35, g: 0.25, b: 0.15 }
+
+  - face: trunk_right
+    vertices: [t_br_b, t_tr_b, t_tr_t, t_br_t]
+    color: { r: 0.35, g: 0.25, b: 0.15 }
+
+  - face: trunk_back
+    vertices: [t_tr_b, t_tl_b, t_tl_t, t_tr_t]
+    color: { r: 0.35, g: 0.25, b: 0.15 }
+
+  - face: trunk_left
+    vertices: [t_tl_b, t_bl_b, t_bl_t, t_tl_t]
+    color: { r: 0.35, g: 0.25, b: 0.15 }
+

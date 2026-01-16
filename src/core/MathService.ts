@@ -35,6 +35,8 @@ const SAFE_FUNCTIONS = new Set([
   'min', 'max',
   // Comparison
   'equal', 'unequal', 'larger', 'smaller', 'largerEq', 'smallerEq',
+  // Conditional
+  'if',
   // Constants (handled separately)
 ]);
 
@@ -46,6 +48,34 @@ const CONSTANTS: Record<string, number> = {
   tau: Math.PI * 2,
   TAU: Math.PI * 2,
 };
+
+/**
+ * Custom 'if' function for conditional expressions
+ * Usage: if(condition, thenValue, elseValue)
+ *
+ * Condition can be:
+ * - A boolean (true/false)
+ * - A number (0 = false, non-zero = true)
+ * - A comparison result
+ *
+ * @example
+ * if(x > 0, 1, -1)  // Returns 1 if x > 0, else -1
+ * if(is_round, 0.5, 0.4)  // Returns 0.5 if is_round is truthy
+ */
+math.import({
+  if: function(condition: any, thenValue: any, elseValue: any) {
+    // Convert condition to boolean
+    // In JavaScript: 0, false, null, undefined, NaN, "" are falsy
+    // For our use: treat 0 and false as falsy, everything else as truthy
+    const conditionBool = typeof condition === 'boolean'
+      ? condition
+      : typeof condition === 'number'
+        ? condition !== 0
+        : Boolean(condition);
+
+    return conditionBool ? thenValue : elseValue;
+  }
+}, { override: true });
 
 /**
  * Result of evaluating an expression

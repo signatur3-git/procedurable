@@ -1,0 +1,119 @@
+# ConditionalTest.yaml - Test conditional expressions with if()
+version: "1.0"
+name: ConditionalTest
+description: Test builder for if() conditional expressions - shows circle vs square
+tags: [test, P2-M2b]
+
+decisions:
+  is_round:
+    type: boolean
+    probability: 0.5
+
+  size_category:
+    type: choice
+    options: [small, medium, large]
+    weights: [0.3, 0.4, 0.3]
+
+measurements:
+  base_size:
+    value: 1.0
+    source: "Base size unit"
+
+derived:
+  # Radius based on is_round
+  radius: "if(is_round, 0.6, 0.5)"
+
+  # Size multiplier - simple constant for now
+  # Note: size_category decision doesn't affect geometry in this test
+  size_multiplier: "1.0"
+
+  # Final radius
+  final_radius: "radius * size_multiplier"
+
+geometry:
+  # Conditional geometry: circle if round, square if not
+  - if: is_round
+    then:
+      # Round shape - create a circle with 12 segments
+      - vertex: center
+        position: { x: 0, y: 0.01, z: 0 }
+
+      # Create circle vertices (12 points around circumference)
+      - vertex: c0
+        position: { x: "final_radius * cos(0)", y: 0.01, z: "final_radius * sin(0)" }
+      - vertex: c1
+        position: { x: "final_radius * cos(pi/6)", y: 0.01, z: "final_radius * sin(pi/6)" }
+      - vertex: c2
+        position: { x: "final_radius * cos(pi/3)", y: 0.01, z: "final_radius * sin(pi/3)" }
+      - vertex: c3
+        position: { x: "final_radius * cos(pi/2)", y: 0.01, z: "final_radius * sin(pi/2)" }
+      - vertex: c4
+        position: { x: "final_radius * cos(2*pi/3)", y: 0.01, z: "final_radius * sin(2*pi/3)" }
+      - vertex: c5
+        position: { x: "final_radius * cos(5*pi/6)", y: 0.01, z: "final_radius * sin(5*pi/6)" }
+      - vertex: c6
+        position: { x: "final_radius * cos(pi)", y: 0.01, z: "final_radius * sin(pi)" }
+      - vertex: c7
+        position: { x: "final_radius * cos(7*pi/6)", y: 0.01, z: "final_radius * sin(7*pi/6)" }
+      - vertex: c8
+        position: { x: "final_radius * cos(4*pi/3)", y: 0.01, z: "final_radius * sin(4*pi/3)" }
+      - vertex: c9
+        position: { x: "final_radius * cos(3*pi/2)", y: 0.01, z: "final_radius * sin(3*pi/2)" }
+      - vertex: c10
+        position: { x: "final_radius * cos(5*pi/3)", y: 0.01, z: "final_radius * sin(5*pi/3)" }
+      - vertex: c11
+        position: { x: "final_radius * cos(11*pi/6)", y: 0.01, z: "final_radius * sin(11*pi/6)" }
+
+      # Create circle faces (triangles from center) - BLUE
+      - face: f0
+        vertices: [center, c0, c1]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f1
+        vertices: [center, c1, c2]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f2
+        vertices: [center, c2, c3]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f3
+        vertices: [center, c3, c4]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f4
+        vertices: [center, c4, c5]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f5
+        vertices: [center, c5, c6]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f6
+        vertices: [center, c6, c7]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f7
+        vertices: [center, c7, c8]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f8
+        vertices: [center, c8, c9]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f9
+        vertices: [center, c9, c10]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f10
+        vertices: [center, c10, c11]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+      - face: f11
+        vertices: [center, c11, c0]
+        color: { r: 0.2, g: 0.4, b: 1.0 }
+
+    else:
+      # Square shape (when NOT round)
+      - vertex: v1
+        position: { x: "-final_radius", y: 0, z: "-final_radius" }
+      - vertex: v2
+        position: { x: "final_radius", y: 0, z: "-final_radius" }
+      - vertex: v3
+        position: { x: "final_radius", y: 0, z: "final_radius" }
+      - vertex: v4
+        position: { x: "-final_radius", y: 0, z: "final_radius" }
+
+      - face: base
+        vertices: [v1, v2, v3, v4]
+        color: { r: 1.0, g: 0.2, b: 0.2 }
+

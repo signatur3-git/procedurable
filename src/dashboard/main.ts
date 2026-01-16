@@ -25,6 +25,8 @@ interface RunResult {
   decisions: Record<string, { value: any; source: string }>;
   measurements: Record<string, { value: number; source: string }>;
   issues: number;
+  instanceCount?: number;
+  hasInstances?: boolean;
 }
 
 interface CellState {
@@ -299,11 +301,44 @@ function updateDetailPanel() {
   const result = cell.result;
   let decisionsHtml = '';
   for (const [key, d] of Object.entries(result.decisions)) {
+    const isOverridden = d.source === 'override';
+    const decisionClass = isOverridden ? 'decision-item overridden' : 'decision-item';
+
+    // Create appropriate control based on decision type
+    let control = '';
+    if (typeof d.value === 'boolean') {
+      // Boolean decision - toggle switch
+      control = `
+        <label class="decision-toggle">
+          <input type="checkbox" ${d.value ? 'checked' : ''} onchange="window.toggleDecision('${key}', this.checked)">
+          <span class="toggle-slider"></span>
+        </label>
+      `;
+    } else if ((d as any).options && Array.isArray((d as any).options)) {
+      // Choice decision - dropdown
+      const options = (d as any).options;
+      control = `
+        <select class="decision-select" onchange="window.overrideDecision('${key}', this.value)">
+          ${options.map((opt: string) => `<option value="${opt}" ${d.value === opt ? 'selected' : ''}>${opt}</option>`).join('')}
+        </select>
+      `;
+    } else if (typeof d.value === 'number') {
+      // Number decision - input field
+      control = `
+        <input type="number" class="decision-input" value="${d.value}" step="0.1" 
+               onchange="window.overrideDecision('${key}', parseFloat(this.value))">
+      `;
+    } else {
+      // Default: just show value
+      control = `<span class="decision-value">${d.value}</span>`;
+    }
+
     decisionsHtml += `
-      <div class="decision-item">
+      <div class="${decisionClass}">
         <span class="decision-key">${key}</span>
-        <span>
-          <span class="decision-value">${d.value}</span>
+        <span class="decision-controls">
+          ${control}
+          ${isOverridden ? `<button class="reset-btn" onclick="window.resetDecision('${key}')" title="Reset to default">↺</button>` : ''}
           <span class="decision-source">${d.source}</span>
         </span>
       </div>
@@ -325,7 +360,7 @@ function updateDetailPanel() {
     <h2>Seed ${result.seed}</h2>
 
     <div class="detail-section">
-      <h3>Geometry</h3>
+    <div class="detail-section">
       <div class="measurement-item">
         <span class="measurement-key">Vertices</span>
         <span class="measurement-value">${result.vertices}</span>
@@ -342,10 +377,19 @@ function updateDetailPanel() {
         <span class="measurement-key">Issues</span>
         <span class="measurement-value">${result.issues}</span>
       </div>
+      ${result.hasInstances ? `
+      <div class="measurement-item">
+        <span class="measurement-key">Instances</span>
+        <span class="measurement-value">${result.instanceCount}</span>
+      </div>
+      ` : ''}
     </div>
 
     <div class="detail-section">
-      <h3>Decisions (${Object.keys(result.decisions).length})</h3>
+      <h3>
+        Decisions (${Object.keys(result.decisions).length})
+        <button class="reset-all-btn" onclick="window.resetAllDecisions()" title="Reset all decisions to defaults">Reset All</button>
+      </h3>
       ${decisionsHtml || '<div class="empty-state">No decisions</div>'}
     </div>
 
@@ -381,13 +425,15 @@ async function runCurrentSeed() {
     const result = await executeCommands([
       `builder.run seed=${seed}`,
       'builder.measurements',
-      'builder.decisions'
+      'builder.decisions',
+      'builder.instances'
     ]);
 
     if (result.results?.[0]?.status === 'ok') {
       const runData = result.results[0].data;
       const measurements = result.results[1]?.data?.measurements || {};
       const decisions = result.results[2]?.data?.decisions || runData.decisions;
+      const instanceData = result.results[3]?.data || {};
 
       state.cell.result = {
         seed,
@@ -397,11 +443,14 @@ async function runCurrentSeed() {
         decisions,
         measurements,
         issues: runData.issues,
+        instanceCount: instanceData.count || 0,
+        hasInstances: instanceData.count > 0
       };
 
       // Update mesh in 3D view
       await updateMainMesh();
-      log(`Seed ${seed}: ${runData.vertices}v, ${runData.faces}f`, 'success');
+      const instanceMsg = state.cell.result.hasInstances ? ` + ${state.cell.result.instanceCount} instances` : '';
+      log(`Seed ${seed}: ${runData.vertices}v, ${runData.faces}f${instanceMsg}`, 'success');
     } else {
       log(`Seed ${seed} failed: ${result.results?.[0]?.error}`, 'error');
     }
@@ -456,6 +505,10 @@ async function updateMainMesh() {
   const cell = state.cell;
   if (!cell?.scene || !cell.result) return;
 
+  // Show loading state
+  cell.loading = true;
+  updateMainOverlay();
+
   // Remove old mesh
   if (cell.mesh) {
     cell.scene.remove(cell.mesh);
@@ -463,50 +516,127 @@ async function updateMainMesh() {
   }
 
   try {
-    // Fetch actual mesh geometry from server
-    const meshResult = await executeCommands(['builder.mesh']);
+    // Fetch both mesh and instances from server
+    const results = await executeCommands(['builder.mesh', 'builder.instances']);
 
-    if (meshResult.results?.[0]?.status === 'ok') {
-      const meshData = meshResult.results[0].data;
+    const meshResult = results.results?.[0];
+    const instancesResult = results.results?.[1];
 
-      // Create Three.js geometry from serialized data
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.vertices, 3));
-      geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
+    const group = new THREE.Group();
 
-      // Add vertex colors if available
-      if (meshData.colors && meshData.hasColors) {
-        geometry.setAttribute('color', new THREE.Float32BufferAttribute(meshData.colors, 3));
+    // Render merged geometry
+    if (meshResult?.status === 'ok') {
+      const meshData = meshResult.data;
+
+      // Only create mesh if there's actual geometry
+      if (meshData.vertices && meshData.vertices.length > 0) {
+        // Create Three.js geometry from serialized data
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute(meshData.vertices, 3));
+        geometry.setAttribute('normal', new THREE.Float32BufferAttribute(meshData.normals, 3));
+
+        // Add vertex colors if available
+        if (meshData.colors && meshData.hasColors) {
+          geometry.setAttribute('color', new THREE.Float32BufferAttribute(meshData.colors, 3));
+        }
+
+        geometry.computeBoundingSphere();
+
+        // Create material - use vertex colors if available
+        const material = new THREE.MeshStandardMaterial({
+          color: meshData.hasColors ? 0xffffff : 0x8b5a2b,  // White base if using vertex colors
+          vertexColors: meshData.hasColors,  // Enable vertex colors
+          roughness: 0.7,
+          metalness: 0.1,
+          flatShading: true,
+          side: THREE.DoubleSide  // Show both sides of faces
+        });
+
+        const mesh = new THREE.Mesh(geometry, material);
+        group.add(mesh);
+
+        log(`Rendered ${meshData.triangleCount} triangles${meshData.hasColors ? ' (with colors)' : ''}`);
+      }
+    }
+
+    // Render instances
+    if (instancesResult?.status === 'ok' && instancesResult.data?.instances?.length > 0) {
+      const instances = instancesResult.data.instances;
+      log(`Rendering ${instances.length} instances...`);
+
+      let instancesRendered = 0;
+      for (const instance of instances) {
+        try {
+          // Fetch the mesh for this instance's builder
+          const instanceMeshResult = await executeCommands([
+            `builder.open ${instance.builderName}`,
+            `builder.run seed=${instance.seed}`,
+            'builder.mesh'
+          ]);
+
+          if (instanceMeshResult.results?.[2]?.status === 'ok') {
+            const instanceMeshData = instanceMeshResult.results[2].data;
+
+            // Create geometry for this instance
+            const instanceGeometry = new THREE.BufferGeometry();
+            instanceGeometry.setAttribute('position', new THREE.Float32BufferAttribute(instanceMeshData.vertices, 3));
+            instanceGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(instanceMeshData.normals, 3));
+
+            if (instanceMeshData.colors && instanceMeshData.hasColors) {
+              instanceGeometry.setAttribute('color', new THREE.Float32BufferAttribute(instanceMeshData.colors, 3));
+            }
+
+            instanceGeometry.computeBoundingSphere();
+
+            // Create material with slight color variation for instances
+            const instanceMaterial = new THREE.MeshStandardMaterial({
+              color: instanceMeshData.hasColors ? 0xffffff : 0x6b8e23,  // Olive green for instances
+              vertexColors: instanceMeshData.hasColors,
+              roughness: 0.7,
+              metalness: 0.1,
+              flatShading: true,
+              side: THREE.DoubleSide
+            });
+
+            const instanceMesh = new THREE.Mesh(instanceGeometry, instanceMaterial);
+
+            // Apply transform from instance data
+            const transform = instance.transform;
+            instanceMesh.position.set(transform.position.x, transform.position.y, transform.position.z);
+            instanceMesh.rotation.set(transform.rotation.x, transform.rotation.y, transform.rotation.z);
+
+            // Handle scale (may be undefined if scale=1)
+            const scale = transform.scale ?? 1;
+            instanceMesh.scale.setScalar(scale);
+
+            group.add(instanceMesh);
+            instancesRendered++;
+          }
+        } catch (err) {
+          console.warn(`Failed to render instance ${instance.id}:`, err);
+        }
       }
 
-      geometry.computeBoundingSphere();
+      log(`Rendered ${instancesRendered}/${instances.length} instances`);
+    }
 
-      // Create material - use vertex colors if available
-      const material = new THREE.MeshStandardMaterial({
-        color: meshData.hasColors ? 0xffffff : 0x8b5a2b,  // White base if using vertex colors
-        vertexColors: meshData.hasColors,  // Enable vertex colors
-        roughness: 0.7,
-        metalness: 0.1,
-        flatShading: true,
-        side: THREE.DoubleSide  // Show both sides of faces
-      });
-
-      const mesh = new THREE.Mesh(geometry, material);
-
-      const group = new THREE.Group();
-      group.add(mesh);
-
+    if (group.children.length > 0) {
       cell.mesh = group;
       cell.scene.add(group);
-
-      log(`Rendered ${meshData.triangleCount} triangles${meshData.hasColors ? ' (with colors)' : ''}`);
     } else {
-      log(`Mesh fetch failed: ${meshResult.results?.[0]?.error}`, 'error');
+      log('No geometry to render, using placeholder', 'error');
       createPlaceholderMesh();
     }
+
   } catch (err) {
     log(`Mesh error: ${err}`, 'error');
     createPlaceholderMesh();
+  } finally {
+    // Clear loading state
+    if (state.cell) {
+      state.cell.loading = false;
+      updateMainOverlay();
+    }
   }
 }
 
@@ -657,6 +787,56 @@ function setupEventHandlers() {
   // Handle window resize
   window.addEventListener('resize', resizeMainCell);
 }
+
+// Decision override functions (exposed globally for HTML onclick handlers)
+async function overrideDecision(key: string, value: any) {
+  if (!state.activeBuilder) return;
+
+  try {
+    log(`Overriding decision ${key} = ${value}`);
+    const overrideResult = await executeCommands([`decision.override ${key} ${value}`]);
+    log(`Override result: ${JSON.stringify(overrideResult.results?.[0]?.data)}`);
+
+    await runCurrentSeed();  // Re-run with override
+  } catch (err) {
+    log(`Failed to override decision: ${err}`, 'error');
+  }
+}
+
+async function toggleDecision(key: string, value: boolean) {
+  // Send boolean as string "true" or "false" (not 1/0)
+  await overrideDecision(key, value ? 'true' : 'false');
+}
+
+async function resetDecision(key: string) {
+  if (!state.activeBuilder) return;
+
+  try {
+    log(`Resetting decision ${key}`);
+    await executeCommands([`decision.reset ${key}`]);
+    await runCurrentSeed();  // Re-run without override
+  } catch (err) {
+    log(`Failed to reset decision: ${err}`, 'error');
+  }
+}
+
+async function resetAllDecisions() {
+  if (!state.activeBuilder) return;
+
+  try {
+    log('Resetting all decisions');
+    await executeCommands(['decision.reset-all']);
+    await runCurrentSeed();  // Re-run without overrides
+  } catch (err) {
+    log(`Failed to reset all decisions: ${err}`, 'error');
+  }
+}
+
+// Expose to window for HTML onclick handlers
+(window as any).overrideDecision = overrideDecision;
+(window as any).toggleDecision = toggleDecision;
+(window as any).resetDecision = resetDecision;
+(window as any).resetAllDecisions = resetAllDecisions;
 
 // Initialize
 function init() {
