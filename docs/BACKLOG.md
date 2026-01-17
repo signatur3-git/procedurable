@@ -53,13 +53,21 @@ Optional implementation hints or agent guidance.
 | P2-M2d: Agent Authoring Layer    | 7       | 6    | 0           | 0       |
 | Future/Research (Optional)       | 2       | 0    | 0           | 0       |
 | P2-M3: 2D Shapes & Extrusion     | 5       | 5    | 0           | 0       |
-| P2-M4: Text & Advanced 2D        | 6       | 2    | 1           | 0       |
+| P2-M3b: Architecture & Flows     | 3       | 0    | 0           | 0       |
+| P2-M4: Text & Advanced 2D        | 8       | 2    | 1           | 0       |
 | P2-M5: 3D Boolean CSG            | 5       | 0    | 0           | 1       |
 | P2-M6: Botanical Systems         | 5       | 0    | 0           | 0       |
 | P2-M7: Advanced Materials        | 5       | 0    | 0           | 0       |
 | P2-M8: Cloth & Soft Bodies       | 4       | 0    | 0           | 0       |
 | P2-M9: Characters (Capstone)     | 6       | 0    | 0           | 0       |
 | P2-M10: Renderer Package         | 5       | 0    | 0           | 0       |
+
+---
+
+## Implementation Review
+
+See `docs/IMPLEMENTATION_REVIEW.md` for the latest assessment of what’s implemented and which milestones need revisits
+for quality or alignment.
 
 ---
 
@@ -1763,11 +1771,109 @@ Combined test demonstrating the full 2D→3D pipeline.
 
 ---
 
+## Epic: P2-M3b - Architecture & Flow Consolidation
+
+> **Goal:** Clarify system flows and reduce duplicated implementations by consolidating around central services.
+> **Status:** ⬜ Not Started
+> **Priority:** P1
+> **Blocked by:** None
+
+### P2M3b-001: System Flow Map (High-Level)
+
+**Epic:** P2-M3b Architecture & Flow Consolidation
+**Status:** ⬜ Not Started
+**Size:** M
+**Priority:** P1
+**Dependencies:** None
+
+#### Context
+
+We need a single, high-level view of how data and commands flow through the system to keep implementations consistent.
+
+#### Acceptance Criteria
+
+- [ ] Document end-to-end flows (authoring → parsing → geometry → mesh → dashboard)
+- [ ] Identify central services and their responsibilities
+- [ ] Include "source of truth" notes for key abstractions
+- [ ] Link to supporting docs (ARCHITECTURE.md, DSL_COMMANDS.md, YAML_BUILDER_FORMAT.md)
+
+#### Files to Modify
+
+- `docs/SYSTEM_FLOW.md` (new)
+
+---
+
+### P2M3b-002: Service Inventory + Reuse Policy
+
+**Epic:** P2-M3b Architecture & Flow Consolidation
+**Status:** ⬜ Not Started
+**Size:** M
+**Priority:** P1
+**Dependencies:** P2M3b-001
+
+#### Context
+
+We are reimplementing similar logic across tools. We need a simple inventory of central services and reuse guidance.
+
+#### Acceptance Criteria
+
+- [ ] List core services (MathService, YamlBuilderParser, Shape2D, Path2D, etc.) and intended usage
+- [ ] Define "do not duplicate" areas and preferred extension points
+- [ ] Add a checklist for new features (which service should own the logic?)
+
+#### Files to Modify
+
+- `docs/SYSTEM_FLOW.md`
+
+---
+
+### P2M3b-003: Consolidation Target List
+
+**Epic:** P2-M3b Architecture & Flow Consolidation
+**Status:** ⬜ Not Started
+**Size:** S
+**Priority:** P1
+**Dependencies:** P2M3b-001
+
+#### Context
+
+We should identify concrete areas where functionality is duplicated and plan consolidation work.
+
+#### Acceptance Criteria
+
+- [ ] Identify at least 3 duplicated or fragmented areas
+- [ ] Propose the owning service for each area
+- [ ] Capture follow-up refactor tickets (future epics)
+
+#### Files to Modify
+
+- `docs/SYSTEM_FLOW.md`
+
+---
+
 ## Epic: P2-M4 - Text & Advanced 2D
 
 > **Goal:** Signage, labels, engravings.
-> **Status:** ⬜ Not Started
-> **Blocked by:** P2-M3 (needs 2D shapes)
+> **Status:** 🟡 In Progress
+> **Blocked by:** P2-M3b (architecture & flow consolidation)
+
+### Milestone Acceptance Ladder (P2-M4)
+
+See `docs/MILESTONE_ACCEPTANCE_LADDERS.md#p2-m4-text--advanced-2d` for the full ladder.
+
+**Exit Criteria (Level 1, Summary)**
+- Bezier-preserving Path2D with configurable tessellation tolerance.
+- Text holes via 2D boolean operations.
+- Extruded text supports bevels and consistent normals.
+- Text-on-2D-path distortion with predictable spacing.
+
+### Current State (P2-M4 Evaluation)
+
+- **Done:** Font integration, text → 2D shapes, procedural fallback font.
+- **In Progress:** Path2D bezier preservation + tessellation.
+- **Missing for Level 1:** Path-based Shape2D integration, 2D boolean ops for holes, robust extrude for multi-contour glyphs,
+  and text-on-path deformation.
+- **Missing for Level 2:** Typography domain model and calligraphic stroke rendering.
 
 ### P2M4-001: Font Integration
 
@@ -1936,6 +2042,7 @@ This loses precision, doesn't scale cleanly, and isn't true vector graphics.
 - [x] Implement `tessellateQuadraticCurve()` and `tessellateCubicCurve()`
 - [x] Implement `pathToPolygon()` for converting curves to triangles
 - [x] Implement helper functions: `createRectPath()`, `createCirclePath()`
+- [ ] Tessellation supports configurable tolerance/segment budget and preserves bounds within tolerance
 - [ ] Unit tests for all tessellation functions
 - [ ] Unit tests for path creation helpers
 
@@ -2085,6 +2192,67 @@ Combined test demonstrating text pipeline.
 #### Files to Modify
 
 - `builders/WallSign.yaml` (new)
+
+---
+
+### P2M4-007: Text on Path (2D + 3D)
+
+**Epic:** P2-M4 Text
+**Status:** ⬜ Not Started
+**Size:** L
+**Priority:** P2
+**Dependencies:** P2M4-003, P2M4-005
+
+#### Context
+
+Text should be deformable along 2D or 3D curves (arches, ribbons, engravings), not just flat extrusion.
+
+#### Acceptance Criteria
+
+- [ ] Add text-on-path API (authoring + YAML): map glyph outlines along a curve
+- [ ] 2D path deformation with consistent spacing and baseline alignment
+- [ ] 3D path deformation with curvature-aware normals
+- [ ] Preserve glyph proportions under moderate curvature (no extreme shear)
+- [ ] Demo builder: CurvedBanner.yaml or ArchSign.yaml
+- [ ] Unit tests for spacing + baseline stability
+
+#### Files to Modify
+
+- `src/text/TextOnPath.ts` (new)
+- `src/geometry/Path3D.ts` (new or reuse existing curve types)
+- `src/builder/YamlBuilderParser.ts`
+- `builders/CurvedBanner.yaml` (new)
+
+---
+
+### P2M4-008: Typography Domain Model + Calligraphy Strokes
+
+**Epic:** P2-M4 Text
+**Status:** ⬜ Not Started
+**Size:** L
+**Priority:** P2
+**Dependencies:** P2M4-003
+
+#### Context
+
+We need typography-aware output rather than crude letter approximations. This milestone adds typographic metrics and
+calligraphic stroke modeling for high-quality text rendering.
+
+#### Acceptance Criteria
+
+- [ ] Expose font metrics: baseline, x-height, cap height, ascender, descender
+- [ ] Kerning + ligature support for layout (fallback to defaults when absent)
+- [ ] Add calligraphic stroke mode: variable stroke width + pen angle
+- [ ] Text-to-path honors metrics and stroke settings
+- [ ] Example builder: CalligraphySample.yaml with curved strokes
+- [ ] Documentation for typography terms and usage
+
+#### Files to Modify
+
+- `src/text/FontParser.ts`
+- `src/text/TextToShape.ts`
+- `docs/YAML_BUILDER_FORMAT.md`
+- `builders/CalligraphySample.yaml` (new)
 
 ---
 
@@ -3247,4 +3415,3 @@ Automatic constraint satisfaction for complex multi-builder scenarios. This is *
 | P2-M1b Steps 1-4                      | 2026-01-14 | Lathe, Sweep, Subdivision exposed. Vase, Mug, Cushion builders. |
 | P2-M2: Scene Constraints              | 2026-01-14 | AABB, Placement.ts, DiningScene fixed                           |
 | P2-M2b Steps 1-2 + Noise              | 2026-01-14 | Conditional/iterative composition, Perlin/FBM noise             |
-
