@@ -1,4 +1,10 @@
 import * as opentype from 'opentype.js';
+import {
+  Path2D,
+  Path2DContour,
+  calculatePathBounds,
+  pathToPolygon
+} from '../geometry/Path2D';
 import { proceduralFontRegistry } from './ProceduralFont';
 
 /**
@@ -25,6 +31,19 @@ export interface GlyphOutline {
   width: number;  // Advance width for kerning
   height: number; // Font height
   contours: GlyphContour[];
+  bounds: {
+    xMin: number;
+    xMax: number;
+    zMin: number;
+    zMax: number;
+  };
+}
+
+export interface GlyphPath {
+  char: string;
+  width: number;
+  height: number;
+  contours: Path2DContour[];
   bounds: {
     xMin: number;
     xMax: number;
@@ -114,6 +133,47 @@ export class FontParser {
     const bounds = this.calculateBounds(contours);
 
     // Get advance width (for kerning)
+    const width = (glyph.advanceWidth || font.unitsPerEm) / font.unitsPerEm * size;
+    const height = size;
+
+    return {
+      char,
+      width,
+      height,
+      contours,
+      bounds
+    };
+  }
+
+  /**
+   * Get glyph path with bezier curves preserved
+   */
+  getGlyphPath(
+    fontName: string,
+    char: string,
+    size: number = 1.0
+  ): GlyphPath {
+    const font = this.fonts.get(fontName);
+
+    if (!font) {
+      if (proceduralFontRegistry.hasFont(fontName)) {
+        return this.getProceduralGlyphPath(fontName, char, size);
+      }
+      throw new Error(`Font not loaded: ${fontName}. Available: ${this.getFontNames().join(', ')}`);
+    }
+
+    if (char.length !== 1) {
+      throw new Error(`getGlyphPath expects single character, got: "${char}"`);
+    }
+
+    const glyph = font.charToGlyph(char);
+    if (!glyph) {
+      throw new Error(`Character not found in font: "${char}"`);
+    }
+
+    const path = glyph.getPath(0, 0, size);
+    const contours = this.extractPathContours(path, size, font.unitsPerEm);
+    const bounds = this.calculatePathBounds(contours);
     const width = (glyph.advanceWidth || font.unitsPerEm) / font.unitsPerEm * size;
     const height = size;
 
@@ -279,6 +339,83 @@ export class FontParser {
     return contours;
   }
 
+  private extractPathContours(
+    path: opentype.Path,
+    size: number,
+    unitsPerEm: number
+  ): Path2DContour[] {
+    const contours: Path2DContour[] = [];
+    let currentSegments: Path2D['segments'] = [];
+
+    const scale = size / unitsPerEm;
+
+    const pushContour = () => {
+      if (currentSegments.length === 0) {
+        return;
+      }
+
+      const contourPath: Path2D = {
+        segments: currentSegments,
+        closed: currentSegments.some(segment => segment.type === 'closePath')
+      };
+
+      const polygon = pathToPolygon(contourPath, 12);
+      const isHole = polygon.length > 2 ? this.isClockwise(polygon) : false;
+
+      contours.push({
+        path: contourPath,
+        isHole
+      });
+
+      currentSegments = [];
+    };
+
+    for (const cmd of path.commands) {
+      switch (cmd.type) {
+        case 'M':
+          pushContour();
+          currentSegments.push({
+            type: 'moveTo',
+            point: { x: cmd.x * scale, z: -cmd.y * scale }
+          });
+          break;
+
+        case 'L':
+          currentSegments.push({
+            type: 'lineTo',
+            point: { x: cmd.x * scale, z: -cmd.y * scale }
+          });
+          break;
+
+        case 'Q':
+          currentSegments.push({
+            type: 'quadraticCurveTo',
+            control: { x: cmd.x1 * scale, z: -cmd.y1 * scale },
+            end: { x: cmd.x * scale, z: -cmd.y * scale }
+          });
+          break;
+
+        case 'C':
+          currentSegments.push({
+            type: 'cubicCurveTo',
+            control1: { x: cmd.x1 * scale, z: -cmd.y1 * scale },
+            control2: { x: cmd.x2 * scale, z: -cmd.y2 * scale },
+            end: { x: cmd.x * scale, z: -cmd.y * scale }
+          });
+          break;
+
+        case 'Z':
+          currentSegments.push({ type: 'closePath' });
+          pushContour();
+          break;
+      }
+    }
+
+    pushContour();
+
+    return contours;
+  }
+
   /**
    * Check if a contour is clockwise (typically indicates a hole)
    */
@@ -313,6 +450,28 @@ export class FontParser {
         zMin = Math.min(zMin, point.z);
         zMax = Math.max(zMax, point.z);
       }
+    }
+
+    return { xMin, xMax, zMin, zMax };
+  }
+
+  private calculatePathBounds(contours: Path2DContour[]): {
+    xMin: number;
+    xMax: number;
+    zMin: number;
+    zMax: number;
+  } {
+    let xMin = Infinity;
+    let xMax = -Infinity;
+    let zMin = Infinity;
+    let zMax = -Infinity;
+
+    for (const contour of contours) {
+      const bounds = calculatePathBounds(contour.path, 16);
+      xMin = Math.min(xMin, bounds.xMin);
+      xMax = Math.max(xMax, bounds.xMax);
+      zMin = Math.min(zMin, bounds.zMin);
+      zMax = Math.max(zMax, bounds.zMax);
     }
 
     return { xMin, xMax, zMin, zMax };
@@ -380,6 +539,49 @@ export class FontParser {
     }
 
     return outlines;
+  }
+
+  private getProceduralGlyphPath(fontName: string, char: string, size: number): GlyphPath {
+    const font = proceduralFontRegistry.getFont(fontName);
+    if (!font) {
+      throw new Error(`Procedural font not found: ${fontName}`);
+    }
+
+    const glyph = font.glyphs.get(char.toUpperCase());
+    if (!glyph) {
+      throw new Error(`Character not found in procedural font: "${char}"`);
+    }
+
+    const contours: Path2DContour[] = glyph.contours.map(contour => {
+      const segments: Path2D['segments'] = [];
+      contour.points.forEach((point, index) => {
+        const scaledPoint = { x: point.x * size, z: point.z * size };
+        if (index === 0) {
+          segments.push({ type: 'moveTo', point: scaledPoint });
+        } else {
+          segments.push({ type: 'lineTo', point: scaledPoint });
+        }
+      });
+      segments.push({ type: 'closePath' });
+
+      return {
+        path: {
+          segments,
+          closed: true
+        },
+        isHole: contour.isHole
+      };
+    });
+
+    const bounds = this.calculatePathBounds(contours);
+
+    return {
+      char: glyph.char,
+      width: glyph.width * size,
+      height: glyph.height * size,
+      contours,
+      bounds
+    };
   }
 }
 

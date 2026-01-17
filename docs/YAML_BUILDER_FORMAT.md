@@ -362,7 +362,9 @@ shapes:
 shapes:
   badge_outline:
     type: path
-    curveSegments: 12        # Tessellation per curve (higher = smoother)
+    curveSegments: 12        # Base tessellation per curve (higher = smoother)
+    curveTolerance: 0.002    # Optional adaptive tolerance (smaller = smoother)
+    curveMaxSegments: 32     # Optional cap when using curveTolerance
     center: { x: 0, z: 0 }   # Optional offset for all points
     segments:
       - type: moveTo

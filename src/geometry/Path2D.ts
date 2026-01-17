@@ -28,6 +28,14 @@ export interface Path2D {
   closed: boolean;
 }
 
+export interface TessellationOptions {
+  segments?: number;
+  tolerance?: number;
+  maxSegments?: number;
+}
+
+export type TessellationInput = number | TessellationOptions;
+
 /**
  * Contour with hole information (for fonts/SVG)
  */
@@ -57,12 +65,18 @@ export function tessellateQuadraticCurve(
   start: Point2D,
   control: Point2D,
   end: Point2D,
-  segments: number = 10
+  segments: TessellationInput = 10
 ): Point2D[] {
+  const options = normalizeTessellationOptions(segments);
+  if (options.tolerance !== undefined) {
+    return tessellateQuadraticCurveAdaptive(start, control, end, options);
+  }
+
   const points: Point2D[] = [];
 
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
+  const segmentCount = options.segments ?? 10;
+  for (let i = 0; i <= segmentCount; i++) {
+    const t = i / segmentCount;
     const t1 = 1 - t;
 
     // Quadratic bezier formula: B(t) = (1-t)²P₀ + 2(1-t)tP₁ + t²P₂
@@ -83,12 +97,18 @@ export function tessellateCubicCurve(
   control1: Point2D,
   control2: Point2D,
   end: Point2D,
-  segments: number = 10
+  segments: TessellationInput = 10
 ): Point2D[] {
+  const options = normalizeTessellationOptions(segments);
+  if (options.tolerance !== undefined) {
+    return tessellateCubicCurveAdaptive(start, control1, control2, end, options);
+  }
+
   const points: Point2D[] = [];
 
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments;
+  const segmentCount = options.segments ?? 10;
+  for (let i = 0; i <= segmentCount; i++) {
+    const t = i / segmentCount;
     const t1 = 1 - t;
 
     // Cubic bezier formula: B(t) = (1-t)³P₀ + 3(1-t)²tP₁ + 3(1-t)t²P₂ + t³P₃
@@ -112,7 +132,8 @@ export function tessellateCubicCurve(
  * Convert a path to a polygon (tessellate all curves)
  * This is for extrusion - we need triangles for 3D mesh
  */
-export function pathToPolygon(path: Path2D, curveSegments: number = 10): Point2D[] {
+export function pathToPolygon(path: Path2D, curveSegments: TessellationInput = 10): Point2D[] {
+  const options = normalizeTessellationOptions(curveSegments);
   const points: Point2D[] = [];
   let currentPoint: Point2D = { x: 0, z: 0 };
 
@@ -133,7 +154,7 @@ export function pathToPolygon(path: Path2D, curveSegments: number = 10): Point2D
           currentPoint,
           segment.control,
           segment.end,
-          curveSegments
+          options
         );
         // Skip first point (already in array)
         points.push(...quadPoints.slice(1));
@@ -146,7 +167,7 @@ export function pathToPolygon(path: Path2D, curveSegments: number = 10): Point2D
           segment.control1,
           segment.control2,
           segment.end,
-          curveSegments
+          options
         );
         // Skip first point (already in array)
         points.push(...cubicPoints.slice(1));
@@ -165,7 +186,7 @@ export function pathToPolygon(path: Path2D, curveSegments: number = 10): Point2D
 /**
  * Calculate bounds of a path
  */
-export function calculatePathBounds(path: Path2D, curveSegments: number = 10): {
+export function calculatePathBounds(path: Path2D, curveSegments: TessellationInput = 10): {
   xMin: number;
   xMax: number;
   zMin: number;
@@ -262,4 +283,118 @@ export function createCirclePath(radius: number, center: Point2D = { x: 0, z: 0 
     ],
     closed: true
   };
+}
+
+function normalizeTessellationOptions(input: TessellationInput): TessellationOptions {
+  if (typeof input === 'number') {
+    return { segments: input };
+  }
+  return { ...input };
+}
+
+function midPoint(a: Point2D, b: Point2D): Point2D {
+  return { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+}
+
+function distancePointToLine(point: Point2D, lineStart: Point2D, lineEnd: Point2D): number {
+  const dx = lineEnd.x - lineStart.x;
+  const dz = lineEnd.z - lineStart.z;
+  const numerator = Math.abs(dz * point.x - dx * point.z + lineEnd.x * lineStart.z - lineEnd.z * lineStart.x);
+  const denominator = Math.sqrt(dx * dx + dz * dz);
+  if (denominator === 0) {
+    return Math.hypot(point.x - lineStart.x, point.z - lineStart.z);
+  }
+  return numerator / denominator;
+}
+
+function tessellateQuadraticCurveAdaptive(
+  start: Point2D,
+  control: Point2D,
+  end: Point2D,
+  options: TessellationOptions
+): Point2D[] {
+  const tolerance = options.tolerance ?? 0;
+  const maxSegments = options.maxSegments ?? options.segments ?? 64;
+  const points: Point2D[] = [{ x: start.x, z: start.z }];
+  let segmentCount = 0;
+  let pendingSegments = 1;
+  const stack: Array<{ p0: Point2D; p1: Point2D; p2: Point2D }> = [{ p0: start, p1: control, p2: end }];
+
+  while (stack.length > 0) {
+    const segment = stack.pop();
+    if (!segment) {
+      break;
+    }
+    pendingSegments -= 1;
+
+    const flatness = distancePointToLine(segment.p1, segment.p0, segment.p2);
+    const canSplit = flatness > tolerance && (segmentCount + pendingSegments + 2) <= maxSegments;
+
+    if (canSplit) {
+      const p01 = midPoint(segment.p0, segment.p1);
+      const p12 = midPoint(segment.p1, segment.p2);
+      const p012 = midPoint(p01, p12);
+
+      stack.push({ p0: p012, p1: p12, p2: segment.p2 });
+      stack.push({ p0: segment.p0, p1: p01, p2: p012 });
+      pendingSegments += 2;
+      continue;
+    }
+
+    points.push({ x: segment.p2.x, z: segment.p2.z });
+    segmentCount += 1;
+  }
+
+  return points;
+}
+
+function tessellateCubicCurveAdaptive(
+  start: Point2D,
+  control1: Point2D,
+  control2: Point2D,
+  end: Point2D,
+  options: TessellationOptions
+): Point2D[] {
+  const tolerance = options.tolerance ?? 0;
+  const maxSegments = options.maxSegments ?? options.segments ?? 64;
+  const points: Point2D[] = [{ x: start.x, z: start.z }];
+  let segmentCount = 0;
+  let pendingSegments = 1;
+  const stack: Array<{ p0: Point2D; p1: Point2D; p2: Point2D; p3: Point2D }> = [
+    { p0: start, p1: control1, p2: control2, p3: end }
+  ];
+
+  while (stack.length > 0) {
+    const segment = stack.pop();
+    if (!segment) {
+      break;
+    }
+    pendingSegments -= 1;
+
+    const flatness = Math.max(
+      distancePointToLine(segment.p1, segment.p0, segment.p3),
+      distancePointToLine(segment.p2, segment.p0, segment.p3)
+    );
+
+    const canSplit = flatness > tolerance && (segmentCount + pendingSegments + 2) <= maxSegments;
+
+    if (canSplit) {
+      const p01 = midPoint(segment.p0, segment.p1);
+      const p12 = midPoint(segment.p1, segment.p2);
+      const p23 = midPoint(segment.p2, segment.p3);
+      const p012 = midPoint(p01, p12);
+      const p123 = midPoint(p12, p23);
+      const p0123 = midPoint(p012, p123);
+
+      stack.push({ p0: p0123, p1: p123, p2: p23, p3: segment.p3 });
+      stack.push({ p0: segment.p0, p1: p01, p2: p012, p3: p0123 });
+      pendingSegments += 2;
+      continue;
+    }
+
+    points.push({ x: segment.p3.x, z: segment.p3.z });
+    segmentCount += 1;
+  }
+
+  return points;
 }

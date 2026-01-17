@@ -75,6 +75,26 @@ describe('Path2D', () => {
         expect(point.z).toBeCloseTo(0, 5);
       }
     });
+
+    it('should support adaptive tessellation with tolerance', () => {
+      const start: Point2D = { x: 0, z: 0 };
+      const control: Point2D = { x: 0.5, z: 0.1 };
+      const end: Point2D = { x: 1, z: 0 };
+
+      const points = tessellateQuadraticCurve(start, control, end, { tolerance: 1 });
+
+      expect(points.length).toBe(2); // start + end
+    });
+
+    it('should respect maxSegments when using tolerance', () => {
+      const start: Point2D = { x: 0, z: 0 };
+      const control: Point2D = { x: 0.5, z: 1 };
+      const end: Point2D = { x: 1, z: 0 };
+
+      const points = tessellateQuadraticCurve(start, control, end, { tolerance: 0.001, maxSegments: 5 });
+
+      expect(points.length).toBeLessThanOrEqual(6); // segments + start
+    });
   });
 
   describe('tessellateCubicCurve', () => {
@@ -137,6 +157,17 @@ describe('Path2D', () => {
       // Early points should be above z=0, late points should be below
       expect(points[5].z).toBeGreaterThan(0);
       expect(points[15].z).toBeLessThan(0);
+    });
+
+    it('should support adaptive tessellation for cubic curves', () => {
+      const start: Point2D = { x: 0, z: 0 };
+      const control1: Point2D = { x: 0.25, z: 0.1 };
+      const control2: Point2D = { x: 0.75, z: 0.1 };
+      const end: Point2D = { x: 1, z: 0 };
+
+      const points = tessellateCubicCurve(start, control1, control2, end, { tolerance: 1 });
+
+      expect(points.length).toBe(2);
     });
   });
 

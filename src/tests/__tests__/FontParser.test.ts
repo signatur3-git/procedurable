@@ -28,6 +28,12 @@ describe('FontParser', () => {
       }).toThrow(/Font not loaded/);
     });
 
+    it('should reject glyph path requests for unloaded fonts', () => {
+      expect(() => {
+        parser.getGlyphPath('notloaded', 'A', 1.0);
+      }).toThrow(/Font not loaded/);
+    });
+
     it('should reject multi-character strings', () => {
       // Would need actual font for this test
       // Testing API contract only

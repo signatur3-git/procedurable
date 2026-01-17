@@ -20,6 +20,7 @@ import { extrude2D } from '../geometry/Extrude';
 import { Mesh } from '../geometry/Mesh';
 import { Vertex } from '../geometry/Vertex';
 import { Face } from '../geometry/Face';
+import type { PathSegment } from '../geometry/Path2D';
 import * as MeshTransform from '../geometry/MeshTransform';
 import {
   EvaluationContext,
@@ -191,6 +192,8 @@ export interface YamlShape {
   spacing?: string | number;
   // For path
   curveSegments?: number | string;
+  curveTolerance?: number | string;
+  curveMaxSegments?: number | string;
   closed?: boolean;
   // Center position (optional, default 0,0)
   center?: { x?: string | number; z?: string | number };
@@ -1696,7 +1699,7 @@ async function processGeometry(
             z: (typeof point.z === 'number' ? point.z : evaluatePositionComponent(point.z, builder)) + centerZ
           });
 
-          const pathSegments = (shapeDef.segments as YamlPathSegment[]).map(segment => {
+          const pathSegments: PathSegment[] = (shapeDef.segments as YamlPathSegment[]).map(segment => {
             switch (segment.type) {
               case 'moveTo':
                 return { type: 'moveTo', point: resolvePathPoint(segment.point) };
@@ -1726,14 +1729,34 @@ async function processGeometry(
             ? (typeof shapeDef.curveSegments === 'number'
               ? shapeDef.curveSegments
               : Math.round(evaluatePositionComponent(shapeDef.curveSegments, builder)))
-            : 10;
+            : undefined;
+
+          const curveTolerance = shapeDef.curveTolerance !== undefined
+            ? (typeof shapeDef.curveTolerance === 'number'
+              ? shapeDef.curveTolerance
+              : evaluatePositionComponent(shapeDef.curveTolerance, builder))
+            : undefined;
+
+          const curveMaxSegments = shapeDef.curveMaxSegments !== undefined
+            ? (typeof shapeDef.curveMaxSegments === 'number'
+              ? shapeDef.curveMaxSegments
+              : Math.round(evaluatePositionComponent(shapeDef.curveMaxSegments, builder)))
+            : undefined;
 
           const path = {
             segments: pathSegments,
             closed: shapeDef.closed ?? pathSegments.some(segment => segment.type === 'closePath')
           };
 
-          shape = Shape2D.fromPath(path, curveSegments);
+          const tessellationOptions = curveTolerance !== undefined || curveMaxSegments !== undefined
+            ? {
+                segments: curveSegments,
+                tolerance: curveTolerance,
+                maxSegments: curveMaxSegments
+              }
+            : (curveSegments ?? 10);
+
+          shape = Shape2D.fromPath(path, tessellationOptions);
           break;
         }
         case 'text': {

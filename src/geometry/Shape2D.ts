@@ -6,7 +6,11 @@
  */
 
 import { Vec3 } from '../core/Vec3';
-import { Path2D as Path2DType, pathToPolygon } from './Path2D';
+import {
+  Path2D as Path2DType,
+  pathToPolygon,
+  TessellationInput
+} from './Path2D';
 
 /**
  * 2D Point in XZ plane (Y=0)
@@ -67,6 +71,8 @@ export interface PathDef {
   type: 'path';
   path: Path2DType;
   curveSegments?: number;  // Tessellation resolution (default: 10)
+  curveTolerance?: number;
+  curveMaxSegments?: number;
 }
 
 /**
@@ -135,7 +141,7 @@ export class Shape2D {
    * @param path The Path2D with curves
    * @param curveSegments Number of line segments per curve (higher = smoother)
    */
-  static fromPath(path: Path2DType, curveSegments: number = 10): Shape2D {
+  static fromPath(path: Path2DType, curveSegments: TessellationInput = 10): Shape2D {
     const points = pathToPolygon(path, curveSegments);
     if (points.length < 3) {
       throw new Error('Path must generate at least 3 points');
@@ -174,6 +180,13 @@ export class Shape2D {
       case 'ellipse':
         return Shape2D.ellipse(def.radiusX, def.radiusZ, def.segments || 32, def.center);
       case 'path':
+        if (def.curveTolerance !== undefined || def.curveMaxSegments !== undefined) {
+          return Shape2D.fromPath(def.path, {
+            segments: def.curveSegments,
+            tolerance: def.curveTolerance,
+            maxSegments: def.curveMaxSegments
+          });
+        }
         return Shape2D.fromPath(def.path, def.curveSegments);
       default:
         throw new Error(`Unknown shape type: ${(def as any).type}`);

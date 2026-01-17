@@ -41,21 +41,29 @@ materials:
 shapes:
   # The heart outline - this is what other builders can reference
   heart_outline:
-    type: polygon
-    points:
-      # Bottom point
-      - { x: 0, z: bottom_y }
-
-      # Right side
-      - { x: side_x, z: side_y }
-      - { x: top_x, z: top_y }
-
-      # Top center
-      - { x: 0, z: "height * 0.5" }
-
-      # Left side (mirrored)
-      - { x: "-top_x", z: top_y }
-      - { x: "-side_x", z: side_y }
+    type: path
+    curveTolerance: 0.0015
+    curveMaxSegments: 24
+    segments:
+      - type: moveTo
+        point: { x: 0, z: bottom_y }
+      - type: cubicCurveTo
+        control1: { x: side_x, z: "bottom_y + height * 0.15" }
+        control2: { x: top_x, z: side_y }
+        end: { x: top_x, z: top_y }
+      - type: cubicCurveTo
+        control1: { x: top_x, z: "height * 0.6" }
+        control2: { x: 0, z: "height * 0.6" }
+        end: { x: 0, z: "height * 0.5" }
+      - type: cubicCurveTo
+        control1: { x: 0, z: "height * 0.6" }
+        control2: { x: "-top_x", z: "height * 0.6" }
+        end: { x: "-top_x", z: top_y }
+      - type: cubicCurveTo
+        control1: { x: "-top_x", z: side_y }
+        control2: { x: "-side_x", z: "bottom_y + height * 0.15" }
+        end: { x: 0, z: bottom_y }
+      - type: closePath
 
 geometry:
   # This builder can output 3D geometry if needed
