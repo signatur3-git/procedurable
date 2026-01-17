@@ -4,7 +4,7 @@
  * Extrude 2D shapes into 3D geometry with proper normals and caps.
  */
 
-import { Shape2D } from './Shape2D';
+import { Shape2D, Shape2DDef } from './Shape2D';
 import { Vec3 } from '../core/Vec3';
 import earcut from 'earcut';
 
@@ -472,42 +472,8 @@ function calculateNormals(vertices: Vec3[], faces: number[][], normals: Vec3[]):
  * Helper to create extruded mesh from Shape2D definition
  * Useful for YAML integration
  */
-export function extrudeShape(
-  type: 'rect' | 'circle' | 'ellipse' | 'polygon',
-  shapeParams: any,
-  extrudeParams: ExtrudeParams
-): ExtrudedGeometry {
-  let shape: Shape2D;
-
-  switch (type) {
-    case 'rect':
-      shape = Shape2D.rect(
-        shapeParams.width || 1,
-        shapeParams.height || 1,
-        shapeParams.center
-      );
-      break;
-    case 'circle':
-      shape = Shape2D.circle(
-        shapeParams.radius || 1,
-        shapeParams.segments || 32,
-        shapeParams.center
-      );
-      break;
-    case 'ellipse':
-      shape = Shape2D.ellipse(
-        shapeParams.radiusX || 1,
-        shapeParams.radiusZ || 1,
-        shapeParams.segments || 32,
-        shapeParams.center
-      );
-      break;
-    case 'polygon':
-      shape = Shape2D.polygon(shapeParams.points || []);
-      break;
-    default:
-      throw new Error(`Unknown shape type: ${type}`);
-  }
+export function extrudeShape(shapeDef: Shape2DDef, extrudeParams: ExtrudeParams): ExtrudedGeometry {
+  const shape = Shape2D.fromDef(shapeDef);
 
   return extrude2D(shape, extrudeParams);
 }
