@@ -172,13 +172,13 @@ export interface YamlSpline {
  * Points are in XZ plane (Y=0)
  */
 export interface YamlShape {
-  type: 'rect' | 'circle' | 'ellipse' | 'polygon' | 'text';
+  type: 'rect' | 'circle' | 'ellipse' | 'polygon' | 'text' | 'path';
   // For rect
   width?: string | number;
   height?: string | number;
   // For circle
   radius?: string | number;
-  segments?: number | string;
+  segments?: number | string | YamlPathSegment[];
   // For ellipse
   radiusX?: string | number;
   radiusZ?: string | number;
@@ -189,9 +189,24 @@ export interface YamlShape {
   font?: string;
   size?: string | number;
   spacing?: string | number;
+  // For path
+  curveSegments?: number | string;
+  closed?: boolean;
   // Center position (optional, default 0,0)
   center?: { x?: string | number; z?: string | number };
 }
+
+export interface YamlPathPoint {
+  x: string | number;
+  z: string | number;
+}
+
+export type YamlPathSegment =
+  | { type: 'moveTo'; point: YamlPathPoint }
+  | { type: 'lineTo'; point: YamlPathPoint }
+  | { type: 'quadraticCurveTo'; control: YamlPathPoint; end: YamlPathPoint }
+  | { type: 'cubicCurveTo'; control1: YamlPathPoint; control2: YamlPathPoint; end: YamlPathPoint }
+  | { type: 'closePath' };
 
 /**
  * Material definition (Phase 2 foundation)
@@ -1649,14 +1664,14 @@ async function processGeometry(
         }
         case 'circle': {
           const radius = typeof shapeDef.radius === 'number' ? shapeDef.radius : evaluatePositionComponent(shapeDef.radius!, builder);
-          const segments = typeof shapeDef.segments === 'number' ? shapeDef.segments : (shapeDef.segments ? Math.round(evaluatePositionComponent(shapeDef.segments, builder)) : 32);
+          const segments = typeof shapeDef.segments === 'number' ? shapeDef.segments : (shapeDef.segments ? Math.round(evaluatePositionComponent(shapeDef.segments as string, builder)) : 32);
           shape = Shape2D.circle(radius, segments, { x: centerX, z: centerZ });
           break;
         }
         case 'ellipse': {
           const radiusX = typeof shapeDef.radiusX === 'number' ? shapeDef.radiusX : evaluatePositionComponent(shapeDef.radiusX!, builder);
           const radiusZ = typeof shapeDef.radiusZ === 'number' ? shapeDef.radiusZ : evaluatePositionComponent(shapeDef.radiusZ!, builder);
-          const segments = typeof shapeDef.segments === 'number' ? shapeDef.segments : (shapeDef.segments ? Math.round(evaluatePositionComponent(shapeDef.segments, builder)) : 32);
+          const segments = typeof shapeDef.segments === 'number' ? shapeDef.segments : (shapeDef.segments ? Math.round(evaluatePositionComponent(shapeDef.segments as string, builder)) : 32);
           shape = Shape2D.ellipse(radiusX, radiusZ, segments, { x: centerX, z: centerZ });
           break;
         }
@@ -1669,6 +1684,56 @@ async function processGeometry(
             z: typeof pt.z === 'number' ? pt.z : evaluatePositionComponent(pt.z, builder)
           }));
           shape = Shape2D.polygon(points);
+          break;
+        }
+        case 'path': {
+          if (!Array.isArray(shapeDef.segments) || shapeDef.segments.length === 0) {
+            throw new Error(`Path shape '${extCmd.shape}' must define path segments`);
+          }
+
+          const resolvePathPoint = (point: { x: string | number; z: string | number }) => ({
+            x: (typeof point.x === 'number' ? point.x : evaluatePositionComponent(point.x, builder)) + centerX,
+            z: (typeof point.z === 'number' ? point.z : evaluatePositionComponent(point.z, builder)) + centerZ
+          });
+
+          const pathSegments = (shapeDef.segments as YamlPathSegment[]).map(segment => {
+            switch (segment.type) {
+              case 'moveTo':
+                return { type: 'moveTo', point: resolvePathPoint(segment.point) };
+              case 'lineTo':
+                return { type: 'lineTo', point: resolvePathPoint(segment.point) };
+              case 'quadraticCurveTo':
+                return {
+                  type: 'quadraticCurveTo',
+                  control: resolvePathPoint(segment.control),
+                  end: resolvePathPoint(segment.end)
+                };
+              case 'cubicCurveTo':
+                return {
+                  type: 'cubicCurveTo',
+                  control1: resolvePathPoint(segment.control1),
+                  control2: resolvePathPoint(segment.control2),
+                  end: resolvePathPoint(segment.end)
+                };
+              case 'closePath':
+                return { type: 'closePath' };
+              default:
+                throw new Error(`Unknown path segment type: ${(segment as any).type}`);
+            }
+          });
+
+          const curveSegments = shapeDef.curveSegments !== undefined
+            ? (typeof shapeDef.curveSegments === 'number'
+              ? shapeDef.curveSegments
+              : Math.round(evaluatePositionComponent(shapeDef.curveSegments, builder)))
+            : 10;
+
+          const path = {
+            segments: pathSegments,
+            closed: shapeDef.closed ?? pathSegments.some(segment => segment.type === 'closePath')
+          };
+
+          shape = Shape2D.fromPath(path, curveSegments);
           break;
         }
         case 'text': {
@@ -1981,4 +2046,3 @@ export function createBuilderRegistry(): BuilderRegistry {
     }
   };
 }
-

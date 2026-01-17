@@ -173,6 +173,8 @@ export class Shape2D {
         return Shape2D.polygon(def.points);
       case 'ellipse':
         return Shape2D.ellipse(def.radiusX, def.radiusZ, def.segments || 32, def.center);
+      case 'path':
+        return Shape2D.fromPath(def.path, def.curveSegments);
       default:
         throw new Error(`Unknown shape type: ${(def as any).type}`);
     }
