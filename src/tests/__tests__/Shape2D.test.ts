@@ -3,6 +3,7 @@
  */
 
 import { Shape2D, Point2D } from '../../geometry/Shape2D';
+import { createRectPath } from '../../geometry/Path2D';
 
 describe('Shape2D', () => {
   describe('Rectangle', () => {
@@ -107,6 +108,13 @@ describe('Shape2D', () => {
       const shape = Shape2D.fromDef({ type: 'ellipse', radiusX: 2, radiusZ: 1, segments: 16 });
       expect(shape.type).toBe('ellipse');
       expect(shape.points.length).toBe(16);
+    });
+
+    it('should create path from definition', () => {
+      const path = createRectPath(2, 1, { x: 1, z: -1 });
+      const shape = Shape2D.fromDef({ type: 'path', path, curveSegments: 8 });
+      expect(shape.type).toBe('path');
+      expect(shape.points.length).toBeGreaterThan(3);
     });
   });
 

@@ -357,6 +357,27 @@ shapes:
       - { x: 0, z: 1 }
 ```
 
+#### Path Shape (Bezier-Preserving)
+```yaml
+shapes:
+  badge_outline:
+    type: path
+    curveSegments: 12        # Tessellation per curve (higher = smoother)
+    center: { x: 0, z: 0 }   # Optional offset for all points
+    segments:
+      - type: moveTo
+        point: { x: -1, z: 0 }
+      - type: cubicCurveTo
+        control1: { x: -1, z: 1 }
+        control2: { x: 1, z: 1 }
+        end: { x: 1, z: 0 }
+      - type: cubicCurveTo
+        control1: { x: 1, z: -1 }
+        control2: { x: -1, z: -1 }
+        end: { x: -1, z: 0 }
+      - type: closePath
+```
+
 #### Text Shape (P2M4-002)
 ```yaml
 shapes:
@@ -645,4 +666,3 @@ To convert a TypeScript builder to YAML:
 5. Extract `builder.compose()` calls → `compose` section
 
 The output should be byte-for-byte identical when run with the same seed.
-
