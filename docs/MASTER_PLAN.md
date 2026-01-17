@@ -75,7 +75,7 @@ Each builder is deterministic (seed → same result) but expressive (wide variat
 | P2-M2d | Agent Authoring Layer | 🟡 6/7 (Decisions, Constraints, Context, Scene Graph, Validation, Introspection ✅) |
 | P2-M3 | 2D Shapes & Extrusion | ✅ Complete |
 | P2-M3b | Architecture & Flow Consolidation | ⬜ (Services, reuse, flow clarity) |
-| P2-M4 | Text & Advanced 2D | 🟡 2/8 (Font Integration ✅, Text to 2D Path ✅ + ProceduralFont, Path2D Bezier 🔄, + Text-on-Path, Typography Domain) |
+| P2-M4 | Text & Advanced 2D | 🟡 3/8 (Font Integration ✅, Text to 2D Path ✅ + ProceduralFont, Path2D Bezier ✅, + Text-on-Path, Typography Domain) |
 | P2-M5 | 3D Boolean CSG | ⬜ |
 | P2-M6 | Botanical Systems | ⬜ |
 | P2-M7 | Advanced Materials | ⬜ |

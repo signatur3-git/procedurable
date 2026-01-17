@@ -1,0 +1,65 @@
+version: "1.0"
+name: LetterA
+description: Rounded vector graphic letter A using bezier paths
+author: AI Agent
+tags: [letter, typography, vector-graphic, bezier, path]
+
+measurements:
+  height:
+    value: 1.0
+    min: 0.5
+    max: 2.0
+    source: "Letter height"
+
+  width:
+    value: 0.8
+    min: 0.4
+    max: 1.6
+    source: "Letter width"
+
+  stroke_width:
+    value: 0.12
+    min: 0.08
+    max: 0.2
+    source: "Stroke thickness"
+
+derived:
+  half_width: "width / 2"
+  half_height: "height / 2"
+  apex_z: "half_height * 1.05"
+  leg_inset: "half_width * 0.25"
+  cross_z: "half_height * 0.15"
+
+materials:
+  letter_color:
+    color: { r: 0.15, g: 0.15, b: 0.15 }
+
+shapes:
+  a_outline:
+    type: path
+    curveTolerance: 0.002
+    curveMaxSegments: 24
+    segments:
+      - type: moveTo
+        point: { x: "-half_width", z: "-half_height" }
+      - type: lineTo
+        point: { x: "-leg_inset", z: cross_z }
+      - type: quadraticCurveTo
+        control: { x: 0, z: apex_z }
+        end: { x: leg_inset, z: cross_z }
+      - type: lineTo
+        point: { x: "half_width", z: "-half_height" }
+      - type: lineTo
+        point: { x: "half_width - stroke_width", z: "-half_height" }
+      - type: lineTo
+        point: { x: 0, z: "cross_z * 0.5" }
+      - type: lineTo
+        point: { x: "-half_width + stroke_width", z: "-half_height" }
+      - type: closePath
+
+geometry:
+  - extrude2d: letter_a
+    shape: a_outline
+    depth: 0.1
+    caps: both
+    color: $letter_color

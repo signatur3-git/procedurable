@@ -54,7 +54,7 @@ Optional implementation hints or agent guidance.
 | Future/Research (Optional)       | 2       | 0    | 0           | 0       |
 | P2-M3: 2D Shapes & Extrusion     | 5       | 5    | 0           | 0       |
 | P2-M3b: Architecture & Flows     | 3       | 0    | 0           | 0       |
-| P2-M4: Text & Advanced 2D        | 8       | 2    | 1           | 0       |
+| P2-M4: Text & Advanced 2D        | 8       | 3    | 0           | 0       |
 | P2-M5: 3D Boolean CSG            | 5       | 0    | 0           | 1       |
 | P2-M6: Botanical Systems         | 5       | 0    | 0           | 0       |
 | P2-M7: Advanced Materials        | 5       | 0    | 0           | 0       |
@@ -1869,10 +1869,8 @@ See `docs/MILESTONE_ACCEPTANCE_LADDERS.md#p2-m4-text--advanced-2d` for the full 
 
 ### Current State (P2-M4 Evaluation)
 
-- **Done:** Font integration, text → 2D shapes, procedural fallback font.
-- **In Progress:** Path2D bezier preservation + tessellation.
-- **Missing for Level 1:** Path-based Shape2D integration, 2D boolean ops for holes, robust extrude for multi-contour glyphs,
-  and text-on-path deformation.
+- **Done:** Font integration, text → 2D shapes, procedural fallback font, Path2D bezier preservation + tessellation.
+- **Missing for Level 1:** 2D boolean ops for holes, robust extrude for multi-contour glyphs, and text-on-path deformation.
 - **Missing for Level 2:** Typography domain model and calligraphic stroke rendering.
 
 ### P2M4-001: Font Integration
@@ -2017,7 +2015,7 @@ geometry:
 ### P2M4-003: Path2D with Bezier Curves
 
 **Epic:** P2-M4 Text & Vector Graphics
-**Status:** 🔄 In Progress
+**Status:** ✅ Complete
 **Size:** L
 **Priority:** P2
 **Dependencies:** P2M3-001
@@ -2042,25 +2040,25 @@ This loses precision, doesn't scale cleanly, and isn't true vector graphics.
 - [x] Implement `tessellateQuadraticCurve()` and `tessellateCubicCurve()`
 - [x] Implement `pathToPolygon()` for converting curves to triangles
 - [x] Implement helper functions: `createRectPath()`, `createCirclePath()`
-- [ ] Tessellation supports configurable tolerance/segment budget and preserves bounds within tolerance
-- [ ] Unit tests for all tessellation functions
-- [ ] Unit tests for path creation helpers
+- [x] Tessellation supports configurable tolerance/segment budget and preserves bounds within tolerance
+- [x] Unit tests for all tessellation functions
+- [x] Unit tests for path creation helpers
 
 **Phase 2: Shape2D Integration**
-- [ ] Add `type: 'path'` to Shape2D
-- [ ] Add `Shape2D.fromPath(path: Path2D, curveSegments?: number)`
-- [ ] Existing extrusion works with path-based shapes
-- [ ] Unit tests for Shape2D path integration
+- [x] Add `type: 'path'` to Shape2D
+- [x] Add `Shape2D.fromPath(path: Path2D, curveSegments?: number)`
+- [x] Existing extrusion works with path-based shapes
+- [x] Unit tests for Shape2D path integration
 
 **Phase 3: FontParser Integration**
-- [ ] Add `FontParser.getGlyphPath()` returning `Path2D` (curves preserved)
-- [ ] Keep existing `getGlyphOutline()` for backward compatibility
-- [ ] Font loading works with Path2D output
-- [ ] Unit tests for glyph path extraction
+- [x] Add `FontParser.getGlyphPath()` returning `Path2D` (curves preserved)
+- [x] Keep existing `getGlyphOutline()` for backward compatibility
+- [x] Font loading works with Path2D output
+- [x] Unit tests for glyph path extraction
 
 **Phase 4: YAML Path Type**
-- [ ] Add `type: path` to YamlShape interface
-- [ ] Parse path segments from YAML:
+- [x] Add `type: path` to YamlShape interface
+- [x] Parse path segments from YAML:
   ```yaml
   shapes:
     flourish:
@@ -2070,24 +2068,25 @@ This loses precision, doesn't scale cleanly, and isn't true vector graphics.
         - { cubicTo: { c1: {...}, c2: {...}, end: {...} } }
         - { close: true }
   ```
-- [ ] Update extrude2d to handle path shapes
-- [ ] Unit tests for YAML path parsing
+- [x] Update extrude2d to handle path shapes
+- [x] Unit tests for YAML path parsing
 
 **Phase 5: Vector Graphics Library**
-- [ ] Create sample letter builders using paths (e.g., LetterA.yaml with curves)
-- [ ] Create sample icon builders (Heart.yaml, Star.yaml)
-- [ ] Demonstrate smooth scaling
-- [ ] Documentation for authoring vector graphics
+- [x] Create sample letter builders using paths (e.g., LetterA.yaml with curves)
+- [x] Create sample icon builders (Heart.yaml, Star.yaml)
+- [x] Demonstrate smooth scaling
+- [x] Documentation for authoring vector graphics
 
 #### Files to Create/Modify
 
-- `src/geometry/Path2D.ts` ✅ Created
-- `src/tests/__tests__/Path2D.test.ts` (new)
-- `src/geometry/Shape2D.ts` - Add path support
-- `src/text/FontParser.ts` - Add getGlyphPath()
-- `src/builder/YamlBuilderParser.ts` - Add path type
-- `builders/letters/LetterA.yaml` (new) - Demo with curves
-- `builders/icons/Heart.yaml` (new) - Demo icon
+- `src/geometry/Path2D.ts` ✅
+- `src/tests/__tests__/Path2D.test.ts` ✅
+- `src/geometry/Shape2D.ts` ✅
+- `src/text/FontParser.ts` ✅
+- `src/builder/YamlBuilderParser.ts` ✅
+- `src/tests/__tests__/YamlPathShape.test.ts` ✅
+- `builders/letters/LetterA.yaml` ✅
+- `builders/icons/IconHeart.yaml` ✅
 
 #### Technical Design
 
