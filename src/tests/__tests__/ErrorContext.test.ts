@@ -9,7 +9,7 @@ import { parseAndExecuteBuilder } from '../../builder/YamlBuilderParser';
 
 describe('YamlBuilderParser - Error Context', () => {
   describe('Decision errors', () => {
-    it('should include path when decision has invalid constraints', () => {
+    it('should include path when decision has invalid constraints', async () => {
       const yaml: any = {
         version: '1.0',
         name: 'TestBuilder',
@@ -22,14 +22,14 @@ describe('YamlBuilderParser - Error Context', () => {
         }
       };
 
-      expect(() => {
-        parseAndExecuteBuilder(yaml, { seed: 1 });
-      }).toThrow(/decisions\.bad_number/);
+      await expect(async () => {
+        await await parseAndExecuteBuilder(yaml, { seed: 1 });
+      }).rejects.toThrow(/decisions\.bad_number/);
     });
   });
 
   describe('Measurement errors', () => {
-    it('should include path when measurement has no value', () => {
+    it('should include path when measurement has no value', async () => {
       const yaml: any = {
         version: '1.0',
         name: 'TestBuilder',
@@ -41,12 +41,12 @@ describe('YamlBuilderParser - Error Context', () => {
         }
       };
 
-      expect(() => {
-        parseAndExecuteBuilder(yaml, { seed: 1 });
-      }).toThrow(/measurements\.bad_measurement/);
+      await expect(async () => {
+        await parseAndExecuteBuilder(yaml, { seed: 1 });
+      }).rejects.toThrow(/measurements\.bad_measurement/);
     });
 
-    it('should include path when expression fails', () => {
+    it('should include path when expression fails', async () => {
       const yaml: any = {
         version: '1.0',
         name: 'TestBuilder',
@@ -58,14 +58,14 @@ describe('YamlBuilderParser - Error Context', () => {
         }
       };
 
-      expect(() => {
-        parseAndExecuteBuilder(yaml, { seed: 1 });
-      }).toThrow(/measurements\.bad_expr/);
+      await expect(async () => {
+        await parseAndExecuteBuilder(yaml, { seed: 1 });
+      }).rejects.toThrow(/measurements\.bad_expr/);
     });
   });
 
   describe('Derived value errors', () => {
-    it('should include path when derived expression fails', () => {
+    it('should include path when derived expression fails', async () => {
       const yaml: any = {
         version: '1.0',
         name: 'TestBuilder',
@@ -77,14 +77,14 @@ describe('YamlBuilderParser - Error Context', () => {
         }
       };
 
-      expect(() => {
-        parseAndExecuteBuilder(yaml, { seed: 1 });
-      }).toThrow(/derived\.bad_derived/);
+      await expect(async () => {
+        await parseAndExecuteBuilder(yaml, { seed: 1 });
+      }).rejects.toThrow(/derived\.bad_derived/);
     });
   });
 
   describe('Geometry errors', () => {
-    it('should include path and command index for geometry errors', () => {
+    it('should include path and command index for geometry errors', async () => {
       const yaml: any = {
         version: '1.0',
         name: 'TestBuilder',
@@ -96,14 +96,14 @@ describe('YamlBuilderParser - Error Context', () => {
         ]
       };
 
-      expect(() => {
-        parseAndExecuteBuilder(yaml, { seed: 1 });
-      }).toThrow(/geometry/);
+      await expect(async () => {
+        await parseAndExecuteBuilder(yaml, { seed: 1 });
+      }).rejects.toThrow(/geometry/);
     });
   });
 
   describe('Composition errors', () => {
-    it('should include path when composed builder not found', () => {
+    it('should include path when composed builder not found', async () => {
       const yaml: any = {
         version: '1.0',
         name: 'TestBuilder',
@@ -115,17 +115,17 @@ describe('YamlBuilderParser - Error Context', () => {
         }
       };
 
-      expect(() => {
-        parseAndExecuteBuilder(yaml, {
+      await expect(async () => {
+        await parseAndExecuteBuilder(yaml, {
           seed: 1,
           builderResolver: () => null
         });
-      }).toThrow(/compose\.sub_instance/);
+      }).rejects.toThrow(/compose\.sub_instance/);
     });
   });
 
   describe('Nested errors', () => {
-    it('should show full path for errors in nested structures', () => {
+    it('should show full path for errors in nested structures', async () => {
       const yaml: any = {
         version: '1.0',
         name: 'TestBuilder',
@@ -144,9 +144,9 @@ describe('YamlBuilderParser - Error Context', () => {
         }
       };
 
-      expect(() => {
-        parseAndExecuteBuilder(yaml, { seed: 1 });
-      }).toThrow(/derived\.nested_bad/);
+      await expect(async () => {
+        await parseAndExecuteBuilder(yaml, { seed: 1 });
+      }).rejects.toThrow(/derived\.nested_bad/);
     });
   });
 });

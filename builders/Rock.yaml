@@ -1,0 +1,56 @@
+name: Rock
+description: Simple rock with random size and shape variations
+
+decisions:
+  rock_width_decision:
+    type: number
+    min: 0.3
+    max: 0.8
+  rock_height_decision:
+    type: number
+    min: 0.4
+    max: 1.0
+  rock_depth_decision:
+    type: number
+    min: 0.3
+    max: 0.8
+  skew_x_decision:
+    type: number
+    min: -0.15
+    max: 0.15
+  skew_z_decision:
+    type: number
+    min: -0.15
+    max: 0.15
+
+measurements:
+  rock_width:
+    value: 0.5
+    source: "Rock width"
+  rock_height:
+    value: 0.7
+    source: "Rock height"
+  rock_depth:
+    value: 0.5
+    source: "Rock depth"
+  skew_x:
+    value: 0
+    source: "X-axis skew"
+  skew_z:
+    value: 0
+    source: "Z-axis skew"
+
+derived:
+  rock_width: "rock_width_decision"
+  rock_height: "rock_height_decision"
+  rock_depth: "rock_depth_decision"
+  skew_x: "skew_x_decision"
+  skew_z: "skew_z_decision"
+
+geometry:
+  - box:
+      name: rock_body
+      center: { x: "skew_x", y: "rock_height / 2", z: "skew_z" }
+      size: { x: "rock_width", y: "rock_height", z: "rock_depth" }
+      color: { r: 0.545, g: 0.353, b: 0.169 }
+

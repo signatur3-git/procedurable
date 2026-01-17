@@ -1,0 +1,108 @@
+version: "1.0"
+name: RoomWithChair
+description: "Demo scene showing constraint passing - places a chair with spatial constraints"
+author: "AI Agent"
+tags: ["demo", "constraints", "scene"]
+
+decisions:
+  room_size:
+    type: choice
+    options: ["small", "medium", "large"]
+    default: "medium"
+
+measurements:
+  # Room dimensions based on size decision
+  room_width:
+    value: 4.0
+    conditional:
+      - if: room_size == "small"
+        value: 3.0
+      - if: room_size == "large"
+        value: 5.0
+  room_depth:
+    value: 4.0
+    conditional:
+      - if: room_size == "small"
+        value: 3.0
+      - if: room_size == "large"
+        value: 5.0
+  floor_thickness:
+    value: 0.05
+
+  # Chair placement area (varies with room size)
+  chair_area_width:
+    value: 0.5
+    conditional:
+      - if: room_size == "small"
+        value: 0.35
+      - if: room_size == "large"
+        value: 0.65
+  chair_area_depth:
+    value: 0.5
+    conditional:
+      - if: room_size == "small"
+        value: 0.35
+      - if: room_size == "large"
+        value: 0.65
+  chair_max_height:
+    value: 0.9
+    conditional:
+      - if: room_size == "small"
+        value: 0.75
+      - if: room_size == "large"
+        value: 1.0
+
+derived:
+  half_width: "room_width / 2"
+  half_depth: "room_depth / 2"
+
+geometry:
+  # === FLOOR ===
+  - vertex: floor_bl
+    position: { x: "-half_width", y: 0, z: "-half_depth" }
+  - vertex: floor_br
+    position: { x: "half_width", y: 0, z: "-half_depth" }
+  - vertex: floor_fr
+    position: { x: "half_width", y: 0, z: "half_depth" }
+  - vertex: floor_fl
+    position: { x: "-half_width", y: 0, z: "half_depth" }
+
+  - vertex: floor_bl_b
+    position: { x: "-half_width", y: "-floor_thickness", z: "-half_depth" }
+  - vertex: floor_br_b
+    position: { x: "half_width", y: "-floor_thickness", z: "-half_depth" }
+  - vertex: floor_fr_b
+    position: { x: "half_width", y: "-floor_thickness", z: "half_depth" }
+  - vertex: floor_fl_b
+    position: { x: "-half_width", y: "-floor_thickness", z: "half_depth" }
+
+  # Floor faces
+  - face: floor_top
+    vertices: [floor_fl, floor_fr, floor_br, floor_bl]
+    color: { r: 0.8, g: 0.8, b: 0.75 }
+  - face: floor_bottom
+    vertices: [floor_bl_b, floor_br_b, floor_fr_b, floor_fl_b]
+    color: { r: 0.7, g: 0.7, b: 0.65 }
+  - face: floor_front
+    vertices: [floor_fl, floor_fr, floor_fr_b, floor_fl_b]
+    color: { r: 0.7, g: 0.7, b: 0.65 }
+  - face: floor_back
+    vertices: [floor_br, floor_bl, floor_bl_b, floor_br_b]
+    color: { r: 0.7, g: 0.7, b: 0.65 }
+  - face: floor_left
+    vertices: [floor_bl, floor_fl, floor_fl_b, floor_bl_b]
+    color: { r: 0.7, g: 0.7, b: 0.65 }
+  - face: floor_right
+    vertices: [floor_fr, floor_br, floor_br_b, floor_fr_b]
+    color: { r: 0.7, g: 0.7, b: 0.65 }
+
+compose:
+  chair:
+    builder: ChairInBounds
+    offset: { x: 0, y: 0, z: 0 }
+    constraints:
+      max_width: "$chair_area_width"
+      max_depth: "$chair_area_depth"
+      max_height: "$chair_max_height"
+      required_tags: ["seating", "stable"]
+      message: "Chair must fit in designated area"

@@ -208,9 +208,22 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
         };
       }
 
-      // Warn if server is hot reloading
+      // Block requests during hot reload to prevent stale data
       if (isReloading && lastReloadEvent) {
-        log(`⚠ Executing commands during hot reload of: ${lastReloadEvent.builder}`);
+        log(`⚠ Blocking command execution during hot reload of: ${lastReloadEvent.builder}`);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify({
+              status: "reloading",
+              builder: lastReloadEvent.builder,
+              timestamp: lastReloadEvent.timestamp,
+              message: `The authoring server is currently reloading builder: ${lastReloadEvent.builder}. Please wait a moment and retry your request.`,
+              hint: "Hot reload typically completes in 1-2 seconds. The system detected a file change and is reloading the builder definition."
+            }, null, 2)
+          }],
+          isError: true,
+        };
       }
 
       try {
@@ -226,7 +239,7 @@ async function handleToolCall(name: string, args: Record<string, unknown>): Prom
               type: "text",
               text: JSON.stringify({
                 error: err.message,
-                hint: `The authoring server is currently reloading builder: ${lastReloadEvent.builder}. This should complete in a moment. The request will be automatically retried.`,
+                hint: `The authoring server may be reloading builder: ${lastReloadEvent.builder}. This should complete in a moment. The request will be automatically retried.`,
                 hotReload: lastReloadEvent
               }, null, 2)
             }],

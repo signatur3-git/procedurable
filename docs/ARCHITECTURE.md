@@ -222,7 +222,12 @@ src/
 │       └── curve.ts
 ├── builder/
 │   ├── TracedBuilder.ts      # Core infrastructure
+│   ├── YamlBuilderParser.ts  # YAML → TracedBuilder calls
+│   ├── ExpressionService.ts  # Unified expression evaluation
 │   └── ChairBuilder.ts       # Reference implementation
+├── core/
+│   ├── MathService.ts        # Math expression evaluator (mathjs)
+│   └── ...                   # Other core utilities
 └── dashboard/
     ├── App.vue               # Main layout
     ├── SeedGrid.vue          # 3×3 render grid

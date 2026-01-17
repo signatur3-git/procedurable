@@ -496,6 +496,82 @@ registerTest('Vase with invalid style fails gracefully', async () => {
 });
 
 // ============================================================================
+// 2D SHAPES (P2-M3-001)
+// ============================================================================
+
+registerTest('geometry.shape2d creates rectangle', async () => {
+  const result = await execute('geometry.shape2d type=rect width=2 height=1');
+  assertOk(result);
+  assert(result.data.type === 'rect', 'Should be rect type');
+  assert(result.data.pointCount === 4, 'Rect should have 4 points');
+  assert(parseFloat(result.data.area) === 2, 'Area should be 2');
+});
+
+registerTest('geometry.shape2d creates circle', async () => {
+  const result = await execute('geometry.shape2d type=circle radius=1 segments=16');
+  assertOk(result);
+  assert(result.data.type === 'circle', 'Should be circle type');
+  assert(result.data.pointCount === 16, 'Circle should have 16 segments');
+  assert(parseFloat(result.data.area) > 3 && parseFloat(result.data.area) < 3.2, 'Area should be ~π');
+});
+
+registerTest('geometry.shape2d creates ellipse', async () => {
+  const result = await execute('geometry.shape2d type=ellipse radiusX=2 radiusZ=1 segments=32');
+  assertOk(result);
+  assert(result.data.type === 'ellipse', 'Should be ellipse type');
+  assert(result.data.pointCount === 32, 'Ellipse should have 32 segments');
+  assert(result.data.bounds, 'Should have bounds');
+});
+
+// ============================================================================
+// 2D EXTRUSION (P2-M3-002)
+// ============================================================================
+
+registerTest('Sign builder uses extrude2d command', async () => {
+  const result = await executeCommands([
+    'builder.open Sign',
+    'builder.run seed=1'
+  ]);
+  assertOk(result.results[0], 'Open Sign should succeed');
+  assertOk(result.results[1], 'Run Sign should succeed');
+
+  const runData = result.results[1].data;
+  assert(runData.vertices > 10, 'Sign should have vertices from extrusion');
+  assert(runData.faces > 10, 'Sign should have faces from extrusion');
+  assert(runData.decisions.sign_shape, 'Should have sign_shape decision');
+});
+
+registerTest('Sign with different shapes', async () => {
+  const result = await executeCommands([
+    'builder.open Sign',
+    'decision.override sign_shape circle',
+    'builder.run seed=1',
+    'builder.mesh'
+  ]);
+  assertOk(result.results[2], 'Run should succeed');
+  assertOk(result.results[3], 'Mesh retrieval should succeed');
+
+  const meshData = result.results[3].data;
+  assert(meshData.vertices.length > 0, 'Should have vertex data');
+  assert(meshData.triangleCount > 0, 'Should have triangulated faces');
+});
+
+registerTest('Sign with size variations', async () => {
+  const result = await executeCommands([
+    'builder.open Sign',
+    'decision.override sign_size large',
+    'builder.run seed=1',
+    'builder.measurements'
+  ]);
+  assertOk(result.results[2], 'Run should succeed');
+  assertOk(result.results[3], 'Measurements should succeed');
+
+  const measurements = result.results[3].data.measurements;
+  assert(measurements.final_width, 'Should have final_width measurement');
+  assert(measurements.final_height, 'Should have final_height measurement');
+});
+
+// ============================================================================
 // INSTANCING OUTPUT (P2-M2c-003)
 // ============================================================================
 

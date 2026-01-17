@@ -36,7 +36,7 @@ const SAFE_FUNCTIONS = new Set([
   // Comparison
   'equal', 'unequal', 'larger', 'smaller', 'largerEq', 'smallerEq',
   // Conditional
-  'if',
+  'if', 'eq',  // eq for string equality comparisons
   // Constants (handled separately)
 ]);
 
@@ -74,6 +74,20 @@ math.import({
         : Boolean(condition);
 
     return conditionBool ? thenValue : elseValue;
+  },
+
+  /**
+   * Custom 'eq' function for string/value equality comparisons
+   * Usage: eq(a, b) returns 1 if equal, 0 if not equal
+   * Works with strings, numbers, booleans
+   *
+   * @example
+   * eq('small', 'small')  // Returns 1 (true)
+   * eq('small', 'large')  // Returns 0 (false)
+   * eq(5, 5)              // Returns 1 (true)
+   */
+  eq: function(a: any, b: any) {
+    return a === b ? 1 : 0;
   }
 }, { override: true });
 
@@ -90,23 +104,24 @@ export interface EvalResult {
  * Evaluate a mathematical expression with variable substitution
  *
  * @param expression - The expression to evaluate (e.g., "sin(angle) * radius")
- * @param variables - Variable values to substitute
+ * @param variables - Variable values to substitute (can be numbers, strings, or booleans)
  * @returns Evaluation result with value and metadata
  *
  * @example
  * evaluate("sin(pi / 4) * 2", {}) // { value: 1.414..., ... }
  * evaluate("x + y", { x: 1, y: 2 }) // { value: 3, ... }
  * evaluate("-half_width", { half_width: 0.5 }) // { value: -0.5, ... }
+ * evaluate("if(eq(size, 'small'), 0.7, 1.0)", { size: 'small' }) // { value: 0.7, ... }
  */
 export function evaluate(
   expression: string,
-  variables: Record<string, number> = {}
+  variables: Record<string, any> = {}
 ): EvalResult {
   // Track which variables were used
   const usedVariables: string[] = [];
 
   // Build scope with constants and provided variables
-  const scope: Record<string, number> = { ...CONSTANTS };
+  const scope: Record<string, any> = { ...CONSTANTS };
 
   for (const [name, value] of Object.entries(variables)) {
     scope[name] = value;
@@ -139,7 +154,7 @@ export function evaluate(
  */
 export function evaluateMany(
   expressions: Record<string, string>,
-  variables: Record<string, number> = {}
+  variables: Record<string, any> = {}
 ): Record<string, EvalResult> {
   const results: Record<string, EvalResult> = {};
 

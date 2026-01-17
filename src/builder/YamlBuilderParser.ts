@@ -4,7 +4,7 @@
  * Converts declarative YAML to TracedBuilder method calls.
  */
 
-import { TracedBuilder, TracedOutput } from './TracedBuilder';
+import { TracedBuilder, TracedOutput, ExpressionContext } from './TracedBuilder';
 import { Vec3 } from '../core/Vec3';
 import { Random } from '../core/Random';
 import { evaluate as mathEvaluate } from '../core/MathService';
@@ -13,7 +13,21 @@ import { Spline } from '../core/Spline';
 import { subdivideCatmullClark } from '../geometry/Subdivision';
 import { placeAroundRectangle, placeAroundCircle } from './Placement';
 import { poissonDiskSample, ScatterBounds } from '../core/Scatter';
-
+import { SharedContext } from './SharedContext';
+import { SceneGraph } from './SceneGraph';
+import { Shape2D } from '../geometry/Shape2D';
+import { extrude2D } from '../geometry/Extrude';
+import { Mesh } from '../geometry/Mesh';
+import { Vertex } from '../geometry/Vertex';
+import { Face } from '../geometry/Face';
+import * as MeshTransform from '../geometry/MeshTransform';
+import {
+  EvaluationContext,
+  createContext,
+  evaluateNumeric as exprEvalNumeric,
+  evaluateCondition as exprEvalCondition,
+  evaluatePosition as exprEvalPosition
+} from './ExpressionService';
 // ============================================================================
 // PARSING CONTEXT (for better error messages)
 // ============================================================================
@@ -76,15 +90,17 @@ export interface YamlBuilderDefinition {
   author?: string;
   tags?: string[];
 
+  shared_context?: Record<string, any>;  // Scene-level shared state (P2-M2d-003)
   decisions?: Record<string, YamlDecision>;
   measurements?: Record<string, YamlMeasurement>;
   derived?: Record<string, string>;
   materials?: Record<string, YamlMaterial>;  // Named colors/materials
   profiles?: Record<string, YamlProfile>;    // 2D profile definitions for lathe/sweep
   splines?: Record<string, YamlSpline>;      // 3D spline paths for sweep
+  shapes?: Record<string, YamlShape>;        // 2D shape definitions for extrusion (P2-M3)
   geometry?: YamlGeometryCommand[];
   compose?: Record<string, YamlComposition>;
-  placement?: YamlPlacement;                  // Constraint-based placement (P2-M2)
+  placement?: YamlPlacement | YamlPlacement[];  // Constraint-based placement (P2-M2), supports array
 }
 
 /**
@@ -150,6 +166,32 @@ export interface YamlSpline {
   points: Array<YamlPosition>;
   tension?: number;  // For catmull-rom (default 0.5)
   closed?: boolean;
+}
+
+/**
+ * 2D Shape definition for extrusion (P2-M3)
+ * Points are in XZ plane (Y=0)
+ */
+export interface YamlShape {
+  type: 'rect' | 'circle' | 'ellipse' | 'polygon' | 'text';
+  // For rect
+  width?: string | number;
+  height?: string | number;
+  // For circle
+  radius?: string | number;
+  segments?: number | string;
+  // For ellipse
+  radiusX?: string | number;
+  radiusZ?: string | number;
+  // For polygon - explicit points
+  points?: Array<{ x: string | number; z: string | number }>;
+  // For text
+  content?: string;
+  font?: string;
+  size?: string | number;
+  spacing?: string | number;
+  // Center position (optional, default 0,0)
+  center?: { x?: string | number; z?: string | number };
 }
 
 /**
@@ -256,12 +298,12 @@ export interface YamlColor {
  */
 export type YamlGeometryCommand =
   | { comment: string }
-  | { vertex: string; position: YamlPosition }
-  | { circle: string; center: YamlPosition; radius: string | number; segments: number | string; purpose: string; normal: number[] }
-  | { loop: string; type: string; vertices: string[]; purpose: string }
-  | { face: string; vertices?: string[]; loop?: string; flip?: boolean; color?: YamlColor }
-  | { loft: string; from: string; to: string; color?: YamlColor }
-  | { cap: string; loop: string; flip?: boolean; color?: YamlColor }
+  | { vertex: string; position: YamlPosition; tags?: string[] }
+  | { circle: string; center: YamlPosition; radius: string | number; segments: number | string; purpose: string; normal: number[]; tags?: string[] }
+  | { loop: string; type: string; vertices: string[]; purpose: string; tags?: string[] }
+  | { face: string; vertices?: string[]; loop?: string; flip?: boolean; color?: YamlColor; tags?: string[] }
+  | { loft: string; from: string; to: string; color?: YamlColor; tags?: string[] }
+  | { cap: string; loop: string; flip?: boolean; color?: YamlColor; tags?: string[] }
   | { when: string; geometry: YamlGeometryCommand[] }
   // Control flow constructs
   | { repeat: number | string; as: string; geometry: YamlGeometryCommand[] }
@@ -269,7 +311,11 @@ export type YamlGeometryCommand =
   // Advanced geometry commands (P2-M1b)
   | { lathe: string; profile: string; segments?: number | string; angle?: number | string; axis?: 'y' | 'x' | 'z'; color?: YamlColor | string }
   | { sweep: string; profile: string; path: string; segments?: number | string; twist?: number | string; scaleStart?: number | string; scaleEnd?: number | string; color?: YamlColor | string }
-  | { subdivide: string; mesh?: string; iterations?: number };
+  | { subdivide: string; mesh?: string; iterations?: number }
+  // 2D Extrusion (P2-M3)
+  | { extrude2d: string; shape: string; depth: number | string; caps?: 'none' | 'front' | 'back' | 'both'; offset?: number | string; bevel?: { size: number | string; segments: number | string }; color?: YamlColor | string }
+  // Radial Array (P2M3-004)
+  | { radialArray: string; count: number | string; radius?: number | string; center?: YamlPosition; axis?: 'x' | 'y' | 'z'; geometry: YamlGeometryCommand[] };
 
 /**
  * Composition definition
@@ -280,6 +326,14 @@ export interface YamlComposition {
   rotation?: YamlPosition;
   scale?: number;
   overrides?: Record<string, any>;
+  /** Constraints to pass to child builder (P2-M2d-002) */
+  constraints?: Record<string, any>;
+  /** Keys to read from shared context (P2-M2d-003) */
+  read_context?: string[];
+  /** Key-value pairs to write to shared context after build (P2-M2d-003) */
+  write_context?: Record<string, string>;  // key -> expression (e.g., "table_width": "$table_width")
+  /** Semantic tags for scene graph (P2-M2d-005) */
+  tags?: string[];
   /** Condition for including this composition (e.g., "$has_stretchers", "count > 0") */
   if?: string;
   /** Repeat this composition N times with index variable */
@@ -298,16 +352,17 @@ export interface YamlComposition {
 export interface ParseOptions {
   seed?: number;
   overrides?: Record<string, any>;
-  builderResolver?: (name: string) => ((seed: number, overrides?: Record<string, any>) => TracedOutput) | null;
+  builderResolver?: (name: string) => ((seed: number, overrides?: Record<string, any>) => TracedOutput | Promise<TracedOutput>) | null;
+  sharedContext?: SharedContext;  // Scene-level shared state (P2-M2d-003)
 }
 
 /**
  * Parse and execute a YAML builder definition
  */
-export function parseAndExecuteBuilder(
+export async function parseAndExecuteBuilder(
   yaml: YamlBuilderDefinition,
   options?: ParseOptions
-): TracedOutput {
+): Promise<TracedOutput> {
   const seed = options?.seed;
   const overrides = options?.overrides ?? {};
 
@@ -318,6 +373,19 @@ export function parseAndExecuteBuilder(
 
   // Track decision values for conditional logic
   const decisionValues = new Map<string, any>();
+
+  // ==========================================================================
+  // PHASE 0: Initialize Shared Context (P2-M2d-003)
+  // ==========================================================================
+
+  // Create or use provided shared context
+  let sharedContext = options?.sharedContext;
+  if (!sharedContext && yaml.shared_context) {
+    sharedContext = new SharedContext(yaml.shared_context);
+  }
+
+  // Initialize scene graph (P2-M2d-005)
+  const sceneGraph = new SceneGraph();
 
   // ==========================================================================
   // PHASE 1: Process Decisions
@@ -387,7 +455,10 @@ export function parseAndExecuteBuilder(
 
         let value: number;
 
-        if (measurement.value !== undefined) {
+        // Check if this measurement has an override (P2-M2d-002 fix)
+        if (overrides[name] !== undefined && typeof overrides[name] === 'number') {
+          value = overrides[name];
+        } else if (measurement.value !== undefined) {
           // Fixed or expression value
           value = typeof measurement.value === 'number'
             ? measurement.value
@@ -403,8 +474,8 @@ export function parseAndExecuteBuilder(
           throw new Error(`Measurement '${name}' has no value or base`);
         }
 
-        // Apply conditionals
-        if (measurement.conditional) {
+        // Apply conditionals (only if not overridden)
+        if (!overrides[name] && measurement.conditional) {
           for (const cond of measurement.conditional) {
             if (evaluateCondition(cond.if, decisionValues)) {
               value = typeof cond.value === 'number'
@@ -451,6 +522,13 @@ export function parseAndExecuteBuilder(
     (builder as any)._yamlSplines = new Map();
   }
 
+  // Store shapes on builder for geometry commands to reference (P2-M3)
+  if (yaml.shapes) {
+    (builder as any)._yamlShapes = new Map(Object.entries(yaml.shapes));
+  } else {
+    (builder as any)._yamlShapes = new Map();
+  }
+
   // ==========================================================================
   // PHASE 3: Process Derived Values
   // ==========================================================================
@@ -495,7 +573,7 @@ export function parseAndExecuteBuilder(
   if (yaml.geometry) {
     try {
       ctx.push('geometry');
-      processGeometry(yaml.geometry, builder, decisionValues, materials, ctx);
+      await processGeometry(yaml.geometry, builder, decisionValues, materials, ctx);
     } catch (err: any) {
       throw ctx.wrapError(err);
     } finally {
@@ -537,7 +615,7 @@ export function parseAndExecuteBuilder(
             const iterInstanceName = `${instanceName}_${i}`;
 
           // Compose this instance
-          composeInstance(iterInstanceName, composition, builder, decisionValues, options);
+          await composeInstance(iterInstanceName, composition, builder, decisionValues, options);
 
           // Restore context
           if (originalValue !== undefined) {
@@ -547,7 +625,7 @@ export function parseAndExecuteBuilder(
         }
       } else {
         // Single composition (no repeat)
-        composeInstance(instanceName, composition, builder, decisionValues, options);
+        await composeInstance(instanceName, composition, builder, decisionValues, options);
       }
       } catch (err: any) {
         throw ctx.wrapError(err);
@@ -558,13 +636,13 @@ export function parseAndExecuteBuilder(
   }
 
   // Helper function to compose a single instance
-  function composeInstance(
+  async function composeInstance(
     instanceName: string,
     composition: YamlComposition,
     builder: TracedBuilder,
     decisionValues: Map<string, any>,
     options: ParseOptions
-  ): void {
+  ): Promise<void> {
     const subBuilderFn = options.builderResolver!(composition.builder);
     if (!subBuilderFn) {
       throw new Error(`Composed builder not found: ${composition.builder}`);
@@ -595,6 +673,44 @@ export function parseAndExecuteBuilder(
       }
     }
 
+    // Forward prefixed decision overrides to child (P2-M2d-002 fix)
+    // If parent has overrides like "chair.constrained", forward as "constrained" to chair
+    if (options.overrides) {
+      const prefix = `${instanceName}.`;
+      for (const [key, value] of Object.entries(options.overrides)) {
+        if (key.startsWith(prefix)) {
+          const childKey = key.slice(prefix.length);
+          resolvedOverrides[childKey] = value;
+        }
+      }
+    }
+
+    // Resolve constraints (replace $references with parent values) (P2-M2d-002)
+    let resolvedConstraints: Record<string, any> | undefined;
+    if (composition.constraints) {
+      resolvedConstraints = {};
+      for (const [key, value] of Object.entries(composition.constraints)) {
+        if (typeof value === 'string' && value.startsWith('$')) {
+          const parentKey = value.slice(1);
+          // First check decisions, then try evaluating as expression (for measurements/derived)
+          if (decisionValues.has(parentKey)) {
+            resolvedConstraints[key] = decisionValues.get(parentKey);
+          } else {
+            // Try to evaluate as expression (for measurements and derived values)
+            try {
+              const evaluated = builder.context.evaluate(parentKey);
+              resolvedConstraints[key] = evaluated.value;
+            } catch {
+              // If evaluation fails, pass through as-is
+              resolvedConstraints[key] = value;
+            }
+          }
+        } else {
+          resolvedConstraints[key] = value;
+        }
+      }
+    }
+
     // Evaluate offset expressions
     let offset: { x: number; y: number; z: number } | undefined;
     if (composition.offset) {
@@ -614,53 +730,15 @@ export function parseAndExecuteBuilder(
       };
     }
 
-    builder.compose(instanceName, subBuilderFn, {
-      offset,
-      rotation,
-      scale: composition.scale,
-      overrides: resolvedOverrides,
-      asInstance: composition.asInstance
-    });
-  }
-
-  // ==========================================================================
-  // PHASE 6: Constraint-Based Placement (P2-M2)
-  // ==========================================================================
-
-  if (yaml.placement && options?.builderResolver) {
-    const placement = yaml.placement;
-    const subBuilderFn = options.builderResolver(placement.builder);
-
-    if (!subBuilderFn) {
-      throw new Error(`Placement builder not found: ${placement.builder}`);
-    }
-
-    // Resolve placement parameters using evaluateExpression (has access to decisionValues)
-    const count = typeof placement.count === 'string'
-      ? evaluateExpression(placement.count, decisionValues, builder)
-      : placement.count;
-
-    const minDistance = typeof placement.minDistance === 'string'
-      ? evaluateExpression(placement.minDistance, decisionValues, builder)
-      : (placement.minDistance ?? 0.1);
-
-    const instancePrefix = placement.instancePrefix ?? 'placed';
-
-    // Resolve overrides once (all placed objects get same overrides)
-    const resolvedOverrides: Record<string, any> = {};
-    if (placement.overrides) {
-      for (const [key, value] of Object.entries(placement.overrides)) {
-        if (typeof value === 'string' && value.startsWith('$')) {
-          const parentKey = value.slice(1);
-          if (decisionValues.has(parentKey)) {
-            resolvedOverrides[key] = decisionValues.get(parentKey);
-          } else {
-            try {
-              const evaluated = builder.context.evaluate(parentKey);
-              resolvedOverrides[key] = evaluated.value;
-            } catch {
-              resolvedOverrides[key] = value;
-            }
+    // Read from shared context (P2-M2d-003)
+    if (composition.read_context && sharedContext) {
+      const contextData = sharedContext.getMultiple(composition.read_context);
+      // Inject context data as overrides (flattened)
+      for (const [key, value] of Object.entries(contextData)) {
+        // If value is an object, flatten it with dot notation
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          for (const [subKey, subValue] of Object.entries(value)) {
+            resolvedOverrides[`${key}_${subKey}`] = subValue;
           }
         } else {
           resolvedOverrides[key] = value;
@@ -668,17 +746,105 @@ export function parseAndExecuteBuilder(
       }
     }
 
-    // Build one instance to get the AABB (for collision detection)
-    const sampleOutput = subBuilderFn(seed ?? 1, resolvedOverrides);
-    if (!sampleOutput || !sampleOutput.mesh) {
-      throw new Error(`Placement builder ${placement.builder} returned invalid output`);
+    // Run sub-builder
+    await builder.compose(instanceName, subBuilderFn, {
+      offset,
+      rotation,
+      scale: composition.scale,
+      overrides: resolvedOverrides,
+      constraints: resolvedConstraints,  // Pass resolved constraints (P2-M2d-002)
+      asInstance: composition.asInstance
+    });
+
+    // Write to shared context (P2-M2d-003)
+    if (composition.write_context && sharedContext) {
+      const subBuilder = builder.getSubBuilder(instanceName);
+      if (subBuilder) {
+        for (const [contextKey, expression] of Object.entries(composition.write_context)) {
+          // Resolve expression from child builder's context
+          if (expression.startsWith('$')) {
+            const measurementKey = expression.slice(1);
+            const measurement = subBuilder.measurements.get(measurementKey);
+            if (measurement) {
+              sharedContext.set(contextKey, measurement.value);
+            }
+          } else {
+            // Evaluate expression in child's context
+            try {
+              const childContext = new ExpressionContext();
+              for (const [name, meas] of subBuilder.measurements.entries()) {
+                childContext.setMeasurement(name, meas.value);
+              }
+              const evaluated = childContext.evaluate(expression);
+              sharedContext.set(contextKey, evaluated.value);
+            } catch (err) {
+              console.warn(`Failed to evaluate write_context expression '${expression}': ${err}`);
+            }
+          }
+        }
+      }
     }
-    const objectAABB = sampleOutput.mesh.getAABB();
+  }
+
+  // ==========================================================================
+  // PHASE 6: Constraint-Based Placement (P2-M2)
+  // ==========================================================================
+
+  if (yaml.placement && options?.builderResolver) {
+    // Handle both single placement and array of placements
+    const placements = Array.isArray(yaml.placement) ? yaml.placement : [yaml.placement];
+
+    for (const placement of placements) {
+      const subBuilderFn = options.builderResolver(placement.builder);
+
+      if (!subBuilderFn) {
+        throw new Error(`Placement builder not found: ${placement.builder}`);
+      }
+
+      // Resolve placement parameters using evaluateExpression (has access to decisionValues)
+      const count = typeof placement.count === 'string'
+        ? evaluateExpression(placement.count, decisionValues, builder)
+        : placement.count;
+
+      const minDistance = typeof placement.minDistance === 'string'
+        ? evaluateExpression(placement.minDistance, decisionValues, builder)
+        : (placement.minDistance ?? 0.1);
+
+      const instancePrefix = placement.instancePrefix ?? 'placed';
+
+      // Resolve overrides once (all placed objects get same overrides)
+      const resolvedOverrides: Record<string, any> = {};
+      if (placement.overrides) {
+        for (const [key, value] of Object.entries(placement.overrides)) {
+          if (typeof value === 'string' && value.startsWith('$')) {
+            const parentKey = value.slice(1);
+            if (decisionValues.has(parentKey)) {
+              resolvedOverrides[key] = decisionValues.get(parentKey);
+            } else {
+              try {
+                const evaluated = builder.context.evaluate(parentKey);
+                resolvedOverrides[key] = evaluated.value;
+              } catch {
+                resolvedOverrides[key] = value;
+              }
+            }
+          } else {
+            resolvedOverrides[key] = value;
+          }
+        }
+      }
+
+      // Build one instance to get the AABB (for collision detection)
+      const sampleOutput = await subBuilderFn(seed ?? 1, resolvedOverrides);
+      if (!sampleOutput || !sampleOutput.mesh) {
+        throw new Error(`Placement builder ${placement.builder} returned invalid output`);
+      }
+      const objectAABB = sampleOutput.mesh.getAABB();
 
 
-    let placementResult: any;
+      let placementResult: any;
 
-    if (placement.mode === 'around_rectangle') {
+      if (placement.mode === 'around_rectangle') {
       const width = typeof placement.width === 'string'
         ? evaluateExpression(placement.width, decisionValues, builder)
         : (placement.width ?? 1);
@@ -769,28 +935,35 @@ export function parseAndExecuteBuilder(
         })),
         rejected: Math.max(0, count - scatterPoints.length)
       };
-    }
-
-    // Compose each placed object
-    if (placementResult && placementResult.placements) {
-      for (let i = 0; i < placementResult.placements.length; i++) {
-        const p = placementResult.placements[i];
-        const instanceName = `${instancePrefix}_${i + 1}`;
-
-        builder.compose(instanceName, subBuilderFn, {
-          offset: { x: p.position.x, y: p.position.y, z: p.position.z },
-          rotation: { x: 0, y: p.rotation.y, z: 0 },  // Use p.rotation.y instead of p.rotation
-          overrides: resolvedOverrides,
-          asInstance: placement.asInstance
-        });
       }
 
-      // TODO: Add placement trace for debugging once TracedBuilder supports custom trace types
-      // For now, placement info is visible via the composed instances (chair_1, chair_2, etc.)
-    }
+      // Compose each placed object
+      if (placementResult && placementResult.placements) {
+        for (let i = 0; i < placementResult.placements.length; i++) {
+          const p = placementResult.placements[i];
+          const instanceName = `${instancePrefix}_${i + 1}`;
+
+          await builder.compose(instanceName, subBuilderFn, {
+            offset: { x: p.position.x, y: p.position.y, z: p.position.z },
+            rotation: { x: 0, y: p.rotation.y, z: 0 },  // Use p.rotation.y instead of p.rotation
+            overrides: resolvedOverrides,
+            asInstance: placement.asInstance
+          });
+        }
+
+        // TODO: Add placement trace for debugging once TracedBuilder supports custom trace types
+        // For now, placement info is visible via the composed instances (chair_1, chair_2, etc.)
+      }
+    } // End of placements loop
   }
 
-  return builder.build();
+  // Build output
+  const output = builder.build();
+
+  // Attach scene graph (P2-M2d-005)
+  output.sceneGraph = sceneGraph;
+
+  return output;
 }
 
 // ============================================================================
@@ -978,13 +1151,13 @@ function resolveGeometryColor(
   return resolveColor(colorDef);
 }
 
-function processGeometry(
+async function processGeometry(
   commands: YamlGeometryCommand[],
   builder: TracedBuilder,
   decisionValues: Map<string, any>,
   materials: Map<string, { r: number; g: number; b: number }> = new Map(),
   ctx: ParsingContext = new ParsingContext()
-): void {
+): Promise<void> {
   for (let cmdIndex = 0; cmdIndex < commands.length; cmdIndex++) {
     const cmd = commands[cmdIndex];
 
@@ -996,7 +1169,8 @@ function processGeometry(
 
       // Conditional geometry (legacy 'when' syntax)
       if ('when' in cmd) {
-        if (evaluateCondition(cmd.when, decisionValues)) {
+        const evalCtx = createContext(builder, decisionValues);
+        if (exprEvalCondition(cmd.when, evalCtx)) {
           processGeometry(cmd.geometry, builder, decisionValues, materials, ctx);
         }
         continue;
@@ -1005,7 +1179,8 @@ function processGeometry(
       // If/else block - mutually exclusive geometry
       if ('if' in cmd) {
         const ifCmd = cmd as { if: string; then: YamlGeometryCommand[]; else?: YamlGeometryCommand[] };
-        if (evaluateCondition(ifCmd.if, decisionValues)) {
+        const evalCtx = createContext(builder, decisionValues);
+        if (exprEvalCondition(ifCmd.if, evalCtx)) {
           processGeometry(ifCmd.then, builder, decisionValues, materials, ctx);
         } else if (ifCmd.else) {
           processGeometry(ifCmd.else, builder, decisionValues, materials, ctx);
@@ -1057,6 +1232,123 @@ function processGeometry(
             decisionValues.delete(indexVar);
           }
         }
+        continue;
+      }
+
+      // Radial Array - duplicate geometry around a center point (P2M3-004)
+      if ('radialArray' in cmd) {
+        const arrayCmd = cmd as {
+          radialArray: string;
+          count: number | string;
+          radius?: number | string;
+          center?: YamlPosition;
+          axis?: 'x' | 'y' | 'z';
+          geometry: YamlGeometryCommand[];
+        };
+
+        // Get count
+        let count: number;
+        if (typeof arrayCmd.count === 'number') {
+          count = arrayCmd.count;
+        } else {
+          if (decisionValues.has(arrayCmd.count)) {
+            count = decisionValues.get(arrayCmd.count);
+          } else {
+            const vars = builder.context.toObject();
+            const result = mathEvaluate(arrayCmd.count, vars);
+            count = Math.round(result.value);
+          }
+        }
+
+        // Get radius (default 0 = no offset, just rotation)
+        let radius = 0;
+        if (arrayCmd.radius !== undefined) {
+          if (typeof arrayCmd.radius === 'number') {
+            radius = arrayCmd.radius;
+          } else {
+            const evalCtx = createContext(builder, decisionValues);
+            radius = exprEvalNumeric(arrayCmd.radius, evalCtx);
+          }
+        }
+
+        // Get center (default 0,0,0)
+        const evalCtx = createContext(builder, decisionValues);
+        const centerX = arrayCmd.center?.x !== undefined
+          ? (typeof arrayCmd.center.x === 'number' ? arrayCmd.center.x : exprEvalNumeric(String(arrayCmd.center.x), evalCtx))
+          : 0;
+        const centerY = arrayCmd.center?.y !== undefined
+          ? (typeof arrayCmd.center.y === 'number' ? arrayCmd.center.y : exprEvalNumeric(String(arrayCmd.center.y), evalCtx))
+          : 0;
+        const centerZ = arrayCmd.center?.z !== undefined
+          ? (typeof arrayCmd.center.z === 'number' ? arrayCmd.center.z : exprEvalNumeric(String(arrayCmd.center.z), evalCtx))
+          : 0;
+
+        // Get axis (default 'y')
+        const axis = arrayCmd.axis || 'y';
+
+        // Store current mesh state
+        const baseMesh = builder.getMesh().clone();
+
+        // Execute geometry for each radial position
+        for (let i = 0; i < count; i++) {
+          const angle = (i / count) * Math.PI * 2; // Radians
+
+          // Calculate offset based on axis and radius
+          let offsetX = 0, offsetY = 0, offsetZ = 0;
+          if (axis === 'y') {
+            // Rotate around Y axis (XZ plane)
+            offsetX = Math.cos(angle) * radius;
+            offsetZ = Math.sin(angle) * radius;
+          } else if (axis === 'x') {
+            // Rotate around X axis (YZ plane)
+            offsetY = Math.cos(angle) * radius;
+            offsetZ = Math.sin(angle) * radius;
+          } else if (axis === 'z') {
+            // Rotate around Z axis (XY plane)
+            offsetX = Math.cos(angle) * radius;
+            offsetY = Math.sin(angle) * radius;
+          }
+
+          // Add index to context
+          builder.context.setMeasurement('__radial_index', i);
+          builder.context.setMeasurement('__radial_angle', angle);
+          builder.context.setMeasurement('__radial_angle_deg', angle * 180 / Math.PI);
+          decisionValues.set('__radial_index', i);
+
+          // Clear current mesh to build from scratch
+          builder.replaceMesh(new Mesh());
+
+          // Process geometry
+          processGeometry(arrayCmd.geometry, builder, decisionValues, materials, ctx);
+
+          // Get the generated mesh
+          const instanceMesh = builder.getMesh();
+
+          // First rotate around the axis
+          let axisVector: Vec3;
+          if (axis === 'y') {
+            axisVector = new Vec3(0, 1, 0);
+          } else if (axis === 'x') {
+            axisVector = new Vec3(1, 0, 0);
+          } else {
+            axisVector = new Vec3(0, 0, 1);
+          }
+
+          const rotated = MeshTransform.rotate(instanceMesh, axisVector, angle);
+
+          // Then translate to position
+          const transformed = MeshTransform.translate(
+            rotated,
+            new Vec3(centerX + offsetX, centerY + offsetY, centerZ + offsetZ)
+          );
+
+          // Merge with base
+          baseMesh.merge(transformed);
+        }
+
+        // Restore the accumulated mesh
+        builder.replaceMesh(baseMesh);
+
         continue;
       }
 
@@ -1311,6 +1603,162 @@ function processGeometry(
       builder.trace(`subdivide:${subCmd.subdivide}`, { iterations });
       continue;
     }
+
+    // Extrude2D (P2-M3)
+    if ('extrude2d' in cmd) {
+      const extCmd = cmd as {
+        extrude2d: string;
+        shape: string;
+        depth: number | string;
+        caps?: 'none' | 'front' | 'back' | 'both';
+        offset?: number | string;
+        bevel?: { size: number | string; segments: number | string };
+        color?: YamlColor | string;
+      };
+
+      const extrudeName = extCmd.extrude2d;
+      const shapeDef = (builder as any)._yamlShapes?.get(extCmd.shape);
+
+      if (!shapeDef) {
+        throw new Error(`Shape '${extCmd.shape}' not found. Define it in shapes: section.`);
+      }
+
+      // Evaluate depth and offset
+      const depth = typeof extCmd.depth === 'number'
+        ? extCmd.depth
+        : evaluatePositionComponent(extCmd.depth, builder);
+
+      const offset = extCmd.offset !== undefined
+        ? (typeof extCmd.offset === 'number' ? extCmd.offset : evaluatePositionComponent(extCmd.offset, builder))
+        : 0;
+
+      // Create Shape2D from definition
+      let shape: Shape2D;
+      const centerX = shapeDef.center?.x !== undefined
+        ? (typeof shapeDef.center.x === 'number' ? shapeDef.center.x : evaluatePositionComponent(shapeDef.center.x, builder))
+        : 0;
+      const centerZ = shapeDef.center?.z !== undefined
+        ? (typeof shapeDef.center.z === 'number' ? shapeDef.center.z : evaluatePositionComponent(shapeDef.center.z, builder))
+        : 0;
+
+      switch (shapeDef.type) {
+        case 'rect': {
+          const width = typeof shapeDef.width === 'number' ? shapeDef.width : evaluatePositionComponent(shapeDef.width!, builder);
+          const height = typeof shapeDef.height === 'number' ? shapeDef.height : evaluatePositionComponent(shapeDef.height!, builder);
+          shape = Shape2D.rect(width, height, { x: centerX, z: centerZ });
+          break;
+        }
+        case 'circle': {
+          const radius = typeof shapeDef.radius === 'number' ? shapeDef.radius : evaluatePositionComponent(shapeDef.radius!, builder);
+          const segments = typeof shapeDef.segments === 'number' ? shapeDef.segments : (shapeDef.segments ? Math.round(evaluatePositionComponent(shapeDef.segments, builder)) : 32);
+          shape = Shape2D.circle(radius, segments, { x: centerX, z: centerZ });
+          break;
+        }
+        case 'ellipse': {
+          const radiusX = typeof shapeDef.radiusX === 'number' ? shapeDef.radiusX : evaluatePositionComponent(shapeDef.radiusX!, builder);
+          const radiusZ = typeof shapeDef.radiusZ === 'number' ? shapeDef.radiusZ : evaluatePositionComponent(shapeDef.radiusZ!, builder);
+          const segments = typeof shapeDef.segments === 'number' ? shapeDef.segments : (shapeDef.segments ? Math.round(evaluatePositionComponent(shapeDef.segments, builder)) : 32);
+          shape = Shape2D.ellipse(radiusX, radiusZ, segments, { x: centerX, z: centerZ });
+          break;
+        }
+        case 'polygon': {
+          if (!shapeDef.points || shapeDef.points.length < 3) {
+            throw new Error(`Polygon shape '${extCmd.shape}' must have at least 3 points`);
+          }
+          const points = shapeDef.points.map((pt: any) => ({
+            x: typeof pt.x === 'number' ? pt.x : evaluatePositionComponent(pt.x, builder),
+            z: typeof pt.z === 'number' ? pt.z : evaluatePositionComponent(pt.z, builder)
+          }));
+          shape = Shape2D.polygon(points);
+          break;
+        }
+        case 'text': {
+          if (!shapeDef.content) {
+            throw new Error(`Text shape '${extCmd.shape}' must have 'content' property`);
+          }
+          if (!shapeDef.font) {
+            throw new Error(`Text shape '${extCmd.shape}' must have 'font' property`);
+          }
+
+          // Import text functions
+          const { textToShape } = await import('../text/TextToShape');
+
+          const size = shapeDef.size !== undefined
+            ? (typeof shapeDef.size === 'number' ? shapeDef.size : evaluatePositionComponent(shapeDef.size, builder))
+            : 1.0;
+          const spacing = shapeDef.spacing !== undefined
+            ? (typeof shapeDef.spacing === 'number' ? shapeDef.spacing : evaluatePositionComponent(shapeDef.spacing, builder))
+            : 0.0;
+
+          // Generate text shape
+          const textShape = textToShape(
+            shapeDef.content,
+            shapeDef.font,
+            size,
+            spacing,
+            { x: centerX, z: centerZ }
+          );
+
+          // Convert text contours to Shape2D
+          // Text can have multiple contours (for holes like in 'A', 'O')
+          // For now, we'll create a Shape2D from the first (outer) contour
+          // TODO: P2M4-003 will add boolean operations to handle holes properly
+          const outerContours = textShape.contours.filter(c => !c.isHole);
+          if (outerContours.length === 0) {
+            throw new Error(`Text shape '${extCmd.shape}' has no outer contours`);
+          }
+
+          // Use the first outer contour for now
+          // When we have boolean ops, we'll union all outer contours and subtract holes
+          shape = Shape2D.polygon(outerContours[0].points);
+          break;
+        }
+        default:
+          throw new Error(`Unknown shape type: ${shapeDef.type}`);
+      }
+
+      // Extrude the shape
+      const extrudeParams: any = {
+        depth,
+        caps: extCmd.caps || 'both',
+        offset
+      };
+
+      // Add bevel if specified
+      if (extCmd.bevel) {
+        const bevelSize = typeof extCmd.bevel.size === 'number'
+          ? extCmd.bevel.size
+          : evaluatePositionComponent(extCmd.bevel.size, builder);
+        const bevelSegments = typeof extCmd.bevel.segments === 'number'
+          ? extCmd.bevel.segments
+          : Math.round(evaluatePositionComponent(extCmd.bevel.segments, builder));
+
+        extrudeParams.bevel = {
+          size: bevelSize,
+          segments: bevelSegments
+        };
+      }
+
+      const extruded = extrude2D(shape, extrudeParams);
+
+      // Get color for faces
+      const color = resolveGeometryColor(extCmd.color, materials);
+
+      // Convert to Mesh format with proper Vertex objects
+      const meshVertices = extruded.vertices.map((v, i) => {
+        const normal = extruded.normals[i];
+        return new Vertex(v, { normal });
+      });
+
+      const meshFaces = extruded.faces.map(face => {
+        return new Face(face, color);
+      });
+
+      const extrudedMesh = new Mesh(meshVertices, meshFaces);
+
+      builder.mergeMesh(extrudeName, extrudedMesh, color);
+      continue;
+    }
     } catch (err: any) {
       // Get command type for error message
       const cmdType = Object.keys(cmd)[0] || 'unknown';
@@ -1341,131 +1789,32 @@ function interpolateName(template: string, context: Record<string, number>): str
 }
 
 function evaluateCondition(condition: string, values: Map<string, any>): boolean {
-  // Simple condition parser: "name == value" or "name != value"
-  const eqMatch = condition.match(/(\w+)\s*==\s*["']?(\w+)["']?/);
-  if (eqMatch) {
-    const [, name, expected] = eqMatch;
-    return values.get(name) === expected;
-  }
-
-  const neqMatch = condition.match(/(\w+)\s*!=\s*["']?(\w+)["']?/);
-  if (neqMatch) {
-    const [, name, expected] = neqMatch;
-    return values.get(name) !== expected;
-  }
-
-  // Boolean check
-  if (values.has(condition)) {
-    return Boolean(values.get(condition));
-  }
-
-  console.warn(`Unknown condition format: ${condition}`);
-  return false;
+  // Use unified ExpressionService evaluation with a minimal context
+  // This provides consistent behavior across all condition evaluation
+  const ctx: EvaluationContext = {
+    decisions: values,
+    measurements: {},
+    constraints: {}
+  };
+  return exprEvalCondition(condition, ctx);
 }
 
 /**
- * Evaluate a composition condition
- * Supports:
- * - "$decision_name" - check if decision value is truthy
- * - "decision_name" - check if decision value is truthy
- * - "value == something" - equality check
- * - "value != something" - inequality check
- * - "value > 0" - numeric comparison
- * - "value >= 0.5" - numeric comparison
+ * Evaluate a composition condition using unified ExpressionService
  */
 function evaluateCompositionCondition(
   condition: string,
   values: Map<string, any>,
   builder: TracedBuilder
 ): boolean {
-  // Handle $-prefixed decision references
-  let cleanCondition = condition;
-  if (condition.startsWith('$')) {
-    cleanCondition = condition.slice(1);
-  }
-
-  // Try simple decision lookup first (boolean check)
-  if (values.has(cleanCondition)) {
-    const value = values.get(cleanCondition);
-    if (typeof value === 'boolean') {
-      return value;
-    }
-    if (typeof value === 'number') {
-      return value > 0;
-    }
-    return Boolean(value);
-  }
-
-  // Try numeric comparisons: "value > 0", "value >= 0.5", "value < 10"
-  const numericMatch = cleanCondition.match(/^(\w+)\s*(>=|<=|>|<)\s*([\d.]+)$/);
-  if (numericMatch) {
-    const [, name, op, numStr] = numericMatch;
-    const leftValue = values.get(name) ?? builder.context.get(name) ?? 0;
-    const rightValue = parseFloat(numStr);
-
-    switch (op) {
-      case '>': return leftValue > rightValue;
-      case '>=': return leftValue >= rightValue;
-      case '<': return leftValue < rightValue;
-      case '<=': return leftValue <= rightValue;
-    }
-  }
-
-  // Try equality/inequality: "style == modern", "type != round"
-  const eqMatch = cleanCondition.match(/^(\w+)\s*==\s*["']?(\w+)["']?$/);
-  if (eqMatch) {
-    const [, name, expected] = eqMatch;
-    const value = values.get(name) ?? builder.context.get(name);
-    return value === expected;
-  }
-
-  const neqMatch = cleanCondition.match(/^(\w+)\s*!=\s*["']?(\w+)["']?$/);
-  if (neqMatch) {
-    const [, name, expected] = neqMatch;
-    const value = values.get(name) ?? builder.context.get(name);
-    return value !== expected;
-  }
-
-  // Try builder context (measurements)
-  try {
-    const result = builder.context.get(cleanCondition);
-    if (result !== undefined) {
-      return Boolean(result);
-    }
-  } catch {
-    // Ignore
-  }
-
-  console.warn(`Unknown composition condition format: ${condition}`);
-  return false;
+  const ctx = createContext(builder, values);
+  return exprEvalCondition(condition, ctx);
 }
 
 function evaluateExpression(expr: string, values: Map<string, any>, builder: TracedBuilder): number {
-  // Build variables object from decision values and builder context
-  const variables: Record<string, number> = {};
-
-  // Add decision values (convert booleans to 1/0 for math expressions)
-  for (const [name, value] of values.entries()) {
-    if (typeof value === 'number') {
-      variables[name] = value;
-    } else if (typeof value === 'boolean') {
-      variables[name] = value ? 1 : 0;  // Convert boolean to number for if() function
-    }
-  }
-
-  // Add measurements and derived values from builder context
-  const contextVars = builder.context.toObject();
-  for (const [name, value] of Object.entries(contextVars)) {
-    variables[name] = value;
-  }
-
-  try {
-    // Use MathService for proper math evaluation (includes sin, cos, pi, etc.)
-    const result = mathEvaluate(expr, variables);
-    return result.value;
-  } catch (e: any) {
-    throw new Error(`Failed to evaluate expression '${expr}': ${e.message}`);
-  }
+  // Use unified ExpressionService
+  const ctx = createContext(builder, values);
+  return exprEvalNumeric(expr, ctx);
 }
 
 function evaluatePositionComponent(value: string | number, builder: TracedBuilder): number {

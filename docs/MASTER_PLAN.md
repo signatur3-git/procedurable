@@ -72,8 +72,8 @@ Each builder is deterministic (seed → same result) but expressive (wide variat
 | P2-M2 | Scene Constraints & Packing | ✅ Complete |
 | P2-M2b | Authoring Infrastructure | ✅ Complete |
 | P2-M2c | World Foundations | ✅ Complete |
-| P2-M2d | Agent Authoring Layer | ⬜ Introspection, Validation |
-| P2-M3 | 2D Shapes & Extrusion | ⬜ |
+| P2-M2d | Agent Authoring Layer | 🟡 6/7 (Decisions, Constraints, Context, Scene Graph, Validation, Introspection ✅) |
+| P2-M3 | 2D Shapes & Extrusion | ✅ Complete |
 | P2-M4 | Text & Advanced 2D | ⬜ |
 | P2-M5 | 3D Boolean CSG | ⬜ |
 | P2-M6 | Botanical Systems | ⬜ |
@@ -247,11 +247,44 @@ For infinite worlds and large scenes (P2-M2c + future):
   - ForestSlice.yaml demo: ground plane (merged) + trees (instanced)
   - 2 integration tests added: instancing with ForestSlice, non-instancing with DiningScene
   - Enables efficient world-scale scenes without mesh merging overhead
-- **P2-M2c COMPLETE: World Foundations Epic**
-  - 5/5 stories complete: Fields, Scatter, Instancing, Chunk Contract, WorldSlice (ready)
+- **P2-M2c-004 COMPLETE: Chunk Query Contract**
+  - Created CHUNK_CONTRACT.md (400+ line specification)
+  - Documented deterministic function contract for world generation
+  - Implemented world query commands: `world.sampleHeight`, `world.instances`
+  - Coordinate hashing for deterministic seeding
+  - Boundary consistency patterns (center rule, padding, deduplication)
+  - Integrates all three systems: ScalarField (terrain), PoissonDisk (scatter), Instance (output)
+  - Ready for infinite world streaming
+- **P2-M2c-005 COMPLETE: WorldSlice Demo Builder**
+  - Created WorldSlice.yaml - comprehensive world generation demo
+  - Ground plane with terrain-aware vertices (50-100m variable size)
+  - Dual Poisson scatter: trees + rocks with different spacing patterns
+  - Coordinate-based generation with chunk_seed hash
+  - All instances output (asInstance: true) - 80+ trees, 15+ rocks per slice
+  - Decisions for terrain (frequency, amplitude), density (tree/rock counts)
+  - Proper derived expressions for coordinate calculations
+  - Created Rock.yaml - procedural rock builder with size/shape variation
+  - Fixed YamlBuilderParser to support array of placements (multiple scatter operations)
+  - Fixed decision type validation (changed invalid 'range' to 'number')
+- **Infrastructure Improvements:**
+  - Added hot reload blocking in MCP server to prevent stale data during cache reload
+  - Returns clear error message during cache reload window (2 seconds)
+  - Prevents race conditions between file changes and MCP requests
+  - Webhook system now properly prevents serving old cached data
+- **P2-M2c COMPLETE: World Foundations Epic 🚀**
+  - 5/5 stories complete: Fields, Scatter, Instancing, Chunk Contract, WorldSlice
   - Foundation ready for infinite world streaming
-  - Deterministic coordinate-based generation
+  - Deterministic coordinate-based generation working
   - All systems integrate: fields drive scatter density, scatter creates instances
-  - CHUNK_CONTRACT.md documents deterministic function contract
-  - Next up: P2-M2d (Agent Authoring Layer)
+  - 95 instances generated in test (80 trees + 15 rocks)
+  - Manual testing: ForestSlice, TreeScatter, WorldSlice all working with varied seeds
+- **P2-M2d-001 COMPLETE: System Introspection**
+  - Added `system.list_builders` command - lists all 15 builders with metadata
+  - Added `system.list_tools` command - catalogs geometry commands, composition tools, math functions
+  - Added `builder.get_interface <name>` command - deep introspection of builder parameters
+  - Returns: decisions (type, min, max, options), measurements, derived expressions, compositions, placements, geometry command counts
+  - Agents can now discover, understand, and plan builder usage
+  - All commands tested with Rock, WorldSlice, DiningChair - working perfectly
+  - Ready for next step: Constraint Context (P2-M2d-002)
 
+---

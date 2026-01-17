@@ -1,0 +1,55 @@
+version: "1.0"
+name: RadialPattern
+description: Simple radial pattern demonstrating radial array
+author: AI Agent
+tags: [geometry, pattern, demo, P2M3-004]
+
+decisions:
+  element_count:
+    type: count
+    min: 3
+    max: 12
+
+  pattern_radius:
+    type: number
+    min: 0.5
+    max: 2.0
+
+measurements:
+  element_size:
+    value: 0.1
+    source: "Size of each element"
+
+  pattern_height:
+    value: 0.05
+    source: "Height of pattern"
+
+materials:
+  pattern_color:
+    color: { r: 0.8, g: 0.6, b: 0.3 }
+
+# Define a simple rectangular element
+shapes:
+  element_shape:
+    type: rect
+    width: element_size
+    height: "element_size * 0.6"
+    center: { x: 0, z: 0 }
+
+geometry:
+  # Use radial array to duplicate the element around a circle
+  - radialArray: pattern_elements
+    count: element_count
+    radius: pattern_radius
+    center: { x: 0, y: 0, z: 0 }
+    axis: y
+    geometry:
+      # Extrude each element
+      - extrude2d: element
+        shape: element_shape
+        depth: pattern_height
+        caps: both
+        bevel:
+          size: 0.005
+          segments: 1
+        color: $pattern_color

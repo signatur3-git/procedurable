@@ -24,6 +24,9 @@ import { systemNamespace } from './commands/system';
 import { mathNamespace } from './commands/math';
 import { materialCommands } from './commands/material';
 import { worldNamespace } from './commands/world';
+import { sceneNamespace } from './commands/scene';
+import { geometryNamespace } from './commands/geometry';
+import { textNamespace } from './commands/text';
 import { parseAndExecuteBuilder, parseYamlWithLibrary } from '../builder/YamlBuilderParser';
 import { TracedOutput } from '../builder/TracedBuilder';
 
@@ -44,6 +47,9 @@ registry.registerNamespace(systemNamespace);
 registry.registerNamespace(mathNamespace);
 registry.registerNamespace(materialCommands);
 registry.registerNamespace(worldNamespace);
+registry.registerNamespace(sceneNamespace);
+registry.registerNamespace(geometryNamespace);
+registry.registerNamespace(textNamespace);
 
 // Global state
 let activeBuilder: string | null = null;
@@ -177,21 +183,24 @@ async function runYamlBuilder(name: string, seed: number, overrides?: Record<str
   const stored = await storage.get(name);
   const definition = await parseYamlWithLibrary(stored.content);
 
-  return parseAndExecuteBuilder(definition, {
+  return await parseAndExecuteBuilder(definition, {
     seed,
     overrides,
     builderResolver: (subName) => {
       // Leg uses TypeScript (synchronous, simple geometry)
       if (subName === 'Leg') {
-        return buildLeg;
+        // Wrap sync builder in async
+        return async (subSeed: number, subOverrides?: Record<string, any>) => {
+          return buildLeg(subSeed, subOverrides);
+        };
       }
 
       // Check if this builder is in the YAML cache
       const cachedBuilder = yamlBuilderCache.get(subName);
       if (cachedBuilder) {
-        // Create a sync wrapper that runs the cached YAML builder
-        return (subSeed: number, subOverrides?: Record<string, any>) => {
-          return parseAndExecuteBuilder(cachedBuilder, {
+        // Create an async wrapper that runs the cached YAML builder
+        return async (subSeed: number, subOverrides?: Record<string, any>) => {
+          return await parseAndExecuteBuilder(cachedBuilder, {
             seed: subSeed,
             overrides: subOverrides,
             // Recursive resolver for nested compositions
@@ -208,16 +217,19 @@ async function runYamlBuilder(name: string, seed: number, overrides?: Record<str
 /**
  * Create a builder resolver function for nested compositions
  */
-function createBuilderResolver(): (name: string) => ((seed: number, overrides?: Record<string, any>) => TracedOutput) | null {
+function createBuilderResolver(): (name: string) => ((seed: number, overrides?: Record<string, any>) => Promise<TracedOutput>) | null {
   return (subName: string) => {
     if (subName === 'Leg') {
-      return buildLeg;
+      // Wrap sync builder in async
+      return async (subSeed: number, subOverrides?: Record<string, any>) => {
+        return buildLeg(subSeed, subOverrides);
+      };
     }
 
     const cachedBuilder = yamlBuilderCache.get(subName);
     if (cachedBuilder) {
-      return (subSeed: number, subOverrides?: Record<string, any>) => {
-        return parseAndExecuteBuilder(cachedBuilder, {
+      return async (subSeed: number, subOverrides?: Record<string, any>) => {
+        return await parseAndExecuteBuilder(cachedBuilder, {
           seed: subSeed,
           overrides: subOverrides,
           builderResolver: createBuilderResolver()

@@ -419,6 +419,182 @@ const handlers: CommandHandler[] = [
         }
       };
     }
+  },
+
+  {
+    action: 'get_interface',
+    description: 'Get detailed interface for a builder (parameters, decisions, measurements)',
+    usage: 'builder.get_interface <name>',
+    execute: async (cmd: ParsedCommand, _ctx: CommandContext): Promise<CommandResult> => {
+      const name = getArg(cmd, 0);
+      if (!name) {
+        return { success: false, error: 'Missing builder name. Usage: builder.get_interface <name>' };
+      }
+
+      // Try to load from YAML storage
+      try {
+        const stored = await storage.get(name);
+        const yamlContent = stored.content;
+
+        // Parse the YAML to extract interface information
+        const { parse: parseYaml } = await import('yaml');
+        const parsed: any = parseYaml(yamlContent);
+
+        const interfaceData: any = {
+          name: parsed.name || name,
+          description: parsed.description || 'No description',
+          version: parsed.version || '1.0',
+          tags: parsed.tags || [],
+          source: 'yaml'
+        };
+
+        // Extract decisions
+        if (parsed.decisions) {
+          interfaceData.decisions = Object.entries(parsed.decisions).map(([key, value]: [string, any]) => ({
+            name: key,
+            type: value.type || 'unknown',
+            description: value.description,
+            default: value.default,
+            options: value.options,
+            weights: value.weights,
+            min: value.min,
+            max: value.max,
+            probability: value.probability
+          }));
+        } else {
+          interfaceData.decisions = [];
+        }
+
+        // Extract measurements
+        if (parsed.measurements) {
+          interfaceData.measurements = Object.entries(parsed.measurements).map(([key, value]: [string, any]) => ({
+            name: key,
+            value: value.value,
+            base: value.base,
+            variation: value.variation,
+            source: value.source,
+            description: value.description
+          }));
+        } else {
+          interfaceData.measurements = [];
+        }
+
+        // Extract derived values
+        if (parsed.derived) {
+          interfaceData.derived = Object.entries(parsed.derived).map(([key, expression]) => ({
+            name: key,
+            expression: expression
+          }));
+        } else {
+          interfaceData.derived = [];
+        }
+
+        // Extract composition info
+        if (parsed.compose) {
+          interfaceData.compositions = Object.entries(parsed.compose).map(([key, value]: [string, any]) => ({
+            name: key,
+            builder: value.builder,
+            offset: value.offset,
+            rotation: value.rotation,
+            scale: value.scale,
+            overrides: value.overrides,
+            asInstance: value.asInstance
+          }));
+        } else {
+          interfaceData.compositions = [];
+        }
+
+        // Extract placement info
+        if (parsed.placement) {
+          const placements = Array.isArray(parsed.placement) ? parsed.placement : [parsed.placement];
+          interfaceData.placements = placements.map((p: any) => ({
+            mode: p.mode,
+            builder: p.builder,
+            count: p.count,
+            center: p.center,
+            width: p.width,
+            depth: p.depth,
+            radius: p.radius,
+            minDistance: p.minDistance,
+            instancePrefix: p.instancePrefix,
+            asInstance: p.asInstance,
+            overrides: p.overrides
+          }));
+        } else {
+          interfaceData.placements = [];
+        }
+
+        // Extract geometry info (count commands)
+        if (parsed.geometry) {
+          const geometryTypes: Record<string, number> = {};
+          for (const cmd of parsed.geometry) {
+            if (cmd.vertex) geometryTypes.vertex = (geometryTypes.vertex || 0) + 1;
+            else if (cmd.loop) geometryTypes.loop = (geometryTypes.loop || 0) + 1;
+            else if (cmd.face) geometryTypes.face = (geometryTypes.face || 0) + 1;
+            else if (cmd.loft) geometryTypes.loft = (geometryTypes.loft || 0) + 1;
+            else if (cmd.box) geometryTypes.box = (geometryTypes.box || 0) + 1;
+            else if (cmd.cylinder) geometryTypes.cylinder = (geometryTypes.cylinder || 0) + 1;
+            else if (cmd.lathe) geometryTypes.lathe = (geometryTypes.lathe || 0) + 1;
+            else if (cmd.sweep) geometryTypes.sweep = (geometryTypes.sweep || 0) + 1;
+            else if (cmd.subdivide) geometryTypes.subdivide = (geometryTypes.subdivide || 0) + 1;
+          }
+          interfaceData.geometryCommands = geometryTypes;
+          interfaceData.totalGeometryCommands = parsed.geometry.length;
+        }
+
+        return {
+          success: true,
+          data: interfaceData
+        };
+
+      } catch (err: any) {
+        return {
+          success: false,
+          error: `Failed to get interface for '${name}': ${err.message}`
+        };
+      }
+    }
+  },
+
+  {
+    action: 'validate',
+    description: 'Run validation checks on the last build',
+    usage: 'builder.validate',
+    execute: async (_cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun || !ctx.lastRun.output) {
+        return {
+          success: false,
+          error: 'No builder has been run yet. Use builder.run first.'
+        };
+      }
+
+      const { validateBuilder } = require('../../validation/ValidationAPI');
+
+      const validationContext = {
+        builderName: ctx.lastRun.builderName,
+        mesh: ctx.lastRun.output.mesh,
+        measurements: ctx.lastRun.output.measurements,
+        decisions: ctx.lastRun.output.decisions,
+        tags: ctx.lastRun.output.sceneGraph?.getAllTags?.() || []
+      };
+
+      const results = validateBuilder(validationContext);
+
+      return {
+        success: true,
+        data: {
+          valid: results.valid,
+          builder: ctx.lastRun.builderName,
+          seed: ctx.lastRun.seed,
+          summary: results.summary,
+          checks: results.checks,
+          // Group checks by status for easier parsing
+          passed: results.checks.filter(c => c.status === 'pass'),
+          warnings: results.checks.filter(c => c.status === 'warning'),
+          failed: results.checks.filter(c => c.status === 'fail')
+        }
+      };
+    }
   }
 ];
 

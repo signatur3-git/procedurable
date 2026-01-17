@@ -1,0 +1,103 @@
+version: "1.0"
+name: Sign
+description: Simple extruded sign with rounded corners
+author: AI Agent
+tags: [geometry, extrusion, demo]
+
+decisions:
+  sign_shape:
+    type: choice
+    default: rectangle
+    options: [rectangle, circle, rounded]
+    description: Shape of the sign
+
+  sign_size:
+    type: choice
+    default: medium
+    options: [small, medium, large]
+    description: Overall size of the sign
+
+measurements:
+  # Base dimensions
+  base_width:
+    value: 1.0
+    min: 0.5
+    max: 2.0
+    description: Sign width
+
+  base_height:
+    value: 0.6
+    min: 0.3
+    max: 1.2
+    description: Sign height
+
+  thickness:
+    value: 0.05
+    min: 0.02
+    max: 0.1
+    description: Sign thickness
+
+derived:
+  # Scale based on size decision using eq() for string comparison
+  size_multiplier: "if(eq(sign_size, 'small'), 0.7, if(eq(sign_size, 'large'), 1.4, 1.0))"
+
+  # Final dimensions
+  final_width: "base_width * size_multiplier"
+  final_height: "base_height * size_multiplier"
+
+materials:
+  wood:
+    color: { r: 0.6, g: 0.4, b: 0.2 }
+
+  metal:
+    color: { r: 0.7, g: 0.7, b: 0.75 }
+
+# Define 2D shapes for extrusion
+shapes:
+  rect_shape:
+    type: rect
+    width: final_width
+    height: final_height
+    center: { x: 0, z: 0 }
+
+  circle_shape:
+    type: circle
+    radius: "final_width * 0.5"
+    segments: 32
+    center: { x: 0, z: 0 }
+
+  rounded_shape:
+    type: ellipse
+    radiusX: "final_width * 0.5"
+    radiusZ: "final_height * 0.5"
+    segments: 48
+    center: { x: 0, z: 0 }
+
+geometry:
+  # Extrude the appropriate shape based on decision
+  - when: "sign_shape == rectangle"
+    geometry:
+      - extrude2d: sign_plate
+        shape: rect_shape
+        depth: thickness
+        caps: both
+        color: $wood
+
+  - when: "sign_shape == circle"
+    geometry:
+      - extrude2d: sign_plate
+        shape: circle_shape
+        depth: thickness
+        caps: both
+        color: $wood
+
+  - when: "sign_shape == rounded"
+    geometry:
+      - extrude2d: sign_plate
+        shape: rounded_shape
+        depth: thickness
+        caps: both
+        bevel:
+          size: 0.01
+          segments: 2
+        color: $metal

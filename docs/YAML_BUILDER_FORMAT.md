@@ -290,6 +290,114 @@ derived:
   adjusted: "base_value + (variation * 0.1)"
 ```
 
+**Accessing constraints with @ prefix:**
+```yaml
+derived:
+  # Clamp natural dimension to parent constraint
+  final_width: "min(seat_width, @max_width)"
+  
+  # Use multiple constraints
+  final_height: "min(seat_height + back_height, @max_height)"
+  
+  # Constraints have automatic fallbacks:
+  # @max_* defaults to 999 (no constraint)
+  # @min_* defaults to 0 (no constraint)
+```
+
+**How @ prefix works:**
+- The `@` prefix is transformed to `__constraint_` internally
+- Example: `@max_width` becomes `__constraint_max_width`
+- This allows MathJS to parse the expression correctly
+
+### Shapes (2D Geometry for Extrusion)
+
+Define 2D shapes that can be extruded into 3D geometry. Used with `extrude2d` command.
+
+#### Rectangle Shape
+```yaml
+shapes:
+  plate:
+    type: rect
+    width: 2.0
+    height: 1.0
+    center: { x: 0, z: 0 }  # Optional, defaults to origin
+```
+
+#### Circle Shape
+```yaml
+shapes:
+  hub:
+    type: circle
+    radius: 0.5
+    segments: 32  # More segments = smoother circle
+    center: { x: 0, z: 0 }
+```
+
+#### Ellipse Shape
+```yaml
+shapes:
+  oval_base:
+    type: ellipse
+    radiusX: 1.0
+    radiusZ: 0.6
+    segments: 32
+    center: { x: 0, z: 0 }
+```
+
+#### Polygon Shape
+```yaml
+shapes:
+  custom_profile:
+    type: polygon
+    points:
+      - { x: 0, z: 0 }
+      - { x: 1, z: 0 }
+      - { x: 1, z: 1 }
+      - { x: 0.5, z: 1.5 }
+      - { x: 0, z: 1 }
+```
+
+#### Text Shape (P2M4-002)
+```yaml
+shapes:
+  sign_text:
+    type: text
+    content: "HELLO"        # Text string or decision reference
+    font: "roboto"          # Font name (must be loaded via text.load command)
+    size: 0.5               # Text height in meters
+    spacing: 0.02           # Extra spacing between characters (optional)
+    center: { x: 0, z: 0 }  # Center position (optional)
+```
+
+**Text shape requirements:**
+- Font must be loaded before building: `text.load roboto path="./fonts/Roboto-Regular.ttf"`
+- Supports TrueType (.ttf) and OpenType (.otf) fonts
+- Text can reference decisions: `content: text_content` where `text_content` is a choice decision
+- Automatically handles kerning for proper character spacing
+- **Current limitation:** Only outer contours are used; holes (like in 'A', 'O') require boolean operations (P2M4-003)
+
+**Using text shapes in geometry:**
+```yaml
+shapes:
+  sign_text:
+    type: text
+    content: text_content  # References a decision
+    font: "roboto"
+    size: text_size       # References a measurement
+    spacing: 0.02
+
+geometry:
+  # Extrude text to 3D
+  - extrude2d: text
+    shape: sign_text
+    depth: 0.05
+    bevel:
+      size: 0.01
+      segments: 2
+    color: $text_color
+```
+
+
 **Conditional expressions** using `if()` function:
 ```yaml
 derived:
@@ -306,6 +414,27 @@ derived:
   leg_radius: "if(has_thick_legs, 0.03, 0.02)"
 ```
 
+**String comparisons** using `eq()` function:
+```yaml
+derived:
+  # Use eq() for string equality with choice decisions in DERIVED expressions
+  size_multiplier: "if(eq(sign_size, 'small'), 0.7, if(eq(sign_size, 'large'), 1.4, 1.0))"
+  
+  # eq() returns 1 for equal, 0 for not equal
+  is_oak: "eq(wood_type, 'oak')"  # Returns 1 if oak, 0 otherwise
+  
+  # Works with any type (strings, numbers, booleans)
+  matches: "eq(value, 'expected')"
+```
+
+**Note:** For `when:` conditions in geometry sections, use simple `==` syntax instead:
+```yaml
+geometry:
+  - when: "sign_shape == rectangle"  # Simple == in when conditions
+    geometry:
+      - extrude2d: sign_plate
+```
+
 **Supported operators and functions:**
 - Arithmetic: `+`, `-`, `*`, `/`, `()`
 - Trigonometry: `sin`, `cos`, `tan`, `atan2`
@@ -313,6 +442,7 @@ derived:
 - Comparison: `>`, `<`, `>=`, `<=`, `==`, `!=`
 - Conditional: `if(condition, then, else)`
 - Constants: `pi`, `e`, `tau`
+- **Constraints:** `@constraint_name` (only in child builders)
 
 ### Geometry Commands
 
@@ -389,9 +519,87 @@ compose:
     overrides:
       decision_name: value
       measurement_name: 0.5
+    constraints:  # NEW (P2-M2d-002): Semantic constraints for child builder
+      max_height: 0.9
+      max_footprint:
+        width: 0.5
+        depth: 0.5
+      pose:
+        facing: center
+        angle_tolerance: 15
+      required_tags: [seating, stable]
 ```
 
-Use `$parent_decision` to reference parent builder's decisions.
+Use `$parent_decision` to reference parent builder's decisions in both `overrides` and `constraints`.
+
+**Constraints vs Overrides:**
+- **Overrides** force specific decision values (e.g., `style: modern`)
+- **Constraints** pass context/requirements that child can query (e.g., `max_height: 0.9`)
+- Child builder accesses constraints via `builder.getConstraint('max_height')`
+- Constraints are metadata - child is responsible for validation
+- Enables semantic relationships like "chair must fit in space" or "face this direction"
+
+**Example:**
+```yaml
+# Parent builder (RoomWithChair.yaml)
+compose:
+  chair:
+    builder: ChairInBounds
+    offset: { x: 0, y: 0, z: 0 }
+    constraints:
+      max_width: "$chair_area_width"    # Reference parent measurement
+      max_depth: "$chair_area_depth"
+      max_height: "$chair_max_height"
+      message: "Chair must fit in designated area"
+
+# Child builder (ChairInBounds.yaml) can query:
+# const maxHeight = builder.getConstraint('max_height');  // 0.9
+# const message = builder.getConstraint('message');       // "Chair must fit..."
+```
+
+### Shared Context (Cross-Builder Communication)
+
+Scene-level shared state for sibling coordination:
+```yaml
+# Define shared state at scene level
+shared_context:
+  theme:
+    style: modern
+    primary_wood: oak
+    accent_color: steel
+  spatial:
+    room_width: 5.0
+    occupied_zones: []
+
+compose:
+  table:
+    builder: Table
+    offset: { x: 0, y: 0, z: 0 }
+    read_context: [theme, spatial]          # Read theme and spatial from context
+    write_context:
+      table_width: "$top_width"              # Write table dimensions back
+      table_height: "$height"
+  
+  chair_1:
+    builder: Chair
+    offset: { x: -1, y: 0, z: 1.5 }
+    read_context: [theme, table_width, table_height]  # Read theme + table size
+    write_context:
+      chair_1_position: "$position"
+```
+
+**How it works:**
+- **`shared_context`**: Initial scene-level state (top-level YAML section)
+- **`read_context`**: Keys to inject as overrides before building child
+- **`write_context`**: Key-value pairs to write back after child builds
+  - Values are expressions evaluated in child's context
+  - Use `$measurement_name` to reference child measurements
+- **Evaluation order**: Sequential (left-to-right), siblings can see previous siblings' writes
+
+**Use cases:**
+- Theme coordination (all furniture uses same style/colors)
+- Spatial awareness (chairs know table size and position themselves)
+- Resource allocation (track occupied zones to avoid collisions)
 
 ---
 

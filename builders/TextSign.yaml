@@ -1,0 +1,104 @@
+version: "1.0"
+name: TextSign
+description: Simple text sign demonstrating text-to-3D pipeline (P2M4-002)
+author: AI Agent
+tags: [text, demo, signage, P2M4-002]
+
+decisions:
+  text_content:
+    type: choice
+    options: ["HELLO", "OPEN", "EXIT", "WELCOME"]
+    weights: [0.3, 0.3, 0.2, 0.2]
+
+  sign_style:
+    type: choice
+    options: [modern, classic, bold]
+    weights: [0.4, 0.3, 0.3]
+
+measurements:
+  text_size:
+    value: 0.5
+    min: 0.3
+    max: 1.0
+    source: "Text height in meters"
+
+  text_depth:
+    value: 0.05
+    min: 0.02
+    max: 0.1
+    source: "Text extrusion depth"
+
+  plate_thickness:
+    value: 0.02
+    min: 0.01
+    max: 0.05
+    source: "Background plate thickness"
+
+  plate_padding:
+    value: 0.2
+    min: 0.1
+    max: 0.4
+    source: "Padding around text"
+
+derived:
+  # Text styling based on sign_style
+  text_spacing: "if(eq(sign_style, 'bold'), 0.05, 0.02)"
+
+  # Bevel size based on style
+  text_bevel: "if(eq(sign_style, 'modern'), 0.01, if(eq(sign_style, 'classic'), 0.005, 0.0))"
+  bevel_segments: "if(eq(sign_style, 'modern'), 2, 1)"
+
+materials:
+  text_color:
+    color: { r: 0.9, g: 0.9, b: 0.95 }  # Off-white text
+
+  plate_wood:
+    color: { r: 0.4, g: 0.3, b: 0.2 }  # Wood background
+
+  plate_metal:
+    color: { r: 0.3, g: 0.3, b: 0.35 }  # Metal background
+
+# Note: Text shapes require fonts to be loaded via text.load command first
+# Example: text.load roboto path="./fonts/Roboto-Regular.ttf"
+# For testing, use any TrueType/OpenType font available on your system
+
+shapes:
+  # Text shape - requires font to be loaded
+  # For now, this is a placeholder - actual font must be loaded at runtime
+  sign_text:
+    type: text
+    content: text_content  # References decision
+    font: "roboto"         # Font must be loaded via text.load command
+    size: text_size
+    spacing: text_spacing
+    center: { x: 0, z: 0 }
+
+  # Background plate (will calculate size from text bounds in future)
+  # For now, using fixed size
+  sign_plate:
+    type: rect
+    width: 3.0
+    height: 1.0
+    center: { x: 0, z: 0 }
+
+geometry:
+  # Step 1: Create background plate
+  - extrude2d: plate
+    shape: sign_plate
+    depth: plate_thickness
+    caps: both
+    bevel:
+      size: 0.01
+      segments: 1
+    color: $plate_wood
+
+  # Step 2: Create text (raised above plate)
+  - extrude2d: text
+    shape: sign_text
+    depth: text_depth
+    offset: plate_thickness  # Position text on top of plate
+    caps: both
+    bevel:
+      size: text_bevel
+      segments: bevel_segments
+    color: $text_color

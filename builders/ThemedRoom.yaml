@@ -1,0 +1,93 @@
+version: "1.0"
+name: ThemedRoom
+description: "Demo showing shared context for theme coordination across furniture"
+author: "AI Agent"
+tags: ["demo", "shared_context", "theme"]
+
+# Shared scene-level state that all children can access
+shared_context:
+  theme:
+    style: modern
+    primary_wood: oak
+    accent_color: steel
+  room:
+    width: 5.0
+    depth: 4.0
+
+decisions:
+  furniture_count:
+    type: count
+    min: 2
+    max: 4
+
+measurements:
+  room_width:
+    value: 5.0
+  room_depth:
+    value: 4.0
+  floor_thickness:
+    value: 0.05
+
+derived:
+  half_width: "room_width / 2"
+  half_depth: "room_depth / 2"
+
+geometry:
+  # === FLOOR ===
+  - vertex: floor_bl
+    position: { x: "-half_width", y: 0, z: "-half_depth" }
+  - vertex: floor_br
+    position: { x: "half_width", y: 0, z: "-half_depth" }
+  - vertex: floor_fr
+    position: { x: "half_width", y: 0, z: "half_depth" }
+  - vertex: floor_fl
+    position: { x: "-half_width", y: 0, z: "half_depth" }
+
+  - vertex: floor_bl_b
+    position: { x: "-half_width", y: "-floor_thickness", z: "-half_depth" }
+  - vertex: floor_br_b
+    position: { x: "half_width", y: "-floor_thickness", z: "-half_depth" }
+  - vertex: floor_fr_b
+    position: { x: "half_width", y: "-floor_thickness", z: "half_depth" }
+  - vertex: floor_fl_b
+    position: { x: "-half_width", y: "-floor_thickness", z: "half_depth" }
+
+  # Floor faces
+  - face: floor_top
+    vertices: [floor_fl, floor_fr, floor_br, floor_bl]
+    color: { r: 0.9, g: 0.9, b: 0.85 }
+  - face: floor_bottom
+    vertices: [floor_bl_b, floor_br_b, floor_fr_b, floor_fl_b]
+    color: { r: 0.8, g: 0.8, b: 0.75 }
+  - face: floor_front
+    vertices: [floor_fl, floor_fr, floor_fr_b, floor_fl_b]
+    color: { r: 0.8, g: 0.8, b: 0.75 }
+  - face: floor_back
+    vertices: [floor_br, floor_bl, floor_bl_b, floor_br_b]
+    color: { r: 0.8, g: 0.8, b: 0.75 }
+  - face: floor_left
+    vertices: [floor_bl, floor_fl, floor_fl_b, floor_bl_b]
+    color: { r: 0.8, g: 0.8, b: 0.75 }
+  - face: floor_right
+    vertices: [floor_fr, floor_br, floor_br_b, floor_fr_b]
+    color: { r: 0.8, g: 0.8, b: 0.75 }
+
+compose:
+  table:
+    builder: Table
+    offset: { x: 0, y: 0, z: 0 }
+    read_context: [theme, room]
+    write_context:
+      table_width: "$top_width"
+      table_depth: "$top_depth"
+      table_height: "$height"
+
+  chair_1:
+    builder: ChairInBounds
+    offset: { x: -1, y: 0, z: 1.5 }
+    read_context: [theme, table_width, table_depth]
+    constraints:
+      max_width: 0.5
+      max_height: 0.9
+    write_context:
+      chair_1_height: "$final_height"

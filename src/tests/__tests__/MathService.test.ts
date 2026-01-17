@@ -105,6 +105,53 @@ describe('MathService - Conditional Expressions', () => {
     });
   });
 
+  describe('String equality with eq() function', () => {
+    it('should compare strings with eq()', () => {
+      const result1 = evaluate("eq('small', 'small')", {});
+      expect(result1.value).toBe(1); // true
+
+      const result2 = evaluate("eq('small', 'large')", {});
+      expect(result2.value).toBe(0); // false
+    });
+
+    it('should use eq() with variables', () => {
+      const result1 = evaluate("eq(size, 'small')", { size: 'small' });
+      expect(result1.value).toBe(1); // true
+
+      const result2 = evaluate("eq(size, 'large')", { size: 'small' });
+      expect(result2.value).toBe(0); // false
+    });
+
+    it('should work with eq() in if() expressions', () => {
+      const result1 = evaluate("if(eq(size, 'small'), 0.7, 1.0)", { size: 'small' });
+      expect(result1.value).toBe(0.7);
+
+      const result2 = evaluate("if(eq(size, 'small'), 0.7, 1.0)", { size: 'large' });
+      expect(result2.value).toBe(1.0);
+    });
+
+    it('should handle nested if() with eq()', () => {
+      const expr = "if(eq(size, 'small'), 0.7, if(eq(size, 'large'), 1.4, 1.0))";
+
+      const result1 = evaluate(expr, { size: 'small' });
+      expect(result1.value).toBe(0.7);
+
+      const result2 = evaluate(expr, { size: 'medium' });
+      expect(result2.value).toBe(1.0);
+
+      const result3 = evaluate(expr, { size: 'large' });
+      expect(result3.value).toBe(1.4);
+    });
+
+    it('should compare numbers with eq()', () => {
+      const result1 = evaluate("eq(5, 5)", {});
+      expect(result1.value).toBe(1);
+
+      const result2 = evaluate("eq(5, 3)", {});
+      expect(result2.value).toBe(0);
+    });
+  });
+
   describe('Expression validation', () => {
     it('should validate if() expressions', () => {
       const result = validate('if(x > 0, 1, -1)');

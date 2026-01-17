@@ -1,0 +1,128 @@
+version: "1.0"
+name: Gear
+description: Mechanical gear demonstrating full 2D→3D pipeline - shape primitives, radial array, and extrusion
+author: AI Agent
+tags: [geometry, mechanical, demo, P2M3-005]
+
+decisions:
+  tooth_count:
+    type: count
+    min: 8
+    max: 32
+
+  gear_style:
+    type: choice
+    options: [simple, beveled, rounded]
+    weights: [0.4, 0.4, 0.2]
+
+measurements:
+  # Gear dimensions
+  inner_radius:
+    value: 0.4
+    min: 0.2
+    max: 0.6
+    source: "Inner radius of gear (hub)"
+
+  outer_radius:
+    value: 1.0
+    min: 0.5
+    max: 1.5
+    source: "Outer radius of gear (to tooth tips)"
+
+  gear_thickness:
+    value: 0.2
+    min: 0.1
+    max: 0.4
+    source: "Thickness of gear body"
+
+  tooth_width:
+    value: 0.1
+    min: 0.05
+    max: 0.2
+    source: "Width of each tooth"
+
+  tooth_height:
+    value: 0.15
+    min: 0.1
+    max: 0.3
+    source: "Height of teeth (radial extension)"
+
+  hub_hole_radius:
+    value: 0.1
+    min: 0.05
+    max: 0.2
+    source: "Center hole radius"
+
+derived:
+  # Calculate tooth dimensions
+  tooth_base_radius: "outer_radius - tooth_height"
+
+  # Bevel size based on style
+  bevel_size: "if(eq(gear_style, 'beveled'), 0.02, if(eq(gear_style, 'rounded'), 0.03, 0.0))"
+  bevel_segments: "if(eq(gear_style, 'rounded'), 3, 1)"
+
+materials:
+  gear_metal:
+    color: { r: 0.6, g: 0.6, b: 0.65 }
+
+  gear_brass:
+    color: { r: 0.8, g: 0.7, b: 0.3 }
+
+# Define 2D shapes
+shapes:
+  # Main gear body (circle with center hole)
+  gear_body:
+    type: circle
+    radius: tooth_base_radius
+    segments: 64
+    center: { x: 0, z: 0 }
+
+  # Center hole for shaft
+  hub_hole:
+    type: circle
+    radius: hub_hole_radius
+    segments: 16
+    center: { x: 0, z: 0 }
+
+  # Single gear tooth shape (rectangular)
+  tooth_shape:
+    type: rect
+    width: tooth_width
+    height: tooth_height
+    center: { x: 0, z: "tooth_base_radius + 0.075" }
+
+geometry:
+  # Step 1: Create main gear body
+  - extrude2d: gear_body
+    shape: gear_body
+    depth: gear_thickness
+    caps: both
+    bevel:
+      size: bevel_size
+      segments: bevel_segments
+    color: $gear_metal
+
+  # Step 2: Create center hole (subtract would be ideal, but we'll use a different color for now)
+  - extrude2d: hub_hole
+    shape: hub_hole
+    depth: gear_thickness
+    offset: 0.001  # Slight offset to avoid z-fighting
+    caps: both
+    color: $gear_brass
+
+  # Step 3: Use radial array to create teeth around the gear
+  - radialArray: gear_teeth
+    count: tooth_count
+    radius: 0  # No offset, teeth are already positioned at tooth_base_radius
+    center: { x: 0, y: 0, z: 0 }
+    axis: y
+    geometry:
+      # Extrude each tooth
+      - extrude2d: tooth
+        shape: tooth_shape
+        depth: gear_thickness
+        caps: both
+        bevel:
+          size: "bevel_size * 0.5"
+          segments: 1
+        color: $gear_metal

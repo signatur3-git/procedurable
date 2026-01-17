@@ -755,33 +755,41 @@ function setupEventHandlers() {
 
   elements.runBtn.addEventListener('click', runCurrentSeed);
 
-  elements.currentSeed.addEventListener('change', () => {
+  elements.currentSeed.addEventListener('change', async () => {
     state.currentSeed = parseInt(elements.currentSeed.value) || 1;
     elements.seedDisplay.textContent = `Seed: ${state.currentSeed}`;
     if (state.activeBuilder) {
-      runCurrentSeed();
+      // Reset measurement overrides when changing seeds
+      await executeCommands(['measurement.reset-all']);
+      await runCurrentSeed();
     }
   });
 
   // Navigation buttons
-  elements.prevBtn.addEventListener('click', () => {
+  elements.prevBtn.addEventListener('click', async () => {
     if (state.currentSeed > 1) {
       state.currentSeed--;
       elements.currentSeed.value = String(state.currentSeed);
-      runCurrentSeed();
+      // Reset measurement overrides when changing seeds
+      await executeCommands(['measurement.reset-all']);
+      await runCurrentSeed();
     }
   });
 
-  elements.nextBtn.addEventListener('click', () => {
+  elements.nextBtn.addEventListener('click', async () => {
     state.currentSeed++;
     elements.currentSeed.value = String(state.currentSeed);
-    runCurrentSeed();
+    // Reset measurement overrides when changing seeds
+    await executeCommands(['measurement.reset-all']);
+    await runCurrentSeed();
   });
 
-  elements.randomBtn.addEventListener('click', () => {
+  elements.randomBtn.addEventListener('click', async () => {
     state.currentSeed = Math.floor(Math.random() * 100000) + 1;
     elements.currentSeed.value = String(state.currentSeed);
-    runCurrentSeed();
+    // Reset measurement overrides when changing seeds
+    await executeCommands(['measurement.reset-all']);
+    await runCurrentSeed();
   });
 
   // Handle window resize

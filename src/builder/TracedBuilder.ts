@@ -214,6 +214,7 @@ export interface TracedOutput {
     overrides?: Record<string, any>;
     seed?: number;
   }>;
+  sceneGraph?: any;  // SceneGraph - Semantic scene representation (P2-M2d-005)
   validation: {
     issues: ValidationIssue[];
     bounds: { min: Vec3; max: Vec3; center: Vec3; size: Vec3 };
@@ -316,6 +317,7 @@ export class TracedBuilder {
   public measurements: Map<string, { value: number; source?: string }>;  // Public for YAML parser access
   private decisions: Map<string, TracedDecision>;
   private decisionOverrides: Map<string, any>;
+  private constraints: Map<string, any>;  // Constraints from parent builder (P2-M2d-002)
   private vertices: Map<string, number>;  // name → index
   private loops: Map<string, { indices: number[]; purpose: LoopPurpose }>;
   private subBuilders: Map<string, TracedOutput>;  // Composed sub-builders
@@ -342,11 +344,20 @@ export class TracedBuilder {
     this.measurements = new Map();
     this.decisions = new Map();
     this.decisionOverrides = new Map(Object.entries(overrides ?? {}));
+    this.constraints = new Map();
     this.vertices = new Map();
     this.loops = new Map();
     this.subBuilders = new Map();
     this.instances = [];
     this.startTime = Date.now();
+
+    // Extract constraints from overrides (P2-M2d-002)
+    if (overrides && overrides.__constraints__) {
+      this.constraints = new Map(Object.entries(overrides.__constraints__));
+      // Remove __constraints__ from decision overrides
+      delete overrides.__constraints__;
+      this.decisionOverrides = new Map(Object.entries(overrides));
+    }
   }
 
   // ==========================================================================
@@ -571,6 +582,34 @@ export class TracedBuilder {
    */
   getSeed(): number {
     return this.seed;
+  }
+
+  // ==========================================================================
+  // CONSTRAINTS (P2-M2d-002)
+  // ==========================================================================
+
+  /**
+   * Query constraint passed from parent builder
+   * Returns undefined if constraint doesn't exist
+   *
+   * Example: builder.getConstraint('max_height') → 0.9
+   */
+  getConstraint<T = any>(key: string): T | undefined {
+    return this.constraints.get(key);
+  }
+
+  /**
+   * Check if a constraint exists
+   */
+  hasConstraint(key: string): boolean {
+    return this.constraints.has(key);
+  }
+
+  /**
+   * Get all constraints
+   */
+  getConstraints(): Record<string, any> {
+    return Object.fromEntries(this.constraints);
   }
 
   // ==========================================================================
@@ -907,22 +946,29 @@ export class TracedBuilder {
    * @param builderFn - Function that creates the sub-builder output
    * @param options - Transform and override options
    */
-  compose(
+  async compose(
     instanceName: string,
-    builderFn: (seed: number, overrides?: Record<string, any>) => TracedOutput,
+    builderFn: (seed: number, overrides?: Record<string, any>) => TracedOutput | Promise<TracedOutput>,
     options: {
       offset?: { x: number; y: number; z: number };
       rotation?: { x: number; y: number; z: number };  // Euler angles in radians
       scale?: number;
       overrides?: Record<string, any>;
+      constraints?: Record<string, any>;  // Constraints to pass to child builder (P2-M2d-002)
       asInstance?: boolean;  // If true, don't merge mesh, output as instance (P2-M2c-003)
     } = {}
-  ): this {
+  ): Promise<this> {
     // Fork RNG for deterministic sub-builder seed
     const subSeed = Math.floor(this.rng.next() * 0xffffffff);
 
-    // Run the sub-builder
-    const subOutput = builderFn(subSeed, options.overrides);
+    // Merge constraints into overrides as __constraints__ (P2-M2d-002)
+    const finalOverrides = { ...options.overrides };
+    if (options.constraints) {
+      finalOverrides.__constraints__ = options.constraints;
+    }
+
+    // Run the sub-builder (await if it's async)
+    const subOutput = await builderFn(subSeed, finalOverrides);
 
     // Store the sub-builder output for inspection
     this.subBuilders.set(instanceName, subOutput);
