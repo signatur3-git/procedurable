@@ -174,21 +174,21 @@ describe('Extrude', () => {
 
   describe('extrudeShape Helper', () => {
     it('should extrude rect from parameters', () => {
-      const result = extrudeShape('rect', { width: 2, height: 1 }, { depth: 1, caps: 'both' });
+      const result = extrudeShape({ type: 'rect', width: 2, height: 1 }, { depth: 1, caps: 'both' });
 
       expect(result.vertices.length).toBe(8);
       expect(result.faces.length).toBe(12);
     });
 
     it('should extrude circle from parameters', () => {
-      const result = extrudeShape('circle', { radius: 1, segments: 12 }, { depth: 2, caps: 'both' });
+      const result = extrudeShape({ type: 'circle', radius: 1, segments: 12 }, { depth: 2, caps: 'both' });
 
       expect(result.vertices.length).toBe(24); // 12 × 2
       expect(result.faces.length).toBeGreaterThan(20); // sides + caps
     });
 
     it('should extrude ellipse from parameters', () => {
-      const result = extrudeShape('ellipse', { radiusX: 2, radiusZ: 1, segments: 8 }, { depth: 1 });
+      const result = extrudeShape({ type: 'ellipse', radiusX: 2, radiusZ: 1, segments: 8 }, { depth: 1 });
 
       expect(result.vertices.length).toBe(16); // 8 × 2
     });
@@ -199,7 +199,7 @@ describe('Extrude', () => {
         { x: 1, z: 0 },
         { x: 0.5, z: 1 }
       ];
-      const result = extrudeShape('polygon', { points }, { depth: 1, caps: 'both' });
+      const result = extrudeShape({ type: 'polygon', points }, { depth: 1, caps: 'both' });
 
       expect(result.vertices.length).toBe(6); // 3 × 2
       expect(result.faces.length).toBe(8); // 3 side quads (6 tris) + 2 caps (1 tri each)
@@ -207,7 +207,7 @@ describe('Extrude', () => {
 
     it('should throw on unknown shape type', () => {
       expect(() => {
-        extrudeShape('unknown' as any, {}, { depth: 1 });
+        extrudeShape({ type: 'unknown' } as any, { depth: 1 });
       }).toThrow();
     });
   });
