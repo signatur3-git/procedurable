@@ -589,9 +589,9 @@ const handlers: CommandHandler[] = [
           summary: results.summary,
           checks: results.checks,
           // Group checks by status for easier parsing
-          passed: results.checks.filter(c => c.status === 'pass'),
-          warnings: results.checks.filter(c => c.status === 'warning'),
-          failed: results.checks.filter(c => c.status === 'fail')
+          passed: results.checks.filter((c: any) => c.status === 'pass'),
+          warnings: results.checks.filter((c: any) => c.status === 'warning'),
+          failed: results.checks.filter((c: any) => c.status === 'fail')
         }
       };
     }

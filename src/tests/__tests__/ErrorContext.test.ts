@@ -23,7 +23,7 @@ describe('YamlBuilderParser - Error Context', () => {
       };
 
       await expect(async () => {
-        await await parseAndExecuteBuilder(yaml, { seed: 1 });
+        await parseAndExecuteBuilder(yaml, { seed: 1 });
       }).rejects.toThrow(/decisions\.bad_number/);
     });
   });

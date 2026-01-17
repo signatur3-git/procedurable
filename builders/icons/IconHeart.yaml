@@ -1,0 +1,84 @@
+version: "1.0"
+name: IconHeart
+description: Parametric heart icon for decorative elements (Vector Graphics PoC)
+author: AI Agent
+tags: [icon, decorative, symbol, love, heart, vector-graphic]
+
+decisions:
+  style:
+    type: choice
+    options: [rounded, sharp, modern]
+    weights: [0.5, 0.3, 0.2]
+
+measurements:
+  width:
+    value: 0.1
+    min: 0.05
+    max: 0.5
+    source: "Heart width in meters"
+
+derived:
+  height: "width * 0.9"
+  half_width: "width / 2"
+  bottom_y: "-height * 0.3"
+
+  # Style-dependent sharpness
+  curve_factor: "if(eq(style, 'sharp'), 0.7, if(eq(style, 'modern'), 0.9, 1.0))"
+
+  # Calculated control points for heart shape
+  side_x: "half_width * 0.9"
+  side_y: "height * 0.15 * curve_factor"
+  top_x: "half_width * 0.95"
+  top_y: "height * 0.4 * curve_factor"
+
+materials:
+  heart_red:
+    color: { r: 0.8, g: 0.1, b: 0.1 }
+
+  heart_pink:
+    color: { r: 0.9, g: 0.4, b: 0.5 }
+
+shapes:
+  # The heart outline - this is what other builders can reference
+  heart_outline:
+    type: polygon
+    points:
+      # Bottom point
+      - { x: 0, z: bottom_y }
+
+      # Right side
+      - { x: side_x, z: side_y }
+      - { x: top_x, z: top_y }
+
+      # Top center
+      - { x: 0, z: "height * 0.5" }
+
+      # Left side (mirrored)
+      - { x: "-top_x", z: top_y }
+      - { x: "-side_x", z: side_y }
+
+geometry:
+  # This builder can output 3D geometry if needed
+  # But its primary purpose is to expose the heart_outline shape
+  - extrude2d: heart_3d
+    shape: heart_outline
+    depth: 0.01
+    caps: both
+    bevel:
+      size: 0.002
+      segments: 2
+    color: $heart_red
+
+# FUTURE (P2M4-Ext-001):
+# Other builders will reference this via:
+#
+# compose:
+#   heart_icon:
+#     builder: IconHeart
+#     offset: { x: 0, y: 0, z: 0 }
+#     expose_shapes: true
+#
+# geometry:
+#   - extrude2d: embossed_heart
+#     shape: $heart_icon.heart_outline  # Reference this shape!
+#     depth: 0.02

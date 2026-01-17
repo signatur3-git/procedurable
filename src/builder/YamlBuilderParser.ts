@@ -25,8 +25,7 @@ import {
   EvaluationContext,
   createContext,
   evaluateNumeric as exprEvalNumeric,
-  evaluateCondition as exprEvalCondition,
-  evaluatePosition as exprEvalPosition
+  evaluateCondition as exprEvalCondition
 } from './ExpressionService';
 // ============================================================================
 // PARSING CONTEXT (for better error messages)
@@ -1680,6 +1679,22 @@ async function processGeometry(
             throw new Error(`Text shape '${extCmd.shape}' must have 'font' property`);
           }
 
+          // Resolve content - could be a literal string or a decision reference
+          let textContent: string;
+          if (typeof shapeDef.content === 'string') {
+            // Check if it's a decision reference (no quotes in YAML = reference)
+            const decision = builder.decisions.get(shapeDef.content);
+            if (decision !== undefined) {
+              // decisions.get returns TracedDecision object, extract the value
+              textContent = String(decision.value);
+            } else {
+              // Use as literal string
+              textContent = shapeDef.content;
+            }
+          } else {
+            textContent = String(shapeDef.content);
+          }
+
           // Import text functions
           const { textToShape } = await import('../text/TextToShape');
 
@@ -1692,32 +1707,104 @@ async function processGeometry(
 
           // Generate text shape
           const textShape = textToShape(
-            shapeDef.content,
+            textContent,
             shapeDef.font,
             size,
             spacing,
             { x: centerX, z: centerZ }
           );
 
-          // Convert text contours to Shape2D
-          // Text can have multiple contours (for holes like in 'A', 'O')
-          // For now, we'll create a Shape2D from the first (outer) contour
-          // TODO: P2M4-003 will add boolean operations to handle holes properly
-          const outerContours = textShape.contours.filter(c => !c.isHole);
-          if (outerContours.length === 0) {
+          // Import extrude with holes function
+          const { extrude2DWithHoles } = await import('../geometry/Extrude');
+
+          // Group contours by letter: each outer contour may have associated holes
+          // For procedural fonts, contours alternate: outer, hole, outer, hole, etc.
+          // We need to pair each outer contour with its holes
+          const letterGroups: { outer: typeof textShape.contours[0]; holes: typeof textShape.contours }[] = [];
+
+          for (const contour of textShape.contours) {
+            if (!contour.isHole) {
+              // New letter - start a new group
+              letterGroups.push({ outer: contour, holes: [] });
+            } else {
+              // Hole - add to the most recent letter group
+              // (assumes holes immediately follow their parent outer contour)
+              if (letterGroups.length > 0) {
+                letterGroups[letterGroups.length - 1].holes.push(contour);
+              }
+            }
+          }
+
+          if (letterGroups.length === 0) {
             throw new Error(`Text shape '${extCmd.shape}' has no outer contours`);
           }
 
-          // Use the first outer contour for now
-          // When we have boolean ops, we'll union all outer contours and subtract holes
-          shape = Shape2D.polygon(outerContours[0].points);
-          break;
+          // Build extrude params once
+          const extrudeParams: any = {
+            depth,
+            caps: extCmd.caps || 'both',
+            offset
+          };
+
+          // Add bevel if specified
+          if (extCmd.bevel) {
+            const bevelSize = typeof extCmd.bevel.size === 'number'
+              ? extCmd.bevel.size
+              : evaluatePositionComponent(extCmd.bevel.size, builder);
+            const bevelSegments = typeof extCmd.bevel.segments === 'number'
+              ? extCmd.bevel.segments
+              : Math.round(evaluatePositionComponent(extCmd.bevel.segments, builder));
+
+            extrudeParams.bevel = {
+              size: bevelSize,
+              segments: bevelSegments
+            };
+          }
+
+          // Get color for faces
+          const textColor = resolveGeometryColor(extCmd.color, materials);
+
+          // Extrude each letter with its holes
+          for (let groupIdx = 0; groupIdx < letterGroups.length; groupIdx++) {
+            const group = letterGroups[groupIdx];
+            let extrudedLetter;
+
+            if (group.holes.length > 0) {
+              // Use hole-aware extrusion
+              const holePoints = group.holes.map(h => h.points);
+              extrudedLetter = extrude2DWithHoles(
+                group.outer.points,
+                holePoints,
+                extrudeParams
+              );
+            } else {
+              // Simple extrusion for letters without holes
+              const letterShape = Shape2D.polygon(group.outer.points);
+              extrudedLetter = extrude2D(letterShape, extrudeParams);
+            }
+
+            // Convert to Mesh format with proper Vertex objects
+            const meshVertices = extrudedLetter.vertices.map((v, i) => {
+              const normal = extrudedLetter.normals[i];
+              return new Vertex(v, { normal });
+            });
+
+            const meshFaces = extrudedLetter.faces.map(face => {
+              return new Face(face, textColor);
+            });
+
+            const letterMesh = new Mesh(meshVertices, meshFaces);
+            builder.mergeMesh(`${extrudeName}_${groupIdx}`, letterMesh, textColor);
+          }
+
+          // Skip the standard extrusion since we handled it here
+          continue;
         }
         default:
           throw new Error(`Unknown shape type: ${shapeDef.type}`);
       }
 
-      // Extrude the shape
+      // Extrude the shape (for non-text shapes)
       const extrudeParams: any = {
         depth,
         caps: extCmd.caps || 'both',

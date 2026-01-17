@@ -9,7 +9,6 @@
  */
 
 import { Mesh } from '../geometry/Mesh';
-import { Vec3 } from '../core/Vec3';
 import { checkMeshValidity } from './MeshChecks';
 import { getMeshBounds } from './MeshValidation';
 

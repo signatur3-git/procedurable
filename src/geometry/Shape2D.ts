@@ -6,6 +6,7 @@
  */
 
 import { Vec3 } from '../core/Vec3';
+import { Path2D as Path2DType, pathToPolygon } from './Path2D';
 
 /**
  * 2D Point in XZ plane (Y=0)
@@ -18,7 +19,7 @@ export interface Point2D {
 /**
  * 2D Shape type
  */
-export type Shape2DType = 'rect' | 'circle' | 'polygon' | 'ellipse';
+export type Shape2DType = 'rect' | 'circle' | 'polygon' | 'ellipse' | 'path';
 
 /**
  * Rectangle definition
@@ -60,9 +61,18 @@ export interface EllipseDef {
 }
 
 /**
+ * Path definition (bezier curves) - true vector graphics
+ */
+export interface PathDef {
+  type: 'path';
+  path: Path2DType;
+  curveSegments?: number;  // Tessellation resolution (default: 10)
+}
+
+/**
  * Shape2D definition union
  */
-export type Shape2DDef = RectDef | CircleDef | PolygonDef | EllipseDef;
+export type Shape2DDef = RectDef | CircleDef | PolygonDef | EllipseDef | PathDef;
 
 /**
  * 2D Shape - closed loop of points
@@ -116,6 +126,23 @@ export class Shape2D {
     // Deep copy points to avoid shared references
     const pointsCopy = points.map(p => ({ x: p.x, z: p.z }));
     return new Shape2D(pointsCopy, 'polygon');
+  }
+
+  /**
+   * Create shape from a Path2D (with bezier curves)
+   * This tessellates the curves into a polygon for use with existing extrusion
+   *
+   * @param path The Path2D with curves
+   * @param curveSegments Number of line segments per curve (higher = smoother)
+   */
+  static fromPath(path: Path2DType, curveSegments: number = 10): Shape2D {
+    const points = pathToPolygon(path, curveSegments);
+    if (points.length < 3) {
+      throw new Error('Path must generate at least 3 points');
+    }
+    // Convert Path2DPoint to Shape2D Point2D (same structure, but ensures compatibility)
+    const shapePoints: Point2D[] = points.map(p => ({ x: p.x, z: p.z }));
+    return new Shape2D(shapePoints, 'path');
   }
 
   /**

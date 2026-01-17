@@ -1,0 +1,83 @@
+version: "1.0"
+name: LetterH
+description: Simple vector graphic letter H (demonstrates native vector graphics system)
+author: AI Agent
+tags: [letter, typography, vector-graphic, simple]
+
+measurements:
+  height:
+    value: 1.0
+    min: 0.5
+    max: 2.0
+    source: "Letter height"
+
+  width:
+    value: 0.6
+    min: 0.3
+    max: 1.2
+    source: "Letter width"
+
+  stroke_width:
+    value: 0.15
+    min: 0.1
+    max: 0.3
+    source: "Stroke thickness"
+
+derived:
+  half_width: "width / 2"
+  half_stroke: "stroke_width / 2"
+
+  # Left vertical bar
+  left_x: "-half_width + half_stroke"
+
+  # Right vertical bar
+  right_x: "half_width - half_stroke"
+
+  # Crossbar
+  crossbar_top: "half_stroke"
+  crossbar_bottom: "-half_stroke"
+
+materials:
+  letter_color:
+    color: { r: 0.2, g: 0.2, b: 0.2 }
+
+shapes:
+  # Letter H as a polygon (counter-clockwise winding for proper extrusion)
+  # Note: This uses straight lines. For smooth curves, we need bezier path support (future: P2M4-Ext-005)
+  h_outline:
+    type: polygon
+    points:
+      # Trace the OUTER perimeter counter-clockwise
+      # Start at bottom-left corner
+      - { x: "left_x - half_stroke", z: "-height / 2" }
+
+      # Left vertical: bottom to top (going up)
+      - { x: "left_x - half_stroke", z: "height / 2" }
+      - { x: "left_x + half_stroke", z: "height / 2" }
+      - { x: "left_x + half_stroke", z: crossbar_top }
+
+      # Crossbar top: left to right
+      - { x: "right_x - half_stroke", z: crossbar_top }
+
+      # Right vertical: top to bottom (going down)
+      - { x: "right_x - half_stroke", z: "height / 2" }
+      - { x: "right_x + half_stroke", z: "height / 2" }
+      - { x: "right_x + half_stroke", z: "-height / 2" }
+      - { x: "right_x - half_stroke", z: "-height / 2" }
+
+      # Right vertical: bottom to crossbar
+      - { x: "right_x - half_stroke", z: crossbar_bottom }
+
+      # Crossbar bottom: right to left
+      - { x: "left_x + half_stroke", z: crossbar_bottom }
+
+      # Left vertical: crossbar to bottom
+      - { x: "left_x + half_stroke", z: "-height / 2" }
+
+geometry:
+  # Can be used as standalone 3D letter
+  - extrude2d: letter_h
+    shape: h_outline
+    depth: 0.1
+    caps: both
+    color: $letter_color

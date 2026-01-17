@@ -53,7 +53,7 @@ Optional implementation hints or agent guidance.
 | P2-M2d: Agent Authoring Layer    | 7       | 6    | 0           | 0       |
 | Future/Research (Optional)       | 2       | 0    | 0           | 0       |
 | P2-M3: 2D Shapes & Extrusion     | 5       | 5    | 0           | 0       |
-| P2-M4: Text & Advanced 2D        | 5       | 2    | 0           | 0       |
+| P2-M4: Text & Advanced 2D        | 6       | 2    | 1           | 0       |
 | P2-M5: 3D Boolean CSG            | 5       | 0    | 0           | 1       |
 | P2-M6: Botanical Systems         | 5       | 0    | 0           | 0       |
 | P2-M7: Advanced Materials        | 5       | 0    | 0           | 0       |
@@ -1881,8 +1881,8 @@ Convert text strings to 2D shapes for extrusion.
 shapes:
   sign_text:
     type: text
-    content: "WELCOME"
-    font: "roboto"
+    content: "HELLO"
+    font: "simple"  # Built-in procedural font (no external files needed)
     size: 0.5
     spacing: 0.02
     center: { x: 0, z: 0 }
@@ -1900,17 +1900,121 @@ geometry:
 - Full text-to-shape pipeline working
 - 17 unit tests passing (FontParser + TextToShape)
 - TextSign.yaml demo builder created
-- Ready for P2M4-003 (2D Boolean Operations) to add hole support
+- **NEW:** ProceduralFont system implemented - built-in "simple" font
+- Available letters: H, E, L, O, I, N, X, T (plus space)
+- No external font files required for basic text
+- External fonts still supported via text.load command
+- Ready for P2M4-003 (Path2D with Bezier Curves)
 
 ---
 
-### P2M4-003: 2D Boolean Operations
+### P2M4-003: Path2D with Bezier Curves
+
+**Epic:** P2-M4 Text & Vector Graphics
+**Status:** 🔄 In Progress
+**Size:** L
+**Priority:** P2
+**Dependencies:** P2M3-001
+
+#### Context
+
+Implement proper vector graphics with bezier curves instead of polygon approximation.
+This is foundational for fonts, calligraphy, musical notes, patterns, and any curved 2D graphics.
+
+**Problem:** Current implementation approximates curves as many small line segments (polygons).
+This loses precision, doesn't scale cleanly, and isn't true vector graphics.
+
+**Solution:** Store bezier curve data (Path2D), tessellate only when rendering/extruding.
+
+**Reference:** `docs/BEZIER_CURVE_IMPLEMENTATION.md`
+
+#### Acceptance Criteria
+
+**Phase 1: Path2D Foundation**
+- [x] Create `src/geometry/Path2D.ts` with curve segment types
+- [x] Implement `PathSegment` types: moveTo, lineTo, quadraticCurveTo, cubicCurveTo, closePath
+- [x] Implement `tessellateQuadraticCurve()` and `tessellateCubicCurve()`
+- [x] Implement `pathToPolygon()` for converting curves to triangles
+- [x] Implement helper functions: `createRectPath()`, `createCirclePath()`
+- [ ] Unit tests for all tessellation functions
+- [ ] Unit tests for path creation helpers
+
+**Phase 2: Shape2D Integration**
+- [ ] Add `type: 'path'` to Shape2D
+- [ ] Add `Shape2D.fromPath(path: Path2D, curveSegments?: number)`
+- [ ] Existing extrusion works with path-based shapes
+- [ ] Unit tests for Shape2D path integration
+
+**Phase 3: FontParser Integration**
+- [ ] Add `FontParser.getGlyphPath()` returning `Path2D` (curves preserved)
+- [ ] Keep existing `getGlyphOutline()` for backward compatibility
+- [ ] Font loading works with Path2D output
+- [ ] Unit tests for glyph path extraction
+
+**Phase 4: YAML Path Type**
+- [ ] Add `type: path` to YamlShape interface
+- [ ] Parse path segments from YAML:
+  ```yaml
+  shapes:
+    flourish:
+      type: path
+      segments:
+        - { moveTo: { x: 0, z: 0 } }
+        - { cubicTo: { c1: {...}, c2: {...}, end: {...} } }
+        - { close: true }
+  ```
+- [ ] Update extrude2d to handle path shapes
+- [ ] Unit tests for YAML path parsing
+
+**Phase 5: Vector Graphics Library**
+- [ ] Create sample letter builders using paths (e.g., LetterA.yaml with curves)
+- [ ] Create sample icon builders (Heart.yaml, Star.yaml)
+- [ ] Demonstrate smooth scaling
+- [ ] Documentation for authoring vector graphics
+
+#### Files to Create/Modify
+
+- `src/geometry/Path2D.ts` ✅ Created
+- `src/tests/__tests__/Path2D.test.ts` (new)
+- `src/geometry/Shape2D.ts` - Add path support
+- `src/text/FontParser.ts` - Add getGlyphPath()
+- `src/builder/YamlBuilderParser.ts` - Add path type
+- `builders/letters/LetterA.yaml` (new) - Demo with curves
+- `builders/icons/Heart.yaml` (new) - Demo icon
+
+#### Technical Design
+
+**Path2D Data Model:**
+```typescript
+type PathSegment =
+  | { type: 'moveTo'; point: Point2D }
+  | { type: 'lineTo'; point: Point2D }
+  | { type: 'quadraticCurveTo'; control: Point2D; end: Point2D }
+  | { type: 'cubicCurveTo'; control1: Point2D; control2: Point2D; end: Point2D }
+  | { type: 'closePath' };
+
+interface Path2D {
+  segments: PathSegment[];
+  closed: boolean;
+}
+```
+
+**Integration Flow:**
+```
+Sources (Font, SVG, YAML) → Path2D (curves) → tessellate → Shape2D (polygon) → extrude → Mesh
+```
+
+**Key Principle:** Store curves, tessellate late.
+
+---
+
+### P2M4-004: 2D Boolean Operations
 
 **Epic:** P2-M4 Text
 **Status:** ⬜ Not Started
 **Size:** L
 **Priority:** P3
-**Dependencies:** P2M3-001
+**Dependencies:** P2M4-003
 
 #### Context
 
@@ -1933,13 +2037,13 @@ Consider using clipper-lib or similar library.
 
 ---
 
-### P2M4-004: Text Extrusion
+### P2M4-005: Text Extrusion
 
 **Epic:** P2-M4 Text
 **Status:** ⬜ Not Started
 **Size:** M
 **Priority:** P3
-**Dependencies:** P2M4-002, P2M4-003, P2M3-002
+**Dependencies:** P2M4-003, P2M4-004
 
 #### Context
 
@@ -1958,7 +2062,7 @@ Extrude text shapes with holes to 3D.
 
 ---
 
-### P2M4-005: Wall Sign Builder
+### P2M4-006: Wall Sign Builder
 
 **Epic:** P2-M4 Text
 **Status:** ⬜ Not Started
@@ -2781,6 +2885,197 @@ Show how to use Procedurable in other frameworks.
 # FUTURE / RESEARCH (Optional, Deferred)
 
 > These stories are **not on the critical path** for Phase 2 or 3. They're research topics or advanced features that we may tackle if specific use cases emerge.
+
+## Phase 3 - Advanced Asset Tools
+
+> **Reference:** See `ASSET_ANALYSIS_SYSTEM.md` for full architecture
+
+These tools enable intelligent import of external assets (SVG, fonts, 3D models) with automatic analysis and parametrization.
+
+### P3-Advanced-001: Asset Analyzer Framework
+
+**Epic:** Phase 3 - Asset Analysis
+**Status:** ⬜ Deferred
+**Size:** L
+**Priority:** P4 (Optional)
+**Dependencies:** P2M4-Ext-003 (Simple SVG Import)
+
+#### Context
+
+Foundation for intelligent asset import. Rather than simple 1:1 conversion, analyze assets to extract semantic information and generate parametric builders.
+
+**When to implement:** After P2-M4 complete, when users request batch import of large asset libraries
+
+#### Acceptance Criteria
+
+- [ ] CLI tool: `procedurable analyze <input> --output <output.yaml>`
+- [ ] Format parsers: SVG, DXF, glTF, OBJ
+- [ ] Asset data model (vertices, contours, hierarchy)
+- [ ] Builder generator framework
+- [ ] Unit tests for each format parser
+- [ ] Documentation: Asset Import Guide
+
+#### Files to Create
+
+- `tools/asset-analyzer/` (new directory)
+- `tools/asset-analyzer/cli.ts` - CLI entry point
+- `tools/asset-analyzer/parsers/` - Format parsers
+- `tools/asset-analyzer/generator.ts` - YAML builder generator
+- `docs/ASSET_IMPORT_GUIDE.md` (new)
+
+---
+
+### P3-Advanced-002: Geometric Analysis Engine
+
+**Epic:** Phase 3 - Asset Analysis
+**Status:** ⬜ Deferred
+**Size:** M
+**Priority:** P4 (Optional)
+**Dependencies:** P3-Advanced-001
+
+#### Context
+
+Analyze asset geometry to extract structural properties and identify parametrization opportunities.
+
+#### Acceptance Criteria
+
+- [ ] **Symmetry detection** - vertical, horizontal, rotational
+  - Algorithm: Point reflection testing
+  - Output: Symmetry axes with confidence scores
+  
+- [ ] **Proportion extraction** - dimensional relationships
+  - Algorithm: Ratio detection (aspect ratio, golden ratio, etc.)
+  - Output: Suggested derived measurements
+  
+- [ ] **Curve analysis** - parametrize bezier curves
+  - Algorithm: Curve fitting to simple functions
+  - Output: Mathematical expressions for curves
+  
+- [ ] **Topology analysis** - holes, boundaries, components
+  - Algorithm: Connected component detection
+  - Output: Contour structure with hole flags
+
+- [ ] Unit tests with known shapes (heart, star, arrow)
+- [ ] Confidence scoring for each analysis
+- [ ] Documentation in ASSET_ANALYSIS_SYSTEM.md
+
+#### Files to Create
+
+- `tools/asset-analyzer/analysis/geometric.ts` (new)
+- `src/tests/asset-analyzer/geometric.test.ts` (new)
+
+#### Example Output
+
+```typescript
+{
+  symmetry: {
+    vertical: { axis: 0, confidence: 0.95 },
+    rotational: { order: 5, center: [0, 0], confidence: 0.88 }
+  },
+  proportions: {
+    aspectRatio: 0.92,
+    relationships: [
+      { param1: "height", param2: "width", ratio: 0.92 }
+    ]
+  }
+}
+```
+
+---
+
+### P3-Advanced-003: Semantic Analysis Engine
+
+**Epic:** Phase 3 - Asset Analysis
+**Status:** ⬜ Deferred
+**Size:** M
+**Priority:** P4 (Optional)
+**Dependencies:** P3-Advanced-001
+
+#### Context
+
+Understand the **meaning** of shapes, not just geometry. Enable auto-tagging and categorization.
+
+#### Acceptance Criteria
+
+- [ ] **Shape classification** - categorize as icon/pattern/ornament/text/abstract
+  - Features: complexity, symmetry, aspect ratio, curvature
+  - ML model: K-NN or decision tree trained on labeled dataset
+  
+- [ ] **Tag generation** - auto-generate semantic tags
+  - Sources: filename analysis, shape matching, geometric features
+  - Output: Ranked list of relevant tags
+  
+- [ ] **Hierarchy extraction** - detect grouped/nested elements
+  - Parse SVG groups → builder compositions
+  - Identify parent-child relationships
+  
+- [ ] Training data collection (100+ labeled shapes)
+- [ ] Validation accuracy > 80% on test set
+- [ ] Documentation: Semantic Analysis Guide
+
+#### Files to Create
+
+- `tools/asset-analyzer/analysis/semantic.ts` (new)
+- `tools/asset-analyzer/training-data/` (labeled dataset)
+- `src/tests/asset-analyzer/semantic.test.ts` (new)
+
+---
+
+### P3-Advanced-004: Parametrization Engine
+
+**Epic:** Phase 3 - Asset Analysis
+**Status:** ⬜ Deferred
+**Size:** L
+**Priority:** P4 (Optional)
+**Dependencies:** P3-Advanced-002, P3-Advanced-003
+
+#### Context
+
+Convert static assets → parametric builders. The "smart" part of smart import.
+
+#### Acceptance Criteria
+
+- [ ] **Variation detection** - analyze multiple similar assets
+  - Batch processing mode
+  - Point correspondence algorithm
+  - Variation clustering (k-means or hierarchical)
+  - Decision generation from clusters
+  
+- [ ] **Coordinate parametrization** - replace absolute values with expressions
+  - Strategy: dimension-based, symmetry-based, relationship-based
+  - Expression synthesis from analysis results
+  - Fallback to simple normalization
+  
+- [ ] **Quality scoring** - rate parametrization quality
+  - Metrics: expression complexity, coverage, semantic meaning
+  - User feedback loop for improvement
+  
+- [ ] Example: 3 heart variants → 1 parametric Heart.yaml
+- [ ] Benchmarks: Process 1000 icons in < 5 minutes
+- [ ] Documentation: Parametrization Guide
+
+#### Files to Create
+
+- `tools/asset-analyzer/analysis/variations.ts` (new)
+- `tools/asset-analyzer/parametrization/engine.ts` (new)
+- `tools/asset-analyzer/parametrization/strategies.ts` (new)
+
+#### Example Result
+
+```yaml
+# Auto-generated from 3 SVG variants
+name: Heart
+decisions:
+  style:
+    type: choice
+    options: [rounded, sharp, modern]
+    # DETECTED: 3 variants in batch
+derived:
+  curve_factor: "if(eq(style, 'rounded'), 1.0, if(eq(style, 'sharp'), 0.7, 0.9))"
+  # GENERATED from variation analysis
+```
+
+---
 
 ## FR-001: Composition Feedback Loop
 

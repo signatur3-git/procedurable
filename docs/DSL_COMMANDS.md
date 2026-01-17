@@ -933,6 +933,11 @@ text.load opensans path="C:/Windows/Fonts/OpenSans.ttf"
 }
 ```
 
+**Auto-loading:** The following font names will auto-load from system fonts if not explicitly loaded:
+- `arial` - Windows: C:/Windows/Fonts/arial.ttf, Linux: Liberation Sans
+- `roboto` - Linux: Roboto-Regular.ttf, Windows: falls back to Arial
+- `helvetica` - macOS: Helvetica.ttc, Windows: falls back to Arial
+
 **Note:** Supports TrueType (.ttf) and OpenType (.otf) fonts via opentype.js.
 
 ---

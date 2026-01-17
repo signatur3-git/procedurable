@@ -736,3 +736,158 @@ This document complements `SOLUTION_DOMAIN.md` (geometry tools) by focusing on *
 - `mesh.get_bounds_of_tag('leg')` -> Returns the combined AABB of all parts tagged 'leg'.
 - `mesh.get_surface_area_of_material('wood')` -> Returns total area for cost estimation.
 - `mesh.check_clearance('drawer_path', 0.1)` -> Checks if a defined path is clear of other geometry.
+
+---
+
+## Category 13: Asset Analysis & Import
+
+> **Reference:** See `ASSET_ANALYSIS_SYSTEM.md` for detailed architecture
+
+Intelligent import and parametrization of external vector graphics and 3D assets. Rather than simple 1:1 conversion, these tools **analyze** assets to extract semantic information and generate parametric builders.
+
+### 13.1 Geometric Analysis
+**What it does:** Extract structural properties from external assets (SVG, fonts, 3D models)
+**Used for:** Understanding asset structure, identifying parametrization opportunities
+**Status:** ⬜ Not built (Phase 3/Optional)
+**Components:**
+- **Symmetry Detection** - Find reflection/rotational symmetry axes
+- **Proportion Extraction** - Identify dimensional relationships (aspect ratios, golden ratio)
+- **Curve Analysis** - Parametrize bezier curves as mathematical expressions
+- **Topology Analysis** - Identify connected components, holes, boundaries
+
+**Example Output:**
+```typescript
+{
+  symmetry: {
+    vertical: { axis: 0, confidence: 0.95 },
+    rotational: { order: 5, center: [0, 0], confidence: 0.88 }
+  },
+  proportions: {
+    aspectRatio: 0.92,
+    relationships: [
+      { param1: "height", param2: "width", ratio: 0.92, confidence: 0.99 }
+    ]
+  }
+}
+```
+
+### 13.2 Semantic Analysis
+**What it does:** Understand the **meaning** of shapes, not just their geometry
+**Used for:** Auto-tagging, categorization, intelligent organization
+**Status:** ⬜ Not built (Phase 3/Optional)
+**Components:**
+- **Shape Classification** - Categorize as icon/pattern/ornament/text/abstract
+- **Tag Generation** - Auto-generate semantic tags from shape + filename
+- **Hierarchy Extraction** - Detect grouped/nested elements for composition
+- **Context Understanding** - Infer purpose from collection (e.g., UI icons vs decorative)
+
+**Example:**
+- Input: `heart-icon.svg` with symmetric curved shape
+- Output: `{ category: 'icon', tags: ['heart', 'love', 'emotion', 'symmetric', 'curved'] }`
+
+### 13.3 Variation Detection (Batch Learning)
+**What it does:** Analyze multiple similar assets to identify variations and generate parametric decisions
+**Used for:** Batch import of icon families, pattern collections
+**Status:** ⬜ Not built (Phase 3/Optional)
+**Algorithm:**
+1. Align all assets (normalize scale, rotation, position)
+2. Find point correspondence across variants
+3. Cluster variations into discrete styles
+4. Extract delta vectors for each variation
+5. Generate parametric builder with style decisions
+
+**Example:**
+- Input: `heart-rounded.svg`, `heart-sharp.svg`, `heart-modern.svg`
+- Output: One `Heart.yaml` builder with `style: [rounded, sharp, modern]` decision
+
+### 13.4 Parametrization Engine
+**What it does:** Convert static coordinates → mathematical expressions with decisions/measurements
+**Used for:** Generating builders (not just static shapes) from external assets
+**Status:** ⬜ Not built (Phase 3/Optional)
+**Strategies:**
+- **Dimension-based:** `x: 10` → `x: "width * 0.5"`
+- **Symmetry-based:** Use detected axes: `x: -5` → `x: "-right_x"`
+- **Relationship-based:** Use proportions: `height: 18` → `height: "width * 0.92"`
+- **Variation-based:** Use detected variations: multiple curves → `curve_factor` decision
+
+**Example Builder Generation:**
+```yaml
+# Auto-generated from SVG analysis
+name: Heart
+description: "Detected: symmetric heart shape with smooth curves"
+
+decisions:
+  style:
+    type: choice
+    options: [rounded, sharp, modern]
+    # DETECTED: 3 variants in batch
+
+measurements:
+  width:
+    value: 0.1
+    # DETECTED: Normalized from SVG viewBox
+
+derived:
+  height: "width * 0.92"  # DETECTED: Aspect ratio
+  half_width: "width / 2"  # DETECTED: Vertical symmetry
+
+shapes:
+  heart_outline:
+    type: polygon
+    points:
+      # PARAMETRIZED from analyzed control points
+      - { x: 0, z: "-height * 0.3" }
+      - { x: "half_width * 0.9", z: "height * 0.15" }
+      # ...
+```
+
+### 13.5 Format Adapters
+**What it does:** Parse various external asset formats
+**Used for:** Importing from design tools, asset libraries, CAD
+**Status:** 🟡 Partial (fonts via opentype.js)
+**Formats:**
+- ✅ **TrueType/OpenType Fonts** - via `FontParser.ts`
+- ⬜ **SVG** - Path data → polygons (P2M4-Ext-003, simple version planned)
+- ⬜ **DXF/DWG** - CAD drawings → builders
+- ⬜ **glTF** - 3D models → mesh builders
+- ⬜ **OBJ** - Simple 3D format
+- ⬜ **JSON Vector Data** - Custom formats
+
+### 13.6 CLI Tool: Asset Analyzer
+**What it does:** Command-line tool for batch import and analysis
+**Used for:** Processing asset libraries, batch conversion
+**Status:** ⬜ Not built (Phase 3/Optional)
+**Commands:**
+```bash
+# Analyze single asset
+procedurable analyze heart.svg --output builders/icons/Heart.yaml
+
+# Batch analysis (learns variations)
+procedurable analyze-batch icons/*.svg --output builders/icons/
+
+# Options
+--smart              # Enable intelligent parametrization
+--symmetry           # Detect and use symmetry
+--variations         # Look for variations in batch
+--tags               # Auto-generate tags
+--lod                # Generate LOD levels
+```
+
+### 13.7 Integration Strategy
+**What it does:** Fit asset import into existing builder workflow
+**Used for:** Seamless external asset usage
+**Status:** 🟡 Conceptual
+**Approaches:**
+- **Builder Generation** - Assets → YAML builders (recommended, most flexible)
+- **Runtime Loading** - Assets → runtime library (faster, less flexible)
+- **Hybrid** - Common assets preloaded, custom assets generated
+
+**Priority:** Optional/Future (Phase 3)
+- Implement after P2-M4 base features complete
+- Most valuable when users import large asset libraries
+- Simple SVG import (P2M4-Ext-003) covers basic needs
+
+---
+
+## Summary Table
+

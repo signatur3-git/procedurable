@@ -1,13 +1,14 @@
 version: "1.0"
 name: TextSign
-description: Simple text sign demonstrating text-to-3D pipeline (P2M4-002)
+description: Horizontal nameplate-style sign with 3D text (view from above, Y-up)
 author: AI Agent
 tags: [text, demo, signage, P2M4-002]
 
 decisions:
   text_content:
     type: choice
-    options: ["HELLO", "OPEN", "EXIT", "WELCOME"]
+    # Using only characters available in 'simple' font: H, E, L, O, I, N, X, T
+    options: ["HELLO", "EXIT", "ONLINE", "HOTEL"]
     weights: [0.3, 0.3, 0.2, 0.2]
 
   sign_style:
@@ -58,17 +59,15 @@ materials:
   plate_metal:
     color: { r: 0.3, g: 0.3, b: 0.35 }  # Metal background
 
-# Note: Text shapes require fonts to be loaded via text.load command first
-# Example: text.load roboto path="./fonts/Roboto-Regular.ttf"
-# For testing, use any TrueType/OpenType font available on your system
+# Note: Uses built-in 'simple' procedural font (no external font files needed)
+# Available characters: H, E, L, O, I, N, X, T and space
 
 shapes:
-  # Text shape - requires font to be loaded
-  # For now, this is a placeholder - actual font must be loaded at runtime
+  # Text shape - uses built-in procedural font
   sign_text:
     type: text
     content: text_content  # References decision
-    font: "roboto"         # Font must be loaded via text.load command
+    font: "simple"         # Uses built-in procedural font
     size: text_size
     spacing: text_spacing
     center: { x: 0, z: 0 }

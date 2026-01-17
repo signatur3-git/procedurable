@@ -1,4 +1,5 @@
 import * as opentype from 'opentype.js';
+import { proceduralFontRegistry } from './ProceduralFont';
 
 /**
  * 2D point for glyph outlines
@@ -66,17 +67,19 @@ export class FontParser {
   }
 
   /**
-   * Check if font is loaded
+   * Check if font is loaded (external or procedural)
    */
   hasFont(name: string): boolean {
-    return this.fonts.has(name);
+    return this.fonts.has(name) || proceduralFontRegistry.hasFont(name);
   }
 
   /**
-   * Get loaded font names
+   * Get loaded font names (both external and procedural)
    */
   getFontNames(): string[] {
-    return Array.from(this.fonts.keys());
+    const external = Array.from(this.fonts.keys());
+    const procedural = proceduralFontRegistry.getFontNames();
+    return [...new Set([...external, ...procedural])];
   }
 
   /**
@@ -133,8 +136,13 @@ export class FontParser {
     spacing: number = 0.0 // Additional spacing between characters
   ): GlyphOutline[] {
     const font = this.fonts.get(fontName);
+
+    // Check for procedural font fallback
     if (!font) {
-      throw new Error(`Font not loaded: ${fontName}`);
+      if (proceduralFontRegistry.hasFont(fontName)) {
+        return this.getProceduralTextOutlines(fontName, text, size, spacing);
+      }
+      throw new Error(`Font not loaded: ${fontName}. Available: ${this.getFontNames().join(', ')}`);
     }
 
     const outlines: GlyphOutline[] = [];
@@ -308,6 +316,70 @@ export class FontParser {
     }
 
     return { xMin, xMax, zMin, zMax };
+  }
+
+  /**
+   * Get text outlines using procedural fonts (fallback when no external font loaded)
+   */
+  private getProceduralTextOutlines(
+    fontName: string,
+    text: string,
+    size: number,
+    spacing: number
+  ): GlyphOutline[] {
+    const font = proceduralFontRegistry.getFont(fontName);
+    if (!font) {
+      throw new Error(`Procedural font not found: ${fontName}`);
+    }
+
+    const outlines: GlyphOutline[] = [];
+    let currentX = 0;
+
+    for (const char of text.toUpperCase()) {
+      const glyph = font.glyphs.get(char);
+
+      if (!glyph) {
+        // Unknown character - add spacing and continue
+        currentX += size * 0.3;
+        continue;
+      }
+
+      // Skip space characters (they have no contours)
+      if (glyph.contours.length === 0) {
+        currentX += glyph.width * size + spacing;
+        continue;
+      }
+
+      // Scale and offset the glyph
+      // Letters are defined with z=0 at bottom, z=h at top
+      // When viewing from above (positive Y), high Z is at the far side
+      // This is correct for a nameplate viewed from above
+      const scaledContours: GlyphContour[] = glyph.contours.map(c => ({
+        points: c.points.map(p => ({
+          x: p.x * size + currentX,
+          z: p.z * size
+        })),
+        isHole: c.isHole
+      }));
+
+      const outline: GlyphOutline = {
+        char: glyph.char,
+        width: glyph.width * size,
+        height: glyph.height * size,
+        contours: scaledContours,
+        bounds: {
+          xMin: glyph.bounds.xMin * size + currentX,
+          xMax: glyph.bounds.xMax * size + currentX,
+          zMin: glyph.bounds.zMin * size,
+          zMax: glyph.bounds.zMax * size
+        }
+      };
+
+      outlines.push(outline);
+      currentX += glyph.width * size + spacing;
+    }
+
+    return outlines;
   }
 }
 

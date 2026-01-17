@@ -315,7 +315,7 @@ export class TracedBuilder {
   private mesh: Mesh;
   public traces: Map<string, TraceEntry>;  // Public for YAML parser access
   public measurements: Map<string, { value: number; source?: string }>;  // Public for YAML parser access
-  private decisions: Map<string, TracedDecision>;
+  public decisions: Map<string, TracedDecision>;  // Public for YAML parser access
   private decisionOverrides: Map<string, any>;
   private constraints: Map<string, any>;  // Constraints from parent builder (P2-M2d-002)
   private vertices: Map<string, number>;  // name → index

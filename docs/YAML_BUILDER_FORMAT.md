@@ -363,14 +363,15 @@ shapes:
   sign_text:
     type: text
     content: "HELLO"        # Text string or decision reference
-    font: "roboto"          # Font name (must be loaded via text.load command)
+    font: "roboto"          # Font name (auto-loads system fonts: arial, roboto, helvetica)
     size: 0.5               # Text height in meters
     spacing: 0.02           # Extra spacing between characters (optional)
     center: { x: 0, z: 0 }  # Center position (optional)
 ```
 
 **Text shape requirements:**
-- Font must be loaded before building: `text.load roboto path="./fonts/Roboto-Regular.ttf"`
+- Fonts can be explicitly loaded: `text.load roboto path="./fonts/Roboto-Regular.ttf"`
+- **Auto-loading:** Common fonts (arial, roboto, helvetica) auto-load from system fonts
 - Supports TrueType (.ttf) and OpenType (.otf) fonts
 - Text can reference decisions: `content: text_content` where `text_content` is a choice decision
 - Automatically handles kerning for proper character spacing

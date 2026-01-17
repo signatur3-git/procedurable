@@ -123,16 +123,16 @@ const handlers: CommandHandler[] = [
       const spacing = cmd.options.spacing ? parseFloat(cmd.options.spacing) : 0.0;
 
       try {
-        const outlines = fontParser.getTextOutlines(fontName, text, size, spacing);
+        const outlines = await fontParser.getTextOutlines(fontName, text, size, spacing);
 
         return {
           success: true,
           data: {
             text,
             glyphs: outlines.length,
-            totalContours: outlines.reduce((sum, o) => sum + o.contours.length, 0),
-            totalPoints: outlines.reduce((sum, o) =>
-              sum + o.contours.reduce((s, c) => s + c.points.length, 0), 0
+            totalContours: outlines.reduce((sum: number, o) => sum + o.contours.length, 0),
+            totalPoints: outlines.reduce((sum: number, o) =>
+              sum + o.contours.reduce((s: number, c) => s + c.points.length, 0), 0
             ),
             width: outlines.length > 0 ?
               outlines[outlines.length - 1].bounds.xMax : 0,

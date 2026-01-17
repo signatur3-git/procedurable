@@ -509,9 +509,20 @@ async function updateMainMesh() {
   cell.loading = true;
   updateMainOverlay();
 
-  // Remove old mesh
+  // Remove old mesh and properly dispose resources
   if (cell.mesh) {
     cell.scene.remove(cell.mesh);
+    // Dispose all children's geometry and materials
+    cell.mesh.traverse((obj: any) => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) {
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach((m: any) => m.dispose());
+        } else {
+          obj.material.dispose();
+        }
+      }
+    });
     cell.mesh = null;
   }
 
@@ -527,6 +538,9 @@ async function updateMainMesh() {
     // Render merged geometry
     if (meshResult?.status === 'ok') {
       const meshData = meshResult.data;
+
+      // Debug logging for mesh data
+      log(`Mesh data: ${meshData.vertexCount} vertices, ${meshData.triangleCount} triangles, hasColors=${meshData.hasColors}`);
 
       // Only create mesh if there's actual geometry
       if (meshData.vertices && meshData.vertices.length > 0) {

@@ -29,6 +29,7 @@ import { geometryNamespace } from './commands/geometry';
 import { textNamespace } from './commands/text';
 import { parseAndExecuteBuilder, parseYamlWithLibrary } from '../builder/YamlBuilderParser';
 import { TracedOutput } from '../builder/TracedBuilder';
+import { proceduralFontRegistry } from '../text/ProceduralFont';
 
 // Import only builders that can't be YAML yet
 // Person requires advanced geometry (subdivision, lathe) - Phase 2
@@ -568,6 +569,10 @@ server.listen(PORT, async () => {
   // Pre-load YAML builders for composition support
   console.log('\nPre-loading YAML builders for composition...');
   await preloadYamlBuilders();
+
+  // Initialize procedural fonts (built-in letter shapes)
+  console.log('\nInitializing procedural fonts...');
+  await proceduralFontRegistry.initialize('./builders');
 
   // Set up hot reload - invalidate cache when files change
   console.log('\nSetting up hot reload...');

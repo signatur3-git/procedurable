@@ -6,6 +6,7 @@
 
 import { Shape2D } from './Shape2D';
 import { Vec3 } from '../core/Vec3';
+import earcut from 'earcut';
 
 /**
  * Cap options for extrusion
@@ -249,8 +250,145 @@ function calculateInset(shape: Shape2D, point: { x: number; z: number }, amount:
 }
 
 /**
+ * Contour definition for multi-contour extrusion
+ */
+export interface Contour {
+  points: { x: number; z: number }[];
+  isHole: boolean;
+}
+
+/**
+ * Extrude a 2D shape with holes into 3D geometry
+ *
+ * This function properly handles shapes with inner holes (like the letter O)
+ * by using earcut's hole support for correct triangulation.
+ *
+ * @param outerContour - The outer boundary of the shape
+ * @param holes - Array of hole contours (inner cutouts)
+ * @param params - Extrusion parameters
+ * @returns Extruded geometry with vertices, faces, and normals
+ */
+export function extrude2DWithHoles(
+  outerContour: { x: number; z: number }[],
+  holes: { x: number; z: number }[][],
+  params: ExtrudeParams
+): ExtrudedGeometry {
+  const { depth, caps = 'both', offset = 0 } = params;
+
+  const vertices: Vec3[] = [];
+  const faces: number[][] = [];
+  const normals: Vec3[] = [];
+
+  const yFront = offset;
+  const yBack = offset + depth;
+
+  // Build combined point array: outer contour followed by hole contours
+  const allPoints: { x: number; z: number }[] = [...outerContour];
+  const holeIndices: number[] = [];
+
+  for (const hole of holes) {
+    holeIndices.push(allPoints.length);  // Start index of this hole
+    allPoints.push(...hole);
+  }
+
+  const totalPoints = allPoints.length;
+  const outerPointCount = outerContour.length;
+
+  // Create front face vertices (at Y = offset)
+  for (const p of allPoints) {
+    vertices.push(new Vec3(p.x, yFront, p.z));
+  }
+
+  // Create back face vertices (at Y = offset + depth)
+  for (const p of allPoints) {
+    vertices.push(new Vec3(p.x, yBack, p.z));
+  }
+
+  // Generate side faces for outer contour
+  for (let i = 0; i < outerPointCount; i++) {
+    const i1 = i;
+    const i2 = (i + 1) % outerPointCount;
+    const i3 = i1 + totalPoints;
+    const i4 = i2 + totalPoints;
+
+    faces.push([i1, i2, i4]);
+    faces.push([i1, i4, i3]);
+  }
+
+  // Generate side faces for each hole (wound in opposite direction)
+  let holeStart = outerPointCount;
+  for (const hole of holes) {
+    const holeLen = hole.length;
+    for (let i = 0; i < holeLen; i++) {
+      const i1 = holeStart + i;
+      const i2 = holeStart + ((i + 1) % holeLen);
+      const i3 = i1 + totalPoints;
+      const i4 = i2 + totalPoints;
+
+      // Reverse winding for holes (inside faces outward)
+      faces.push([i1, i4, i2]);
+      faces.push([i1, i3, i4]);
+    }
+    holeStart += holeLen;
+  }
+
+  // Generate caps with holes using earcut
+  if (caps === 'front' || caps === 'both') {
+    const frontFaces = triangulateWithHoles(allPoints, holeIndices, true);
+    faces.push(...frontFaces);
+  }
+
+  if (caps === 'back' || caps === 'both') {
+    const backFaces = triangulateWithHoles(allPoints, holeIndices, false).map(face =>
+      face.map(idx => idx + totalPoints)
+    );
+    faces.push(...backFaces);
+  }
+
+  // Calculate normals
+  calculateNormals(vertices, faces, normals);
+
+  return { vertices, faces, normals };
+}
+
+/**
+ * Triangulate a polygon with holes using earcut
+ */
+function triangulateWithHoles(
+  points: { x: number; z: number }[],
+  holeIndices: number[],
+  counterClockwise: boolean
+): number[][] {
+  const faces: number[][] = [];
+
+  if (points.length < 3) {
+    return faces;
+  }
+
+  // Flatten points for earcut: [x0, z0, x1, z1, ...]
+  const flatPoints: number[] = [];
+  for (const p of points) {
+    flatPoints.push(p.x, p.z);
+  }
+
+  // Use earcut with hole indices
+  const triangleIndices = earcut(flatPoints, holeIndices.length > 0 ? holeIndices : undefined);
+
+  // Convert flat indices to face arrays
+  for (let i = 0; i < triangleIndices.length; i += 3) {
+    if (counterClockwise) {
+      faces.push([triangleIndices[i], triangleIndices[i + 1], triangleIndices[i + 2]]);
+    } else {
+      faces.push([triangleIndices[i], triangleIndices[i + 2], triangleIndices[i + 1]]);
+    }
+  }
+
+  return faces;
+}
+
+/**
  * Triangulate a 2D polygon for cap generation
- * Uses simple fan triangulation (assumes convex or star-convex polygon)
+ * Uses earcut algorithm for proper triangulation of concave polygons
  *
  * @param shape - The 2D shape to triangulate
  * @param counterClockwise - If true, generate CCW faces (front cap), else CW (back cap)
@@ -264,14 +402,23 @@ function triangulatePolygon(shape: Shape2D, counterClockwise: boolean): number[]
     return faces;
   }
 
-  // Simple fan triangulation from first vertex
-  for (let i = 1; i < pointCount - 1; i++) {
+  // Flatten points for earcut: [x0, z0, x1, z1, ...]
+  const flatPoints: number[] = [];
+  for (const p of shape.points) {
+    flatPoints.push(p.x, p.z);
+  }
+
+  // Use earcut for proper triangulation of concave polygons
+  const triangleIndices = earcut(flatPoints);
+
+  // Convert flat indices to face arrays
+  for (let i = 0; i < triangleIndices.length; i += 3) {
     if (counterClockwise) {
       // CCW winding for front face (looking down -Y axis)
-      faces.push([0, i, i + 1]);
+      faces.push([triangleIndices[i], triangleIndices[i + 1], triangleIndices[i + 2]]);
     } else {
       // CW winding for back face (looking down +Y axis)
-      faces.push([0, i + 1, i]);
+      faces.push([triangleIndices[i], triangleIndices[i + 2], triangleIndices[i + 1]]);
     }
   }
 
