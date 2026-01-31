@@ -1,5 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
-import { textToShape, charToShape, measureText } from '../../text/TextToShape';
+import { textToShape, charToShape, measureText } from '../../generation/text/TextToShape';
 
 describe('TextToShape', () => {
   // Note: These tests need a real font file to work

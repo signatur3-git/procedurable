@@ -1,0 +1,223 @@
+version: "1.0"
+name: SimpleChairWithQuality
+description: Example builder demonstrating quality section usage (A1-001)
+author: System
+tags: [furniture, chair, example, quality-reference]
+
+# =============================================================================
+# QUALITY SECTION (A1-001)
+# Declares current and target quality tiers, identifies gaps, documents
+# decision coverage. This metadata helps agents understand where the builder
+# stands and what needs improvement.
+# =============================================================================
+quality:
+  target_tier: 2                    # Goal: form-resolved quality
+  current_tier: 1                   # Reality: silhouette-correct only
+
+  # Specific gaps preventing us from reaching tier 2
+  tier_gaps:
+    - "Seat is a single flat quad with no thickness"
+    - "Back is a placeholder floating quad, not actual slat/spindle geometry"
+    - "Legs lack joinery detail at top (how they connect to seat)"
+    - "No edge treatment - needs bevels or chamfers for professional finish"
+    - "Single material throughout - needs multi-material (wood seat, different leg material)"
+
+  # Per-part assessment
+  parts:
+    seat:
+      tier: 1
+      notes: "Proportions correct, but zero thickness. Needs extrude2d with bevel."
+
+    legs:
+      tier: 1
+      notes: "Tapered cylinders capture silhouette but are too simple. Need foot detail."
+
+    back:
+      tier: 0
+      notes: "Just a quad placeholder. Back_style decision exists but doesn't generate real geometry."
+
+  # Decision coverage analysis
+  decision_coverage:
+    # Decisions that actually modify mesh structure
+    geometry_affecting:
+      - leg_taper        # Changes leg bottom radius
+      - has_stretchers   # Adds/removes stretcher geometry
+
+    # Decisions that are declared but don't affect output yet
+    decorative_only:
+      - back_style       # Declared with 3 options, but all produce same quad
+      - seat_shape       # Declared but not implemented
+
+    coverage_percentage: 50   # 2/4 decisions actually work
+
+# =============================================================================
+# DECISIONS
+# =============================================================================
+decisions:
+  back_style:
+    type: choice
+    options: [solid, slat, ladder]
+    weights: [0.5, 0.3, 0.2]
+
+  seat_shape:
+    type: choice
+    options: [square, rounded]
+    weights: [0.6, 0.4]
+
+  leg_taper:
+    type: number
+    min: 0.6
+    max: 1.0
+
+  has_stretchers:
+    type: boolean
+    probability: 0.3
+
+# =============================================================================
+# MEASUREMENTS
+# =============================================================================
+measurements:
+  seat_width:
+    value: 0.42
+    source: "Standard dining chair width"
+
+  seat_depth:
+    value: 0.38
+    source: "Standard depth"
+
+  seat_height:
+    value: 0.45
+    source: "Ergonomic height"
+
+  back_height:
+    value: 0.40
+    source: "Back support height above seat"
+
+  leg_radius:
+    value: 0.02
+    source: "Leg thickness"
+
+  leg_inset:
+    value: 0.03
+    source: "Leg position from edge"
+
+# =============================================================================
+# DERIVED
+# =============================================================================
+derived:
+  half_width: "seat_width / 2"
+  half_depth: "seat_depth / 2"
+  leg_x: "half_width - leg_inset"
+  leg_z: "half_depth - leg_inset"
+  back_top: "seat_height + back_height"
+
+# =============================================================================
+# MATERIALS
+# =============================================================================
+materials:
+  wood:
+    color: { r: 0.6, g: 0.4, b: 0.2 }
+
+# =============================================================================
+# GEOMETRY
+# Only implements basic geometry to demonstrate quality assessment
+# NOTE: This is intentionally kept simple to show Tier 1 characteristics
+# =============================================================================
+geometry:
+  # --- SEAT (Tier 1: flat quad) ---
+  - vertex: seat_bl
+    position: { x: "-half_width", y: "seat_height", z: "-half_depth" }
+  - vertex: seat_br
+    position: { x: "half_width", y: "seat_height", z: "-half_depth" }
+  - vertex: seat_fr
+    position: { x: "half_width", y: "seat_height", z: "half_depth" }
+  - vertex: seat_fl
+    position: { x: "-half_width", y: "seat_height", z: "half_depth" }
+
+  - face: seat_top
+    vertices: [seat_bl, seat_br, seat_fr, seat_fl]
+    color: $wood
+
+  # --- BACK (Tier 0: placeholder quad regardless of back_style decision) ---
+  - vertex: back_bl
+    position: { x: "-half_width + 0.05", y: "seat_height", z: "-half_depth + 0.02" }
+  - vertex: back_br
+    position: { x: "half_width - 0.05", y: "seat_height", z: "-half_depth + 0.02" }
+  - vertex: back_tr
+    position: { x: "half_width - 0.05", y: "back_top", z: "-half_depth + 0.02" }
+  - vertex: back_tl
+    position: { x: "-half_width + 0.05", y: "back_top", z: "-half_depth + 0.02" }
+
+  - face: back_face
+    vertices: [back_bl, back_br, back_tr, back_tl]
+    color: $wood
+
+  # --- LEGS (Tier 1: tapered cylinders) ---
+  # Back-left leg
+  - circle: leg_bl_top
+    center: { x: "-leg_x", y: "seat_height", z: "-leg_z" }
+    radius: leg_radius
+    segments: 8
+    normal: [0, 1, 0]
+
+  - circle: leg_bl_bottom
+    center: { x: "-leg_x", y: 0, z: "-leg_z" }
+    radius: "leg_radius * leg_taper"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - loft: leg_bl_shaft
+    from: leg_bl_bottom
+    to: leg_bl_top
+
+  - cap: leg_bl_top_cap
+    loop: leg_bl_top
+
+  - cap: leg_bl_bottom_cap
+    loop: leg_bl_bottom
+    flip: true
+
+  # (Repeat for other 3 legs - omitted for brevity)
+
+  # Front-right leg
+  - circle: leg_fr_top
+    center: { x: "leg_x", y: "seat_height", z: "leg_z" }
+    radius: leg_radius
+    segments: 8
+    normal: [0, 1, 0]
+
+  - circle: leg_fr_bottom
+    center: { x: "leg_x", y: 0, z: "leg_z" }
+    radius: "leg_radius * leg_taper"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - loft: leg_fr_shaft
+    from: leg_fr_bottom
+    to: leg_fr_top
+
+  - cap: leg_fr_top_cap
+    loop: leg_fr_top
+
+  - cap: leg_fr_bottom_cap
+    loop: leg_fr_bottom
+    flip: true
+
+  # --- STRETCHERS (conditional, demonstrates geometry_affecting decision) ---
+  - when: has_stretchers
+    geometry:
+      - circle: stretcher_front
+        center: { x: 0, y: 0.15, z: "leg_z" }
+        radius: 0.01
+        segments: 6
+        normal: [1, 0, 0]
+
+      - circle: stretcher_back
+        center: { x: 0, y: 0.15, z: "-leg_z" }
+        radius: 0.01
+        segments: 6
+        normal: [1, 0, 0]
+
+      - loft: stretcher_front_bar
+        from: stretcher_front
+        to: stretcher_back

@@ -2,9 +2,9 @@
  * Tests for SceneGraph (P2-M2d-005)
  */
 
-import { SceneGraph, SceneNode } from '../../builder/SceneGraph';
-import { Vec3 } from '../../core/Vec3';
-import { AABB } from '../../core/AABB';
+import { SceneGraph, SceneNode } from '../../platform/scene/SceneGraph';
+import { Vec3 } from '../../platform/math/Vec3';
+import { AABB } from '../../platform/math/AABB';
 
 describe('SceneGraph', () => {
   describe('Basic operations', () => {

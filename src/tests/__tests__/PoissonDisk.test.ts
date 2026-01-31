@@ -5,8 +5,8 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { poissonDiskScatter, poissonDiskCircle, createRadialDensityField } from '../../core/PoissonDisk';
-import { field } from '../../core/ScalarField';
+import { poissonDiskScatter, poissonDiskCircle, createRadialDensityField } from '../../platform/spatial/PoissonDisk';
+import { field } from '../../platform/spatial/ScalarField';
 
 describe('PoissonDisk - Basic Scatter', () => {
   describe('poissonDiskScatter', () => {

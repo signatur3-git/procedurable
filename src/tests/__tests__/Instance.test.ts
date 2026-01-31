@@ -9,7 +9,7 @@ import {
   InstanceTransform,
   createInstanceFromPoint,
   createInstanceGroupFromScatter
-} from '../../core/Instance';
+} from '../../platform/spatial/Instance';
 
 describe('Instance - Basic Creation', () => {
   it('should create instance from point', () => {

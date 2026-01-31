@@ -2,8 +2,8 @@
  * Shape2D Tests
  */
 
-import { Shape2D, Point2D } from '../../geometry/Shape2D';
-import { createRectPath } from '../../geometry/Path2D';
+import { Shape2D, Point2D } from '../../platform/geometry/Shape2D';
+import { createRectPath } from '../../platform/geometry/Path2D';
 
 describe('Shape2D', () => {
   describe('Rectangle', () => {

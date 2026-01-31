@@ -2,7 +2,7 @@
  * Tests for constraint passing system (P2-M2d-002)
  */
 
-import { TracedBuilder } from '../../builder/TracedBuilder';
+import { TracedBuilder } from '../../generation/builder/TracedBuilder';
 
 describe('Constraint Passing System', () => {
   describe('TracedBuilder constraint methods', () => {

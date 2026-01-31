@@ -2,7 +2,7 @@
  * Tests for SharedContext (P2-M2d-003)
  */
 
-import { SharedContext } from '../../builder/SharedContext';
+import { SharedContext } from '../../generation/builder/SharedContext';
 
 describe('SharedContext', () => {
   describe('Basic operations', () => {

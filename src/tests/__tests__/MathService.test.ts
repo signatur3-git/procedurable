@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { evaluate, validate } from '../../core/MathService';
+import { evaluate, validate } from '../../platform/math/MathService';
 
 describe('MathService - Conditional Expressions', () => {
   describe('if() function', () => {

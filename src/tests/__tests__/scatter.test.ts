@@ -2,7 +2,7 @@
  * Tests for Poisson disk sampling and scatter algorithms
  */
 
-import { poissonDiskSample, uniformScatter, ScatterBounds } from '../../core/Scatter';
+import { poissonDiskSample, uniformScatter, ScatterBounds } from '../../platform/spatial/Scatter';
 
 describe('Scatter', () => {
   describe('poissonDiskSample', () => {

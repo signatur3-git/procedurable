@@ -1061,6 +1061,161 @@ These outlines can be extruded to 3D geometry using the `extrude2d` command (onc
 
 ---
 
+## Scene Commands
+
+Scene graph queries and goal-seeking placement primitives (P2-M2d-005, B1-003).
+
+### `scene.place_around`
+
+Place N objects in a ring around a center point. Supports both circular and rectangular arrangements with automatic collision avoidance and facing direction.
+
+**Usage:**
+```bash
+scene.place_around count=6 center=0,0,0 radius=2 size=0.4,0.8,0.4 shape=circle seed=42
+scene.place_around count=8 center=0,0,0 shape=rect width=3 depth=2 size=0.4,0.8,0.4 minDist=0.2
+```
+
+**Parameters:**
+- `count` - Number of objects to place
+- `center` - Center point (x,y,z format)
+- `radius` - Distance from center
+- `size` - Object bounding box size (sx,sy,sz format)
+- `shape` - Arrangement shape: `circle` (default) or `rect`
+- `width` - Width for rectangular arrangement (required if shape=rect)
+- `depth` - Depth for rectangular arrangement (required if shape=rect)
+- `minDist` - Minimum distance between objects (default: 0.1)
+- `seed` - Random seed for deterministic placement
+
+**Returns:**
+```json
+{
+  "count": 6,
+  "requested": 6,
+  "rejected": 0,
+  "placements": [
+    {
+      "position": { "x": 2.0, "y": 0.0, "z": 0.0 },
+      "rotation": 3.14159,
+      "rotationDeg": "180.0"
+    }
+  ]
+}
+```
+
+**Use cases:**
+- Place chairs around a table
+- Arrange pillars around a courtyard
+- Position lights around a stage
+
+### `scene.place_along`
+
+Place objects along a line or path with even or fixed spacing. Objects can face forward, toward start, or toward end.
+
+**Usage:**
+```bash
+scene.place_along count=5 start=0,0,0 end=4,0,0 size=0.3,0.5,0.3 facing=forward
+scene.place_along count=10 start=-5,0,0 end=5,0,0 size=0.2,0.4,0.2 spacing=0.8 facing=end
+```
+
+**Parameters:**
+- `count` - Number of objects to place
+- `start` - Start position (x,y,z format)
+- `end` - End position (x,y,z format)
+- `size` - Object bounding box size (sx,sy,sz format)
+- `spacing` - Fixed spacing between objects (optional; if omitted, objects are evenly distributed)
+- `facing` - Direction objects face: `forward` (no rotation), `start` (face toward start), `end` (face toward end)
+- `seed` - Random seed for deterministic placement
+
+**Returns:**
+```json
+{
+  "count": 5,
+  "requested": 5,
+  "lineLength": "4.000",
+  "spacing": "1.000",
+  "placements": [
+    {
+      "position": { "x": 0.0, "y": 0.0, "z": 0.0 },
+      "rotation": 0,
+      "rotationDeg": "0.0",
+      "t": 0.0
+    }
+  ]
+}
+```
+
+**Use cases:**
+- Fence posts along a property line
+- Street lights along a road
+- Trees along a path
+- Bollards along a walkway
+
+### `scene.fill_area`
+
+Scatter-fill an area with objects using Poisson disk sampling for natural distribution. Ensures minimum distance between objects.
+
+**Usage:**
+```bash
+scene.fill_area bounds=-5,-5,5,5 density=1.0 size=0.3,0.5,0.3 minDist=0.5 seed=42
+scene.fill_area bounds=-10,-10,10,10 density=0.8 size=0.4,0.6,0.4 seed=123
+```
+
+**Parameters:**
+- `bounds` - Area bounds (xMin,zMin,xMax,zMax format)
+- `density` - Placement density (0.0-1.0, higher = denser)
+- `size` - Object bounding box size (sx,sy,sz format)
+- `minDist` - Minimum distance between objects (optional; defaults to max(sizeX, sizeZ))
+- `seed` - Random seed for deterministic placement
+
+**Returns:**
+```json
+{
+  "count": 37,
+  "density": 1.0,
+  "area": "100.00",
+  "minDistance": "0.500",
+  "placements": [
+    {
+      "position": { "x": 1.23, "y": 0.0, "z": -2.45 },
+      "rotation": 0,
+      "rotationDeg": "0.0"
+    }
+  ]
+}
+```
+
+**Use cases:**
+- Scatter rocks in a landscape
+- Distribute trees in a forest
+- Place grass clumps on terrain
+- Random clutter placement
+
+### `scene.query_by_tag`
+
+Find scene nodes by tag from the last builder run.
+
+**Usage:** `scene.query_by_tag <tag>`
+
+**Returns:** Nodes matching the tag with their bounds, transform, and metadata.
+
+### `scene.query_nearby`
+
+Find scene nodes near a point within a radius.
+
+**Usage:** `scene.query_nearby <x,y,z> radius=<r>`
+
+**Returns:** Nodes within radius of the point, sorted by distance.
+
+### `scene.tags`
+
+List all available tags in the current scene graph.
+
+**Usage:** `scene.tags`
+
+**Returns:** Array of unique tags from all nodes in the scene.
+
+---
+
 ## Geometry Query Commands (P2-M3)
 
 ### `geometry.shape2d`

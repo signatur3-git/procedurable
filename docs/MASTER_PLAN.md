@@ -63,10 +63,32 @@
 
 ### Known Gaps in Completed Work
 - P2-M2d-007 (goal-seeking primitives) not started
-- P2-M3b (architecture consolidation) not started -- creates service ownership confusion
+- ~~P2-M3b (architecture consolidation) not started~~ → **COMPLETED 2026-01-31**
 - Text glyph holes (letters A, O, etc. don't subtract inner contours)
 - Gear demo unfinished
 - Decision coverage in existing builders is poor (decisions declared but don't affect geometry)
+
+### Code Structure Reorganization (Completed 2026-01-31)
+
+The codebase has been restructured from 10+ flat folders to 6 domain-organized groups:
+
+```
+src/
+├── platform/     Core infrastructure (math, geometry, spatial, scene, materials, modifiers)
+├── generation/   Content pipeline (builder, text, validation, export)
+├── servers/      External interfaces (authoring, mcp, dashboard, knowledge)
+├── storage/      Persistence layer
+├── demos/        Example builders (not platform code)
+└── tests/        Test suites
+```
+
+**Benefits:**
+- Clear separation of infrastructure vs. engine vs. interfaces vs. examples
+- Reduced cognitive load at top level (6 folders vs. 10+)
+- Room for future components (modifiers/, knowledge/, export/)
+- Dependencies flow cleanly: platform ← generation ← servers
+
+See `CODE_STRUCTURE_EVALUATION.md` for full details.
 
 ---
 
@@ -93,7 +115,7 @@
 
 | Milestone | Purpose |
 |-----------|---------|
-| B1: Foundation Cleanup | Complete M3b consolidation, fix text holes, finish M2d-007 |
+| B1: Foundation Cleanup | ~~Complete M3b consolidation~~✅, fix text holes, finish M2d-007 |
 | B2: Scene Description Format | PSD v0.1 -- serializable scene graph with tags, bounds, materials |
 | B3: World Metadata Collector | Persistent knowledge store for agents (styles, rules, relationships) |
 | B4: Builder Authoring via DSL | Agents create new YAML builders through DSL commands (not just file edits) |

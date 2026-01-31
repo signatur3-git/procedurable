@@ -2,10 +2,55 @@
 
 **Date**: 2026-01-31
 **Scope**: `src/` directory — folder structure, component relationships, builder pipeline, missing abstractions
+**Status**: ✅ **RESTRUCTURING COMPLETE** (2026-01-31)
 
 ---
 
-## 1. Current Folder Layout vs. Actual Components
+## 0. Final Structure (Implemented)
+
+The restructuring described in this document has been completed. The new folder structure is:
+
+```
+src/
+├── platform/                "Core infrastructure"
+│   ├── math/                    Vec3, Mat4, Transform, AABB, Spline, Random, MathService
+│   ├── spatial/                 ScalarField, PoissonDisk, Scatter, Instance
+│   ├── geometry/                Mesh, Vertex, Face, EdgeLoop, Path2D, Shape2D, Extrude, Sweep, Subdivision
+│   ├── scene/                   SceneNode, SceneGraph, Placement
+│   ├── materials/               MaterialLibrary
+│   └── modifiers/               (placeholder for modifier stack)
+│
+├── generation/              "Content creation pipeline"
+│   ├── builder/                 TracedBuilder, YamlBuilderParser, ExpressionService, SharedContext, SceneBuilder
+│   ├── text/                    FontParser, ProceduralFont, TextToShape
+│   ├── validation/              ValidationAPI, MeshChecks, MeshValidation
+│   └── export/                  (placeholder for exporters)
+│
+├── servers/                 "External interfaces"
+│   ├── authoring/               DSL server, commands
+│   ├── mcp/                     MCP server variants
+│   ├── dashboard/               Three.js preview
+│   └── knowledge/               (placeholder for knowledge server)
+│
+├── storage/                 "Persistence layer"
+│   └── StorageProvider, FileSystemStorage
+│
+├── demos/                   "Example content"
+│   └── ChairBuilder, TableBuilder, PersonBuilder, MeshMapBaker
+│
+└── tests/
+```
+
+**Benefits achieved:**
+- Top-level cognitive load reduced from 10+ folders to 6 domain groupings
+- Clear separation between infrastructure (platform), engine (generation), interfaces (servers), and examples (demos)
+- Each folder answers one question: "What is this for?"
+- Dependency direction is clear: platform ← generation ← servers
+- Room for future additions (modifiers, export, knowledge) is pre-allocated
+
+---
+
+## 1. Previous Folder Layout (Historical Reference)
 
 ```
 src/
@@ -112,91 +157,103 @@ There's no `export/` folder or abstraction. Export to OBJ, glTF, or PSD (BACKLOG
 
 ## 3. Proposed Restructuring
 
-The goal: **each folder answers one question**, and the folder name tells you what that question is.
+### 3.1 Cognitive Load Consideration
+
+The flat structure originally proposed (17 folders) reduces the problem of "what does this folder contain?" but increases the problem of "where do I even start?" A developer opening `src/` sees 17 peer folders with no hierarchy.
+
+**Solution**: Add one organizational layer that groups by *domain*. This reduces top-level cognitive load to 6 entries while preserving fine-grained organization within each domain.
+
+### 3.2 Final Structure with Organizational Layer
 
 ```
 src/
-├── math/                    "What are the numeric primitives?"
-│   ├── Vec3.ts
-│   ├── Mat4.ts
-│   ├── Transform.ts
-│   ├── AABB.ts
-│   ├── Spline.ts
-│   ├── Random.ts
-│   └── MathService.ts
+├── platform/                "Core infrastructure — math, geometry, scenes"
+│   ├── math/                    "What are the numeric primitives?"
+│   │   ├── Vec3.ts
+│   │   ├── Mat4.ts
+│   │   ├── Transform.ts
+│   │   ├── AABB.ts
+│   │   ├── Spline.ts
+│   │   ├── Random.ts
+│   │   └── MathService.ts
+│   │
+│   ├── spatial/                 "How do I distribute things in space?"
+│   │   ├── ScalarField.ts
+│   │   ├── PoissonDisk.ts
+│   │   ├── Scatter.ts
+│   │   └── Instance.ts
+│   │
+│   ├── geometry/                "How do I create and manipulate meshes?"
+│   │   ├── Mesh.ts
+│   │   ├── Vertex.ts
+│   │   ├── Face.ts
+│   │   ├── EdgeLoop.ts
+│   │   ├── Path2D.ts
+│   │   ├── Shape2D.ts
+│   │   ├── MeshOperations.ts
+│   │   ├── MeshTransform.ts
+│   │   ├── Extrude.ts
+│   │   ├── Sweep.ts
+│   │   └── Subdivision.ts
+│   │
+│   ├── scene/                   "How do I organize objects in a scene?"
+│   │   ├── SceneNode.ts
+│   │   ├── SceneGraph.ts
+│   │   └── Placement.ts
+│   │
+│   ├── materials/               "How do I define surface properties?"
+│   │   └── MaterialLibrary.ts
+│   │
+│   └── modifiers/               "What post-processing can I apply?"
+│       ├── ModifierStack.ts
+│       ├── SubdivisionModifier.ts
+│       └── (future: BevelModifier, DeformModifier, UVModifier)
 │
-├── spatial/                 "How do I distribute things in space?"
-│   ├── ScalarField.ts
-│   ├── PoissonDisk.ts
-│   ├── Scatter.ts
-│   └── Instance.ts
+├── generation/              "Builder engine — how content gets created"
+│   ├── builder/                 "How does the authoring engine work?"
+│   │   ├── TracedBuilder.ts
+│   │   ├── YamlBuilderParser.ts
+│   │   ├── ExpressionService.ts
+│   │   ├── SharedContext.ts
+│   │   └── SceneBuilder.ts
+│   │
+│   ├── text/                    "How do I turn text into geometry?"
+│   │   ├── FontParser.ts
+│   │   ├── ProceduralFont.ts
+│   │   └── TextToShape.ts
+│   │
+│   ├── validation/              "How do I check quality?"
+│   │   ├── ValidationAPI.ts
+│   │   ├── MeshChecks.ts
+│   │   └── MeshValidation.ts
+│   │
+│   └── export/                  "How do I get results out?"
+│       └── (future: ObjExporter, GltfExporter, PsdExporter)
 │
-├── geometry/                "How do I create and manipulate meshes?"
-│   ├── Mesh.ts
-│   ├── Vertex.ts
-│   ├── Face.ts
-│   ├── EdgeLoop.ts
-│   ├── Path2D.ts
-│   ├── Shape2D.ts
-│   ├── MeshOperations.ts
-│   ├── MeshTransform.ts
-│   ├── Extrude.ts
-│   ├── Sweep.ts
-│   └── Subdivision.ts
+├── servers/                 "External interfaces — MCP, authoring, dashboard"
+│   ├── authoring/               "How does the DSL server work?"
+│   │   ├── server.ts
+│   │   ├── command-parser.ts
+│   │   ├── command-registry.ts
+│   │   └── commands/
+│   │
+│   ├── mcp/                     "How does the MCP integration work?"
+│   │   ├── server.ts
+│   │   ├── http-server.ts
+│   │   └── minimal-server.ts
+│   │
+│   ├── dashboard/               "How does the preview UI work?"
+│   │   └── main.ts
+│   │
+│   └── knowledge/               "Domain knowledge for intelligent generation"
+│       └── (future: KnowledgeServer, ObjectSchemas, WorkflowHints)
 │
-├── text/                    "How do I turn text into geometry?"
-│   ├── FontParser.ts
-│   ├── ProceduralFont.ts
-│   └── TextToShape.ts
-│
-├── materials/               "How do I define surface properties?"
-│   └── MaterialLibrary.ts   (+ future: MaterialSlot, PBRMaterial, UVGenerator)
-│
-├── modifiers/               "What post-processing can I apply?"  ← NEW
-│   ├── ModifierStack.ts     Virtual modifier list, evaluated on apply()
-│   ├── SubdivisionModifier.ts
-│   └── (future: BevelModifier, DeformModifier, UVModifier)
-│
-├── scene/                   "How do I organize objects in a scene?"
-│   ├── SceneNode.ts         (from core/)
-│   ├── SceneGraph.ts        (from builder/, semantic query index)
-│   └── Placement.ts         (from builder/)
-│
-├── builder/                 "How does the authoring engine work?"
-│   ├── TracedBuilder.ts
-│   ├── YamlBuilderParser.ts
-│   ├── ExpressionService.ts
-│   ├── SharedContext.ts
-│   └── SceneBuilder.ts
-│
-├── validation/              "How do I check quality?"
-│   ├── ValidationAPI.ts
-│   ├── MeshChecks.ts
-│   └── MeshValidation.ts
-│
-├── export/                  "How do I get results out?"  ← NEW
-│   └── (future: ObjExporter, GltfExporter, PsdExporter)
-│
-├── authoring/               "How does the DSL server work?"
-│   ├── server.ts
-│   ├── command-parser.ts
-│   ├── command-registry.ts
-│   └── commands/
-│
-├── mcp/                     "How does the MCP integration work?"
-│   ├── server.ts
-│   ├── http-server.ts
-│   └── minimal-server.ts
-│
-├── storage/                 "How do I persist builders and assets?"
+├── storage/                 "Persistence layer"
 │   ├── StorageProvider.ts
 │   ├── FileSystemStorage.ts
 │   └── index.ts
 │
-├── dashboard/               "How does the preview UI work?"
-│   └── main.ts
-│
-├── demos/                   "What are the example builders?"  ← NEW
+├── demos/                   "Example content — not platform code"
 │   ├── ChairBuilder.ts
 │   ├── TableBuilder.ts
 │   ├── PersonBuilder.ts
@@ -205,34 +262,55 @@ src/
 └── tests/
 ```
 
-### What changed
+### 3.3 What Changed
 
 | Change | Rationale |
 |--------|-----------|
-| `core/` → `math/` | Name matches contents. Vec3 and Mat4 are math, not "core platform." |
-| Spatial algorithms → `spatial/` | ScalarField, PoissonDisk, Scatter, Instance are tools that *use* math. Separating them clarifies the dependency direction. |
-| `scene/` extracted | SceneNode, SceneGraph, Placement all deal with "where things go in a scene." Putting them together resolves the two-SceneNode confusion. |
-| `materials/` extracted | Gives materials room to grow (slots, PBR, textures) without cluttering builder/. |
-| `modifiers/` added | Home for the modifier stack concept. Even if only SubdivisionModifier exists initially, the folder signals the pattern. |
-| `export/` added | Gives export formats a proper home instead of being inlined in command handlers. |
+| **Added organizational layer** | Groups 17 folders into 6 top-level domains (platform, generation, servers, storage, demos, tests). Reduces cognitive load when first opening the project. |
+| `core/` → `platform/math/` | Name matches contents. Vec3 and Mat4 are math, not "core platform." The `platform/` parent signals these are foundational. |
+| Spatial algorithms → `platform/spatial/` | ScalarField, PoissonDisk, Scatter, Instance are tools that *use* math. Separating them clarifies the dependency direction. |
+| `platform/scene/` extracted | SceneNode, SceneGraph, Placement all deal with "where things go in a scene." Putting them together resolves the two-SceneNode confusion. |
+| `platform/materials/` extracted | Gives materials room to grow (slots, PBR, textures) without cluttering builder/. |
+| `platform/modifiers/` added | Home for the modifier stack concept. Even if only SubdivisionModifier exists initially, the folder signals the pattern. |
+| `generation/` domain | Groups builder engine, text, validation, export — all concerned with "how content gets created." |
+| `servers/` domain | Groups authoring, mcp, dashboard, knowledge — all external interfaces that consume the generation layer. |
+| `servers/knowledge/` added | Placeholder for domain knowledge server (see SYSTEM_FLOW.md for concept). |
+| `generation/export/` added | Gives export formats a proper home instead of being inlined in command handlers. |
 | `demos/` extracted | Hardcoded builders are example content. Separating them makes it obvious that TracedBuilder is infrastructure and ChairBuilder is a demo. |
 | `builder/` slimmed down | Now contains only the 5 files that form the authoring engine core. |
 
-### Dependency direction (clean layering)
+### 3.4 Dependency Direction (Clean Layering)
 
 ```
-math/  ←  spatial/  ←  geometry/  ←  text/
-                                  ←  modifiers/
-                    ←  scene/     ←  builder/   ←  authoring/  ←  mcp/
-                                  ←  materials/
-                                  ←  validation/
-                                  ←  export/
-                                                ←  demos/
-                                                ←  dashboard/
-storage/ (independent)
+                     ┌──────────────────────────────────────────────────────┐
+                     │                    platform/                         │
+                     │  math/ ← spatial/ ← geometry/                        │
+                     │                   ← scene/    ← materials/           │
+                     │                               ← modifiers/           │
+                     └─────────────────────────┬────────────────────────────┘
+                                               │
+                                               ▼
+                     ┌──────────────────────────────────────────────────────┐
+                     │                   generation/                        │
+                     │  builder/ ← text/                                    │
+                     │          ← validation/                               │
+                     │          ← export/                                   │
+                     └─────────────────────────┬────────────────────────────┘
+                                               │
+                                               ▼
+                     ┌──────────────────────────────────────────────────────┐
+                     │                     servers/                         │
+                     │  authoring/ ← mcp/                                   │
+                     │            ← dashboard/                              │
+                     │            ← knowledge/                              │
+                     └──────────────────────────────────────────────────────┘
+
+storage/ (independent, used by servers/)
+demos/   (depends on generation/, example content only)
+tests/   (can reach everything)
 ```
 
-No circular dependencies. Each layer only imports from layers to its left.
+No circular dependencies. Each layer only imports from layers above it in the diagram.
 
 ---
 

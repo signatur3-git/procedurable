@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from '@jest/globals';
-import { FontParser } from '../../text/FontParser';
+import { FontParser } from '../../generation/text/FontParser';
 
 describe('FontParser', () => {
   let parser: FontParser;
@@ -53,11 +53,11 @@ describe('FontParser', () => {
   });
 
   describe('Contour Winding Detection', () => {
-    it('should detect clockwise contours', () => {
+    it('should detect clockwise contours (after Y-flip, these are outer contours)', () => {
       // Access private method through type assertion for testing
       const testParser = parser as any;
 
-      // Clockwise square
+      // Clockwise square in XZ plane
       const clockwise = [
         { x: 0, z: 0 },
         { x: 1, z: 0 },
@@ -68,10 +68,10 @@ describe('FontParser', () => {
       expect(testParser.isClockwise(clockwise)).toBe(true);
     });
 
-    it('should detect counter-clockwise contours', () => {
+    it('should detect counter-clockwise contours (after Y-flip, these are holes)', () => {
       const testParser = parser as any;
 
-      // Counter-clockwise square
+      // Counter-clockwise square in XZ plane
       const counterClockwise = [
         { x: 0, z: 0 },
         { x: 0, z: 1 },

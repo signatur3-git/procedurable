@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect } from '@jest/globals';
-import { parseAndExecuteBuilder } from '../../builder/YamlBuilderParser';
+import { parseAndExecuteBuilder } from '../../generation/builder/YamlBuilderParser';
 
 describe('YamlBuilderParser - Error Context', () => {
   describe('Decision errors', () => {

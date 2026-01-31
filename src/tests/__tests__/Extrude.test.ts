@@ -2,8 +2,8 @@
  * Extrude Tests
  */
 
-import { extrude2D, extrudeShape } from '../../geometry/Extrude';
-import { Shape2D } from '../../geometry/Shape2D';
+import { extrude2D, extrudeShape } from '../../platform/geometry/Extrude';
+import { Shape2D } from '../../platform/geometry/Shape2D';
 
 describe('Extrude', () => {
   describe('Basic Extrusion', () => {

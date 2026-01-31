@@ -8,11 +8,12 @@
 ## Overview
 
 Builders are defined as YAML files that declaratively specify:
-1. **Metadata** - Name, description, version
-2. **Decisions** - Virtual artist choices with options and weights
-3. **Measurements** - Dimensional values with optional variation
-4. **Derived** - Computed values from expressions
-5. **Geometry** - Vertices, loops, faces, lofts, compositions
+1. **Metadata** - Name, description, version, tags, author
+2. **Quality** - Target and current quality tier with gaps (A1-001)
+3. **Decisions** - Virtual artist choices with options and weights
+4. **Measurements** - Dimensional values with optional variation
+5. **Derived** - Computed values from expressions
+6. **Geometry** - Vertices, loops, faces, lofts, compositions
 
 The YAML is parsed and executed by `YamlBuilderParser`, which generates
 calls to `TracedBuilder` methods.
@@ -214,6 +215,81 @@ name: BuilderName        # Unique identifier
 description: "..."       # Human-readable description
 author: "name"           # Optional
 tags: [furniture, chair] # Optional categorization
+```
+
+### Quality (A1-001)
+
+The `quality:` section declares the builder's current quality tier and target tier, identifies gaps, and documents decision coverage. This metadata helps agents and humans understand where the builder stands and what needs improvement.
+
+```yaml
+quality:
+  target_tier: 2                    # Goal quality level (0-4)
+  current_tier: 1                   # Actual quality level
+  
+  # Gaps preventing target tier (required if current < target)
+  tier_gaps:
+    - "Back is floating quad, needs thickness and frame structure"
+    - "Legs are simple cylinders, need joinery detail"
+    - "No edge treatment (bevels/chamfers)"
+    - "Single material, needs multi-material (wood seat, metal legs, etc.)"
+  
+  # Per-part quality assessment
+  parts:
+    seat:
+      tier: 1
+      notes: "Correct proportions but no thickness variation or contour"
+    legs:
+      tier: 1
+      notes: "Tapered cylinders are silhouette-correct but lack detail"
+    back:
+      tier: 1
+      notes: "Floating quad placeholder, needs proper slat/spindle geometry"
+  
+  # Decision coverage - which decisions actually change geometry
+  decision_coverage:
+    geometry_affecting:          # Decisions that modify mesh structure
+      - leg_style                # Changes leg geometry
+      - back_style               # Changes back structure
+      - has_stretchers           # Adds/removes stretcher geometry
+      - slat_count               # Changes back complexity
+    
+    decorative_only:             # Decisions that don't change geometry yet
+      - seat_shape               # Declared but not implemented
+      - leg_taper                # Only affects one parameter slightly
+    
+    coverage_percentage: 67      # (4/6 decisions affect geometry)
+```
+
+**Quality Tier Definitions** (see `QUALITY_TIERS.md`):
+- **Tier 0**: Bounding volume (box that's the right size)
+- **Tier 1**: Silhouette correct (shape recognizable, proportions right)
+- **Tier 2**: Form resolved (thickness, multi-part, material variation)
+- **Tier 3**: Detail refined (joinery, chamfers, ornament)
+- **Tier 4**: Production ready (UVs, LODs, performance optimized)
+
+**Guidelines:**
+- Be **brutally honest** about `current_tier` - assess what actually renders, not intent
+- `tier_gaps` should be specific and actionable ("Add bevels" not "Make better")
+- `decision_coverage` forces explicit recognition of which decisions are cosmetic
+- Per-part assessment reveals where to focus upgrade efforts
+
+**Example - Honest Assessment:**
+```yaml
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps:
+    - "Seat has no thickness or edge treatment"
+    - "Back_style decision declares 4 options but only 'solid' is implemented"
+    - "Legs lack foot detail and top joinery"
+  parts:
+    seat: { tier: 1, notes: "Flat quad, needs extrusion with bevel" }
+    legs: { tier: 1, notes: "Cylinders work but too simple" }
+    back: { tier: 0, notes: "Most variants unimplemented - just placeholder" }
+  decision_coverage:
+    geometry_affecting: [leg_style, has_stretchers]
+    decorative_only: [back_style, seat_shape, leg_taper]
+    coverage_percentage: 33   # Only 2/6 decisions work
 ```
 
 ### Decisions

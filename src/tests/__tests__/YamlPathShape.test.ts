@@ -1,6 +1,6 @@
 import { describe, it, expect } from '@jest/globals';
-import { parseAndExecuteBuilder } from '../../builder/YamlBuilderParser';
-import type { YamlBuilderDefinition } from '../../builder/YamlBuilderParser';
+import { parseAndExecuteBuilder } from '../../generation/builder/YamlBuilderParser';
+import type { YamlBuilderDefinition } from '../../generation/builder/YamlBuilderParser';
 
 describe('YamlBuilderParser - Path Shapes', () => {
   it('should parse and extrude a path shape with adaptive tessellation', async () => {

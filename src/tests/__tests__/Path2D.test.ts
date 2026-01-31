@@ -12,9 +12,9 @@ import {
   calculatePathBounds,
   createRectPath,
   createCirclePath
-} from '../../geometry/Path2D';
-import type { Point2D, Path2D } from '../../geometry/Path2D';
-import { Shape2D } from '../../geometry/Shape2D';
+} from '../../platform/geometry/Path2D';
+import type { Point2D, Path2D } from '../../platform/geometry/Path2D';
+import { Shape2D } from '../../platform/geometry/Shape2D';
 
 describe('Path2D', () => {
   describe('tessellateQuadraticCurve', () => {

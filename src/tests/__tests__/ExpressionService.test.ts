@@ -11,7 +11,7 @@ import {
   evaluateCondition,
   evaluatePosition,
   EvaluationContext
-} from '../../builder/ExpressionService';
+} from '../../generation/builder/ExpressionService';
 
 describe('ExpressionService', () => {
   let ctx: EvaluationContext;
