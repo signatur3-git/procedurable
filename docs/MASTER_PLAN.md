@@ -105,20 +105,21 @@ See `CODE_STRUCTURE_EVALUATION.md` for full details.
 | Milestone | Purpose |
 |-----------|---------|
 | A1: Quality Declaration | Add `quality:` section to YAML format; retrofit existing builders |
-| A2: Quality Gates | Automated tier validation in ValidationAPI |
+| A2: Quality Gates | Automated tier validation in ValidationAPI; machine-readable suggestions for agent loop |
 | A3: Decision Coverage | Verify every decision option produces different output |
 | A4: Sophistication Plans | First-class format for planning builder quality before coding |
 
 ### Track B: Platform Components
 
-**Goal:** New infrastructure that makes the authoring platform more capable.
+**Goal:** New infrastructure that makes the authoring platform more capable, including inter-builder communication and negotiation.
 
 | Milestone | Purpose |
 |-----------|---------|
 | B1: Foundation Cleanup | ~~Complete M3b consolidation~~✅, fix text holes, finish M2d-007 |
-| B2: Scene Description Format | PSD v0.1 -- serializable scene graph with tags, bounds, materials |
+| B2: Scene Description Format | PSD v0.1 -- serializable scene graph with tags (aggregated), bounds, materials, spatial queries, summary views |
 | B3: World Metadata Collector | Persistent knowledge store for agents (styles, rules, relationships) |
 | B4: Builder Authoring via DSL | Agents create new YAML builders through DSL commands (not just file edits) |
+| B5: Builder Negotiation | Attachment points, request/offer protocol, transition zone blending between builders |
 
 ### Track C: Foundational Geometry Tools
 
@@ -132,6 +133,7 @@ See `CODE_STRUCTURE_EVALUATION.md` for full details.
 | C4: Basic UV Generation | Automatic UVs for lathe/sweep/extrude output |
 | C5: Deformers | Bend/twist/noise displacement (breaks CG-perfect look) |
 | C6: glTF Export | Get geometry into other tools and engines |
+| C7: Symmetry Operations | Mirror, radial array, translational symmetry |
 
 ### Track D: Domain Demos (Quality Proof)
 
@@ -149,7 +151,9 @@ See `CODE_STRUCTURE_EVALUATION.md` for full details.
 ```
 A1 ──→ A2 ──→ A3 ──→ A4
 B1 ──→ B2 ──→ B3 ──→ B4
+              B2 ──→ B5 (independent of B3/B4)
 C1 ──→ C2 ──→ C3 ──→ C4 ──→ C5 ──→ C6
+                                       C7 (independent, can start any time)
 
 A2 + C2 ──→ D1 (need quality gates + bevel for Tier 2 chair)
 A2 + C5 ──→ D2 (need quality gates + deformers for Tier 2 vase)
@@ -179,6 +183,9 @@ These remain valid goals but are explicitly deferred until the authoring platfor
 | Characters (PersonBuilder) | Capstone that needs everything | Nearly all of the above |
 | Renderer Package | Deployment concern, not authoring | C6 (glTF export) |
 | Animation & Physics | Phase 3 | Rigging foundations (vertex weights) |
+| Style System | Composable styles (modifiers, role-based builder resolution, proportion rules) need B3 + B4 first | B3 (metadata), B4 (DSL authoring), B5 (negotiation for proportion constraints) |
+| Morph Targets / Blend Shapes | Useful for characters and LOD blending but Phase 3 | C5 (deformers) as lightweight precursor |
+| LOD / View-Dependent Generation | Scene-level tier selection based on camera distance | Track A (quality tiers), Track D (proves tiers work) |
 
 ---
 
@@ -203,6 +210,12 @@ AI agents should be able to:
 
 6. **Accumulate** -- Store world metadata, style guides, builder relationships across sessions
    - *Status: Not built (needs B3)*
+
+7. **Negotiate** -- Compose builders that adapt to each other: publish spatial requirements, receive offers from environment builders, declare attachment points and blend zones
+   - *Status: Not built (needs B5)*
+
+8. **Reason about scenes** -- Query large scenes hierarchically (overview → drill-down), compute spatial relationships, understand semantic roles without reading builder source
+   - *Status: Not built (needs B2 enhancements: tag aggregation, summary queries, spatial queries)*
 
 ---
 

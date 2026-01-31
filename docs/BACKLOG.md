@@ -52,12 +52,14 @@ Implementation hints.
 | B: Platform | B2: Scene Description | 3 | 0 | ⬜ |
 | B: Platform | B3: World Metadata | 3 | 0 | ⬜ |
 | B: Platform | B4: Builder Authoring via DSL | 3 | 0 | ⬜ |
+| B: Platform | B5: Builder Negotiation | 3 | 0 | ⬜ |
 | C: Geometry | C1: 2D Booleans | 3 | 0 | ⬜ |
 | C: Geometry | C2: Bevel & Chamfer | 3 | 0 | ⬜ |
 | C: Geometry | C3: Material Slots | 2 | 0 | ⬜ |
 | C: Geometry | C4: Basic UV Generation | 2 | 0 | ⬜ |
 | C: Geometry | C5: Deformers | 3 | 0 | ⬜ |
 | C: Geometry | C6: glTF Export | 2 | 0 | ⬜ |
+| C: Geometry | C7: Symmetry Operations | 2 | 0 | ⬜ |
 | D: Demos | D1: DiningChair Tier 2 | 1 | 0 | ⬜ |
 | D: Demos | D2: Vase Tier 2 | 1 | 0 | ⬜ |
 | D: Demos | D3: Gear Tier 2 | 1 | 0 | ⬜ |
@@ -155,6 +157,7 @@ Tier 1 gates are basic checks that every builder should pass: parts exist, propo
 - [ ] `evaluateQualityTier()` function in ValidationAPI
 - [ ] Tier 1 checks: all declared parts produce geometry, bounding box within expected range, no degenerate faces > 10%
 - [ ] Returns structured `QualityGateResult` (tier, gates_passed, gates_failed, suggestions)
+- [ ] Suggestions are machine-readable: `{ action, target, reason, current_value, required_value }` so agents can act on them programmatically
 - [ ] DSL command `builder.quality <name>` returns gate results
 - [ ] At least 3 existing builders pass Tier 1 gates
 - [ ] Integration test for quality gate system
@@ -452,10 +455,15 @@ Builder TracedOutput should be serializable to PSD format. This is the bridge be
 Agents need to query PSD scenes to reason about builder output: find parts by tag, get bounds, check spatial relationships.
 
 #### Acceptance Criteria
-- [ ] `scene.query_by_tag <tag>` returns matching prims from last PSD output
+- [ ] `scene.query_by_tag <tag>` returns matching prims from last PSD output (recursive — searches children)
 - [ ] `scene.get_bounds <prim_path>` returns AABB for a prim
 - [ ] `scene.list_prims` returns hierarchy
 - [ ] `scene.get_materials` returns material assignments
+- [ ] `scene.overview` returns top-level prims only, with aggregated metadata: child count, combined bounds, collected tags from descendants (summary view for large scenes)
+- [ ] `scene.inspect <prim_path>` returns one level of children for a specific prim (drill-down)
+- [ ] `scene.distance <prim_a> <prim_b>` returns center-to-center and surface-to-surface distance between prims
+- [ ] `scene.prims_within <prim> <radius>` returns prims whose bounds intersect the search sphere
+- [ ] Tag aggregation: each prim collects tags from all descendants so `query_by_tag` on a parent finds tags from any child
 - [ ] Integration tests for each query
 
 #### Files to Modify
@@ -591,6 +599,92 @@ When creating a builder, an agent should be guided by a sophistication plan. The
 
 #### Files to Modify
 - `src/servers/authoring/commands/builder.ts`
+
+---
+
+## B5: Builder Negotiation
+
+> **Goal:** Enable builders to communicate bidirectionally — declaring attachment points, publishing spatial requirements, receiving offers from environment builders, and blending geometry at shared boundaries. See `VISION_EXAMPLES.md` Scene #13 for full motivation.
+
+### B5-001: Attachment Point Declarations
+
+**Track:** B | **Status:** ⬜ | **Size:** S
+**Dependencies:** B2-001
+
+#### Context
+Builders should declare named ports (attachment points) as part of their output. A port has a position, orientation, and optionally references a named edge loop. When composing, the parent can snap a child's port to its own port, auto-computing offset and rotation. This is the simplest level of inter-builder communication — one-directional conformance.
+
+#### Acceptance Criteria
+- [ ] `ports:` section in YAML builder format: each port has `name`, `position`, `normal`, optional `loop` (reference to named edge loop)
+- [ ] Port data included in TracedOutput and PSD format
+- [ ] Composition syntax: `attach_to: <parent_builder>.<port_name>` snaps child port to parent port
+- [ ] Auto-computed offset and rotation from port alignment
+- [ ] Port data queryable via `scene.get_ports <prim_path>`
+- [ ] Integration test: lamp attaches to table surface port
+
+#### Files to Modify
+- `src/generation/builder/YamlBuilderParser.ts` (parse ports section)
+- `src/generation/builder/TracedBuilder.ts` (store port data in output)
+- `src/generation/builder/PSD.ts` (port type in PSD schema)
+- `src/servers/authoring/commands/scene.ts` (query ports)
+- `docs/YAML_BUILDER_FORMAT.md` (document ports syntax)
+
+---
+
+### B5-002: Request/Offer Negotiation Protocol
+
+**Track:** B | **Status:** ⬜ | **Size:** L
+**Dependencies:** B5-001, B2-002
+
+#### Context
+Some builders need to adapt to each other. A house needs a flat area; terrain needs to know where houses go before generating. This requires a structured negotiation protocol: builders publish **requirements**, environment builders process them and publish **offers**, then all builders generate geometry using the offers.
+
+The simplest implementation uses composition ordering within the current single-pass model: compose requirement-publishers first (they write to SharedContext), then compose the environment builder (it reads requirements, generates adapted geometry, writes offers), then re-compose the original builders (they read offers and adapt). A true multi-pass execution model is a future enhancement.
+
+#### Acceptance Criteria
+- [ ] `requirements:` section in YAML: typed spatial requirements (e.g., `type: terrain_clearance, shape: rectangle, width: N, depth: N, position: {x, z}, max_slope: N`)
+- [ ] Requirements published to SharedContext as structured data (not flat strings)
+- [ ] Environment builders can read all published requirements via `context.get_requirements(type)`
+- [ ] `offers:` section: environment builders publish typed offers (e.g., `elevation, slope, slope_direction, boundary_loop`)
+- [ ] Requesting builders can read offers via `context.get_offer(requirement_name)`
+- [ ] Offer data usable in measurement expressions: `$offer.flat_pad.elevation`
+- [ ] Demo: terrain builder flattens pad for house; house reads elevation and slope from terrain's offer
+- [ ] All requirements and offers are traced (inspectable: "why is this house at elevation 42.3m?")
+- [ ] Integration test with terrain + house negotiation
+
+#### Files to Modify
+- `src/generation/builder/YamlBuilderParser.ts` (parse requirements/offers)
+- `src/generation/builder/TracedBuilder.ts` (requirement/offer storage and tracing)
+- `src/platform/scene/SharedContext.ts` (typed requirement/offer channels)
+- `docs/YAML_BUILDER_FORMAT.md` (document negotiation syntax)
+
+#### Notes
+The initial implementation should use **composition ordering** (compose children that publish requirements → compose environment → re-compose children with offers) rather than a true multi-pass engine. This keeps the architecture simple while proving the protocol. Multi-pass execution can be added later if the ordering approach becomes too limiting.
+
+---
+
+### B5-003: Transition Zone Blending
+
+**Track:** B | **Status:** ⬜ | **Size:** L
+**Dependencies:** B5-002
+
+#### Context
+When two builders share a boundary (terrain meets house foundation, road cuts through hill), neither builder alone can generate the transition geometry. Both must contribute boundary loops, and a blend operation connects them. This reuses the existing loft primitive — the new work is the protocol for exchanging boundary data and the composition syntax for declaring blend zones.
+
+#### Acceptance Criteria
+- [ ] `blend_zone:` composition option: declares two boundary loops (one from each builder) and a blending method
+- [ ] Syntax: `blend_zone: { my_loop: <name>, their_loop: <other_builder>.<loop_name>, method: loft, segments: N }`
+- [ ] System retrieves both loops, applies builder transforms to bring them into shared coordinate space
+- [ ] Loft/bridge mesh generated between the two loops
+- [ ] Loop resampling when vertex counts don't match (linear interpolation to target count)
+- [ ] Blend mesh inherits material from the nearest source builder (or configurable)
+- [ ] Demo: terrain-to-house-foundation blend produces watertight connecting mesh
+- [ ] Integration test
+
+#### Files to Modify
+- `src/generation/builder/YamlBuilderParser.ts` (parse blend_zone)
+- `src/generation/builder/TracedBuilder.ts` (blend zone execution)
+- `src/platform/geometry/MeshOperations.ts` (loop resampling utility)
 
 ---
 
@@ -931,6 +1025,56 @@ Export composed scenes (multiple builders) as a single glTF with proper hierarch
 
 #### Files to Modify
 - `src/export/GLTFExporter.ts`
+
+---
+
+## C7: Symmetry Operations
+
+> **Goal:** Mirror, radial array, and translational symmetry — fundamental geometry operations missing from the toolkit. Essential for Art Deco, mechanical parts, natural forms, and any style with intentional repetition.
+
+### C7-001: Mirror Operation
+
+**Track:** C | **Status:** ⬜ | **Size:** M
+**Dependencies:** None
+
+#### Context
+Mirror is the most common symmetry operation in 3D modeling. Build half a chair, mirror it. Build one gear tooth, radially array it. Currently builders must manually duplicate and transform geometry, which is error-prone and verbose.
+
+#### Acceptance Criteria
+- [ ] `MeshOperations.mirror(mesh, plane)` returns mirrored mesh (plane defined by point + normal)
+- [ ] Option to merge mirrored mesh with original (`weld: true` merges boundary vertices)
+- [ ] Handles vertex colors and material slots correctly (mirrored, not flipped)
+- [ ] Normals correctly flipped on mirrored faces
+- [ ] YAML `mirror:` command with `plane` and `weld` parameters
+- [ ] Unit tests including weld boundary case
+
+#### Files to Modify
+- `src/platform/geometry/MeshOperations.ts`
+- `src/generation/builder/YamlBuilderParser.ts`
+- `docs/DSL_COMMANDS.md`
+
+---
+
+### C7-002: Radial Array
+
+**Track:** C | **Status:** ⬜ | **Size:** M
+**Dependencies:** None
+
+#### Context
+Duplicate geometry N times around an axis. Used for gear teeth, table legs, flower petals, wheel spokes — any radially symmetric form. More general than `repeat` composition since it operates on raw geometry, not sub-builders.
+
+#### Acceptance Criteria
+- [ ] `MeshOperations.radialArray(mesh, axis, count)` returns arrayed mesh
+- [ ] Axis defined by point + direction
+- [ ] Option to merge adjacent copies (`weld: true`)
+- [ ] Option for partial array (e.g., 180° instead of 360°): `angle` parameter
+- [ ] YAML `radial_array:` command
+- [ ] Unit tests
+
+#### Files to Modify
+- `src/platform/geometry/MeshOperations.ts`
+- `src/generation/builder/YamlBuilderParser.ts`
+- `docs/DSL_COMMANDS.md`
 
 ---
 
