@@ -367,8 +367,8 @@ cache.get(chunkId) ?? world.generate(bounds, seed)
 
 ## References
 
-- Scalar Fields: `src/core/ScalarField.ts`
-- Poisson Scatter: `src/core/PoissonDisk.ts`
-- Instancing: `src/core/Instance.ts`
-- Math Service (hashing): `src/core/MathService.ts`
+- Scalar Fields: `src/platform/spatial/ScalarField.ts`
+- Poisson Scatter: `src/platform/spatial/PoissonDisk.ts`
+- Instancing: `src/platform/spatial/Instance.ts`
+- Math Service (hashing): `src/platform/math/MathService.ts`
 

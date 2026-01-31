@@ -94,7 +94,7 @@ geometry:
 We now have a built-in procedural font system that works without external font files:
 
 ```typescript
-// src/text/ProceduralFont.ts
+// src/generation/text/ProceduralFont.ts
 export const proceduralFontRegistry = new ProceduralFontRegistry();
 
 // Built-in 'simple' font with these characters:

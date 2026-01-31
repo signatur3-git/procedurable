@@ -56,7 +56,7 @@ This state means commands are contextual: `decision.override back_style solid` a
 
 To extend the platform with new capabilities:
 
-1. Create a handler in `src/authoring/handlers/`
+1. Create a handler in `src/servers/authoring/handlers/`
 2. Register the namespace in the command registry
 3. Commands are immediately available via DSL (and therefore via MCP)
 

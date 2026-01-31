@@ -1,5 +1,25 @@
 name: Rock
 description: Simple rock with random size and shape variations
+tags: [nature, primitive]
+
+# =============================================================================
+# QUALITY
+# =============================================================================
+quality:
+  target_tier: 2
+  current_tier: 0
+  tier_gaps: "Literally a scaled box, no rock-like form, no surface detail, no material variation"
+  parts:
+    body:
+      tier: 0
+      notes: "Single box"
+  decision_coverage:
+    score: "100%"
+    notes: "All 5 numeric decisions affect dimensions/position"
+  upgrade_path:
+    - "Subdivide + noise displacement for rock form"
+    - "Multiple shape presets"
+    - "Vertex color variation for moss/lichen"
 
 decisions:
   rock_width_decision:

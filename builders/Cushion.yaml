@@ -8,6 +8,25 @@ author: procedurable
 tags: [furniture, subdivision, P2-M1b]
 
 # =============================================================================
+# QUALITY
+# =============================================================================
+quality:
+  target_tier: 2
+  current_tier: 2
+  tier_gaps: "cushion_shape decision declared but unused (square/rectangle produce same output), single material"
+  parts:
+    body:
+      tier: 2
+      notes: "Subdivided box creates convincing soft form"
+  decision_coverage:
+    score: "0%"
+    notes: "cushion_shape is decorative_only"
+  upgrade_path:
+    - "Implement cushion_shape (different base proportions)"
+    - "Add piping/seam detail"
+    - "Multi-material (fabric + piping)"
+
+# =============================================================================
 # DECISIONS
 # =============================================================================
 decisions:

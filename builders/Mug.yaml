@@ -8,6 +8,36 @@ author: procedurable
 tags: [vessels, lathe, sweep, P2-M1b]
 
 # =============================================================================
+# QUALITY
+# =============================================================================
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps:
+    - "mug_style decision (classic/modern/tall) declared but completely unused - body and handle identical for all styles"
+    - "No interior cavity - solid body"
+    - "Single material"
+    - "Handle attachment is visual overlap, not geometric join"
+  parts:
+    body:
+      tier: 1
+      notes: "Lathed profile with lip flare. Good silhouette but no style variation"
+    handle:
+      tier: 1
+      notes: "Swept catmull-rom path with proper volume. Well-constructed"
+  decision_coverage:
+    geometry_affecting: []
+    decorative_only:
+      - mug_style  # 3 options, all produce identical geometry
+    coverage_percentage: 0
+  upgrade_path:
+    to_tier_2:
+      - "Implement mug_style: classic (current), modern (straight walls), tall (narrower/taller proportions)"
+      - "Add interior cavity via second smaller lathe or boolean subtract"
+      - "Add handle shape variation (loop vs D-shape)"
+      - "Add multi-material: ceramic body + glaze"
+
+# =============================================================================
 # DECISIONS
 # =============================================================================
 decisions:

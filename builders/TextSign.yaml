@@ -4,6 +4,26 @@ description: Horizontal nameplate-style sign with 3D text (view from above, Y-up
 author: AI Agent
 tags: [text, demo, signage, P2M4-002]
 
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps: "Plate size is hardcoded (not responsive to text bounds), no mounting detail, single color scheme"
+  parts:
+    plate:
+      tier: 1
+      notes: "Extruded rectangle"
+    text:
+      tier: 1
+      notes: "Extruded text glyphs"
+  decision_coverage:
+    summary: "text_content changes text glyphs, sign_style affects spacing/bevel"
+    coverage: 100%
+  upgrade_path:
+    - "Auto-size plate to text bounds"
+    - "Add frame/border"
+    - "Multi-material (plate vs text)"
+    - "Add mounting brackets"
+
 decisions:
   text_content:
     type: choice

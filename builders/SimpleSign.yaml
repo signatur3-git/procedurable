@@ -4,6 +4,22 @@ description: Simple sign without text (uses 2D shapes only)
 author: AI Agent
 tags: [demo, signage, simple]
 
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps: "No text content, just a blank plate. No mounting hardware. Single material."
+  parts:
+    plate:
+      tier: 1
+      notes: "Extruded 2D shape with bevel"
+  decision_coverage:
+    summary: "sign_shape and sign_size both affect geometry"
+    coverage: 100%
+  upgrade_path:
+    - "Add text content"
+    - "Add frame/border"
+    - "Multi-material"
+
 decisions:
   sign_shape:
     type: choice

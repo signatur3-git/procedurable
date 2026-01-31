@@ -8,6 +8,29 @@ author: procedurable
 tags: [furniture, materials, decisions]
 
 # =============================================================================
+# QUALITY
+# =============================================================================
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps: "No backrest (it's a stool), wood_type and finish only affect color not geometry, no edge treatment, legs have no foot detail"
+  parts:
+    seat:
+      tier: 1
+      notes: "Simple box"
+    legs:
+      tier: 1
+      notes: "Lofted cylinders"
+  decision_coverage:
+    score: "100%"
+    notes: "wood_type and finish both affect material color (color-only variation)"
+  upgrade_path:
+    - "Add backrest"
+    - "Implement seat shape variation"
+    - "Edge bevel"
+    - "Multi-material (seat vs legs)"
+
+# =============================================================================
 # DECISIONS - Virtual artist choices
 # =============================================================================
 decisions:

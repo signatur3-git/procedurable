@@ -8,6 +8,42 @@ author: procedurable
 tags: [furniture, dining, table]
 
 # =============================================================================
+# QUALITY
+# =============================================================================
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps:
+    - "Rectangular top is a single-thickness slab with no edge treatment"
+    - "Round top uses loft but has no edge profile"
+    - "No apron/skirt under tabletop"
+    - "Single material throughout"
+  parts:
+    top:
+      tier: 1
+      notes: "Rectangular (6-face box) or round (lofted circle). Correct silhouette"
+    legs:
+      tier: 1
+      notes: "Composed Leg sub-builder with style passthrough. Quality depends on Leg builder"
+  decision_coverage:
+    geometry_affecting:
+      - table_style       # rectangular vs round - completely different geometry
+      - leg_style          # Passed to Leg builder
+      - width_variation    # Scales width
+      - depth_variation    # Scales depth
+      - height_variation   # Scales height
+      - thickness_variation  # Changes top thickness
+      - inset_variation    # Changes leg position
+    decorative_only: []
+    coverage_percentage: 100
+  upgrade_path:
+    to_tier_2:
+      - "Add edge profile to tabletop (bevel/roundover, needs C2)"
+      - "Add apron/skirt geometry under top"
+      - "Add multi-material: top surface + leg material"
+      - "Round table legs should use radial placement instead of corner positions"
+
+# =============================================================================
 # DECISIONS
 # =============================================================================
 decisions:

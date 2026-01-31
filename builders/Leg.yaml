@@ -8,6 +8,25 @@ author: procedurable
 tags: [furniture, component]
 
 # =============================================================================
+# QUALITY
+# =============================================================================
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps: "No foot detail, no joinery at top, turned style not implemented (uses same as tapered)"
+  parts:
+    shaft:
+      tier: 1
+      notes: "Lofted cylinder/prism with correct variation"
+  decision_coverage:
+    score: "100%"
+    notes: "style affects segments and taper, taper_ratio affects radius"
+  upgrade_path:
+    - "Add foot pad/cap detail"
+    - "Implement turned style (multi-section loft)"
+    - "Add joinery tenon at top"
+
+# =============================================================================
 # DECISIONS
 # =============================================================================
 decisions:

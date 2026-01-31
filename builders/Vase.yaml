@@ -8,6 +8,35 @@ author: procedurable
 tags: [vessels, lathe, P2-M1b]
 
 # =============================================================================
+# QUALITY
+# =============================================================================
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps:
+    - "vase_style decision (classic/modern/bulbous) is declared but completely unused - profile is identical for all styles"
+    - "Single fixed profile - no lip, foot, or neck variation"
+    - "No surface detail or displacement"
+    - "Single material"
+  parts:
+    body:
+      tier: 1
+      notes: "Lathed profile with base, belly, neck, lip flare. Correct silhouette but no style variation"
+  decision_coverage:
+    geometry_affecting:
+      - height_variation  # Scales vase height
+    decorative_only:
+      - vase_style  # 3 options, all produce identical geometry
+    coverage_percentage: 50
+  upgrade_path:
+    to_tier_2:
+      - "Implement vase_style: classic (current profile), modern (straight walls, no belly), bulbous (exaggerated belly)"
+      - "Add lip detail: rim thickness, flare amount as decisions"
+      - "Add foot ring geometry"
+      - "Add noise displacement for organic surface variation (needs C5)"
+      - "Add multi-material: body glaze + accent band"
+
+# =============================================================================
 # DECISIONS
 # =============================================================================
 decisions:

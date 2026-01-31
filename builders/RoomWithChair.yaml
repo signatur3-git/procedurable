@@ -4,6 +4,31 @@ description: "Demo scene showing constraint passing - places a chair with spatia
 author: "AI Agent"
 tags: ["demo", "constraints", "scene"]
 
+quality:
+  target_tier: 1
+  current_tier: 0
+  tier_gaps:
+    - "Floor is a flat box slab"
+    - "No walls or room enclosure"
+    - "Only one piece of furniture"
+  parts:
+    floor:
+      tier: 0
+      notes: "6-face box slab"
+    chair:
+      tier: 0
+      notes: "Composed ChairInBounds with spatial constraints. Quality depends on child builder"
+  decision_coverage:
+    geometry_affecting:
+      - room_size  # Changes floor dimensions AND constraint values passed to child
+    decorative_only: []
+    coverage_percentage: 100
+  upgrade_path:
+    to_tier_1:
+      - "Add wall geometry"
+      - "Add multiple furniture pieces"
+      - "Upgrade child builder to use lofted legs"
+
 decisions:
   room_size:
     type: choice

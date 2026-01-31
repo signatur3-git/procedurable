@@ -4,6 +4,23 @@ description: Simple extruded sign with rounded corners
 author: AI Agent
 tags: [geometry, extrusion, demo]
 
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps: "No text content, just a blank plate. No mounting hardware. Single material."
+  parts:
+    plate:
+      tier: 1
+      notes: "Extruded 2D shape with optional bevel"
+  decision_coverage:
+    summary: "sign_shape and sign_size both affect geometry"
+    coverage: 100%
+  upgrade_path:
+    - "Add text content"
+    - "Add mounting brackets/holes"
+    - "Multi-material (face vs edge)"
+    - "Add frame/border"
+
 decisions:
   sign_shape:
     type: choice

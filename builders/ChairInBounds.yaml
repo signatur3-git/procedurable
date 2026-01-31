@@ -4,6 +4,27 @@ description: "Demo builder showing spatial constraints - chair respects max_widt
 author: "AI Agent"
 tags: ["demo", "constraints", "spatial"]
 
+quality:
+  target_tier: 1
+  current_tier: 0
+  tier_gaps:
+    - "All parts are boxes"
+    - "No round legs"
+    - "No back variation"
+    - "Constraint-responsive but primitive shapes"
+  parts:
+    seat: { tier: 0, notes: "box" }
+    back: { tier: 0, notes: "box" }
+    legs: { tier: 0, notes: "boxes" }
+  decision_coverage:
+    constrained: "always true (not really a decision)"
+    notes: "Constraint values from parent affect sizing"
+    coverage: "0%"
+  upgrade_path:
+    - "Use lofted cylinders for legs"
+    - "Add back variation"
+    - "Round seat edges"
+
 decisions:
   # Check if constraints are provided
   constrained:

@@ -31,7 +31,7 @@ Dashboard Visualization & Export
 - **Geometry primitives:** `Shape2D` / `Path2D` define the canonical 2D shape formats.
 - **Mesh output:** Mesh + material data represent the canonical 3D output.
 
-Avoid ad-hoc geometry generation outside `src/geometry/*` and `src/builder/*` so all authoring paths converge on the
+Avoid ad-hoc geometry generation outside `src/platform/geometry/*` and `src/generation/builder/*` so all authoring paths converge on the
 same primitives.
 
 ---
@@ -40,13 +40,13 @@ same primitives.
 
 | Service | Responsibility | Primary Location | Notes |
 |--------|----------------|------------------|-------|
-| `YamlBuilderParser` | Parse YAML builder files and emit geometry commands | `src/builder/YamlBuilderParser.ts` | Central entry point for builder authoring. |
-| `ExpressionService` / `MathService` | Expression evaluation, derived values | `src/builder/ExpressionService.ts`, `src/core/MathService.ts` | All math/condition logic should be routed here. |
-| `Shape2D` | 2D polygonal shapes | `src/geometry/Shape2D.ts` | Used by extrude and 2D ops; avoid duplicate shape formats. |
-| `Path2D` | Bezier-preserving vector paths | `src/geometry/Path2D.ts` | Source for vector shapes before tessellation. |
-| `Extrude` | Convert 2D shapes to 3D meshes | `src/geometry/Extrude.ts` | Single owner for extrusion variants. |
-| `Boolean2D` / `CSG` | Boolean operations | `src/geometry/*` | 2D and 3D boolean ops should be centralized. |
-| `FontParser` / `TextToShape` | Text layout, glyph extraction | `src/text/*` | Typography logic lives here, not in builders. |
+| `YamlBuilderParser` | Parse YAML builder files and emit geometry commands | `src/generation/builder/YamlBuilderParser.ts` | Central entry point for builder authoring. |
+| `ExpressionService` / `MathService` | Expression evaluation, derived values | `src/generation/builder/ExpressionService.ts`, `src/platform/math/MathService.ts` | All math/condition logic should be routed here. |
+| `Shape2D` | 2D polygonal shapes | `src/platform/geometry/Shape2D.ts` | Used by extrude and 2D ops; avoid duplicate shape formats. |
+| `Path2D` | Bezier-preserving vector paths | `src/platform/geometry/Path2D.ts` | Source for vector shapes before tessellation. |
+| `Extrude` | Convert 2D shapes to 3D meshes | `src/platform/geometry/Extrude.ts` | Single owner for extrusion variants. |
+| `Boolean2D` / `CSG` | Boolean operations | `src/platform/geometry/*` | 2D and 3D boolean ops should be centralized. |
+| `FontParser` / `TextToShape` | Text layout, glyph extraction | `src/generation/text/*` | Typography logic lives here, not in builders. |
 
 ---
 
@@ -60,7 +60,7 @@ same primitives.
 
 **Preferred extension points:**
 - Add new commands to `YamlBuilderParser` rather than custom builder logic.
-- Add new geometry features inside `src/geometry/*` with documented APIs.
+- Add new geometry features inside `src/platform/geometry/*` with documented APIs.
 - Add authoring affordances via DSL commands rather than new ad-hoc file formats.
 
 ---
@@ -82,12 +82,12 @@ These are candidates where logic is duplicated or fragmented and should be conso
 1. **Shape2D creation mapping**
    - **Current split:** `YamlBuilderParser` and `geometry.shape2d` both map type → `Shape2D.*` constructors.
    - **Target owner:** A shared Shape2D factory helper (or expand `Shape2D.fromDef`) used by both authoring paths.
-   - **Follow-up:** Create a shared helper in `src/geometry` and use it from both code paths.
+   - **Follow-up:** Create a shared helper in `src/platform/geometry` and use it from both code paths.
 
 2. **Text outline → extrusion path**
    - **Current split:** `TextToShape` outputs polygon contours, while YAML text extrusion groups holes directly in
      `YamlBuilderParser`.
-   - **Target owner:** Text contour grouping should live in `src/text/*`, returning a contour structure that extrude can
+   - **Target owner:** Text contour grouping should live in `src/generation/text/*`, returning a contour structure that extrude can
      consume directly.
    - **Follow-up:** Move hole grouping + contour pairing into `TextToShape` or a dedicated text utility.
 

@@ -27,12 +27,12 @@ npm install
 
 **Terminal 1 - Authoring Server:**
 ```bash
-npx tsx src/authoring/server.ts
+npx tsx src/servers/authoring/server.ts
 ```
 
 **Terminal 2 - MCP HTTP Server:**
 ```bash
-npx tsx src/mcp/http-server.ts
+npx tsx src/servers/mcp/http-server.ts
 ```
 
 ### 3. Configure GitHub Copilot
@@ -57,7 +57,7 @@ Add to your Copilot MCP settings (`mcp.json`):
     "procedurable": {
       "type": "stdio",
       "command": "npx",
-      "args": ["tsx", "src/mcp/server.ts"],
+      "args": ["tsx", "src/servers/mcp/server.ts"],
       "cwd": "D:\\workspaces\\procedurable"
     }
   }

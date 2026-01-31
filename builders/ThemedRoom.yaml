@@ -4,6 +4,32 @@ description: "Demo showing shared context for theme coordination across furnitur
 author: "AI Agent"
 tags: ["demo", "shared_context", "theme"]
 
+quality:
+  target_tier: 1
+  current_tier: 0
+  tier_gaps:
+    - "Floor is a flat box slab with no detail"
+    - "furniture_count decision declared but unused - always composes fixed Table + ChairInBounds"
+    - "No walls, ceiling, or room enclosure"
+    - "shared_context theme values not used by children for styling"
+  parts:
+    floor:
+      tier: 0
+      notes: "6-face box slab. Functional but primitive"
+    furniture:
+      tier: 0
+      notes: "Composed Table + ChairInBounds. Quality depends on child builders"
+  decision_coverage:
+    geometry_affecting: []
+    decorative_only:
+      - furniture_count  # Declared but unused in composition
+    coverage_percentage: 0
+  upgrade_path:
+    to_tier_1:
+      - "Use furniture_count to drive actual placement count"
+      - "Add wall geometry for room enclosure"
+      - "Wire shared_context theme to child builder material overrides"
+
 # Shared scene-level state that all children can access
 shared_context:
   theme:

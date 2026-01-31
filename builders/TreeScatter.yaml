@@ -4,6 +4,33 @@ name: TreeScatter
 description: Forest with naturally scattered trees using Poisson disk sampling
 tags: [demo, world, scatter, poisson]
 
+quality:
+  target_tier: 1
+  current_tier: 0
+  tier_gaps:
+    - "Ground plane with no height variation"
+    - "Tree instances are boxes (Tree.yaml is Tier 0)"
+    - "tree_height_variation decision declared but unused"
+    - "Merged geometry loses individual tree identity"
+  parts:
+    ground:
+      tier: 0
+      notes: "Flat ground plane"
+    trees:
+      tier: 0
+      notes: "Poisson-scattered merged Tree geometry"
+  decision_coverage:
+    geometry_affecting:
+      - tree_count_hint  # Controls Poisson scatter target count
+    decorative_only:
+      - tree_height_variation  # Declared but not referenced in overrides
+    coverage_percentage: 50
+  upgrade_path:
+    to_tier_1:
+      - "Wire tree_height_variation to Tree overrides"
+      - "Upgrade Tree.yaml to Tier 1"
+      - "Add terrain height variation"
+
 decisions:
   tree_count_hint:
     type: count

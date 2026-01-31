@@ -61,7 +61,7 @@
 
 ## Architecture Changes
 
-1. **MathService** (`src/core/MathService.ts`) - Centralized expression evaluation
+1. **MathService** (`src/platform/math/MathService.ts`) - Centralized expression evaluation
 2. **YAML Builder Cache** - Pre-loads Table, DiningChair for composition
 3. **Source Tracking** - `activeBuilderSource` tracks yaml/typescript
 4. **TYPESCRIPT_BUILDERS reduced** - Only Person remains
