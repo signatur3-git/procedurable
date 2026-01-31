@@ -23,7 +23,7 @@ Sources (Font, SVG, YAML) → Path2D (curves) → tessellate → Shape2D (polygo
 ## What Needs To Be Done (Properly)
 
 ### Phase 1: Path2D Foundation ✅ COMPLETE
-**File:** `src/geometry/Path2D.ts`
+**File:** `src/platform/geometry/Path2D.ts`
 
 **Status:** Created and functional
 
@@ -42,7 +42,7 @@ Sources (Font, SVG, YAML) → Path2D (curves) → tessellate → Shape2D (polygo
 - [x] Unit tests for path helpers
 
 ### Phase 2: Shape2D Integration ✅ COMPLETE
-**File:** `src/text/FontParser.ts`
+**File:** `src/generation/text/FontParser.ts`
 
 **Status:** Complete
 
@@ -53,7 +53,7 @@ Sources (Font, SVG, YAML) → Path2D (curves) → tessellate → Shape2D (polygo
 4. Returning `Path2DContour[]` with hole detection
 
 ### Phase 3: Update TextToShape (Deferred)
-**File:** `src/text/TextToShape.ts`
+**File:** `src/generation/text/TextToShape.ts`
 
 **Status:** Deferred - current pipeline keeps polygon-based text for extrusion
 
@@ -61,7 +61,7 @@ Sources (Font, SVG, YAML) → Path2D (curves) → tessellate → Shape2D (polygo
 but the current P2M4-003 scope focuses on bezier-preserving Path2D infrastructure.
 
 ### Phase 4: Integrate with Shape2D ✅ COMPLETE
-**File:** `src/geometry/Shape2D.ts`
+**File:** `src/platform/geometry/Shape2D.ts`
 
 **Status:** Complete
 
@@ -72,7 +72,7 @@ but the current P2M4-003 scope focuses on bezier-preserving Path2D infrastructur
 4. Adaptive tolerance support for tessellation
 
 ### Phase 5: Update YAML Parser ✅ COMPLETE
-**File:** `src/builder/YamlBuilderParser.ts`
+**File:** `src/generation/builder/YamlBuilderParser.ts`
 
 **Status:** Complete
 

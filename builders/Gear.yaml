@@ -4,6 +4,34 @@ description: Mechanical gear demonstrating full 2D→3D pipeline - shape primiti
 author: AI Agent
 tags: [geometry, mechanical, demo, P2M3-005]
 
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps:
+    - "Teeth are rectangular (not involute profile)"
+    - "Hub hole is faked (overlapping extrusion, not boolean subtract)"
+    - "No web/spoke structure"
+    - "Single material"
+  parts:
+    body:
+      tier: 1
+      notes: "Extruded circle"
+    teeth:
+      tier: 1
+      notes: "Radial array of extruded rectangles with bevel"
+    hub:
+      tier: 0
+      notes: "Overlapping cylinder, not subtracted"
+  decision_coverage:
+    tooth_count: "Drives radialArray count"
+    gear_style: "Affects bevel"
+    coverage: "100%"
+  upgrade_path:
+    - "Implement involute tooth profile via 2D booleans (needs C1)"
+    - "Proper hub hole via boolean subtract"
+    - "Add web/spoke structure"
+    - "Multi-material (body + teeth)"
+
 decisions:
   tooth_count:
     type: count

@@ -270,7 +270,7 @@ async function updateMainMesh() {
 
 ## Files Modified
 
-1. **src/dashboard/main.ts** (844 lines)
+1. **src/servers/dashboard/main.ts** (844 lines)
    - Added instance rendering loop
    - Added decision override functions
    - Added loading state management

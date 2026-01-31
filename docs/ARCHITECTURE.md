@@ -166,7 +166,7 @@ results:
 ## Authoring Server: Command Handler Pattern
 
 ```typescript
-// src/authoring/commands/measurement.ts
+// src/servers/authoring/commands/measurement.ts
 export const measurementCommands: CommandHandler[] = [
   {
     pattern: "measurement.set <name> <value>",

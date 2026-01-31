@@ -91,7 +91,7 @@
 
 | File | Changes | Lines |
 |------|---------|-------|
-| `src/dashboard/main.ts` | Instance rendering, decision controls, loading states | 844 |
+| `src/servers/dashboard/main.ts` | Instance rendering, decision controls, loading states | 844 |
 | `dashboard.html` | CSS for toggles, inputs, selects, reset buttons | 709 |
 | `docs/BACKLOG.md` | Updated 3 stories to complete | 2235 |
 | `docs/DASHBOARD_IMPLEMENTATION.md` | Implementation summary (new) | 300+ |

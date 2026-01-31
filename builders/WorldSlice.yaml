@@ -5,6 +5,38 @@ name: WorldSlice
 description: Demonstrates complete world generation - terrain height variation, natural scatter, and efficient instancing
 tags: [demo, world, scatter, poisson, instancing, terrain]
 
+quality:
+  target_tier: 1
+  current_tier: 0
+  tier_gaps:
+    - "Ground is flat despite terrain_frequency/terrain_amplitude decisions being declared"
+    - "Tree and Rock instances are both boxes"
+    - "terrain_frequency and terrain_amplitude only partially used (amplitude in derived but not applied to vertices)"
+  parts:
+    ground:
+      tier: 0
+      notes: "Flat ground plane. Terrain variation declared but not applied"
+    trees:
+      tier: 0
+      notes: "Poisson-scattered Tree instances (boxes)"
+    rocks:
+      tier: 0
+      notes: "Poisson-scattered Rock instances (boxes)"
+  decision_coverage:
+    geometry_affecting:
+      - slice_size      # Changes ground size and scatter area
+      - tree_density    # Controls tree scatter count
+      - rock_density    # Controls rock scatter count
+    decorative_only:
+      - terrain_frequency   # Declared, used in derived but ground stays flat
+      - terrain_amplitude   # Same - derived value exists but not applied to mesh
+    coverage_percentage: 60
+  upgrade_path:
+    to_tier_1:
+      - "Apply terrain height via scalar field displacement to subdivided ground mesh"
+      - "Upgrade Tree.yaml and Rock.yaml to Tier 1"
+      - "Place instances at terrain height, not y=0"
+
 # World generation parameters
 decisions:
   slice_size:

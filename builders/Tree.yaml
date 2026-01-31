@@ -4,6 +4,28 @@ name: Tree
 description: Single tree trunk for instancing
 tags: [primitive, instancing]
 
+quality:
+  target_tier: 1
+  current_tier: 0
+  tier_gaps:
+    - "Trunk is a box with 8 vertices and 6 faces - no cylindrical or organic shape"
+    - "No canopy/crown geometry at all"
+    - "No taper, branching, or any tree-like features"
+    - "Designed as instancing placeholder, not standalone asset"
+  parts:
+    trunk:
+      tier: 0
+      notes: "Rectangular prism. Correct proportions but wrong shape for a tree"
+  decision_coverage:
+    geometry_affecting: []
+    decorative_only: []
+    coverage_percentage: 0
+  upgrade_path:
+    to_tier_1:
+      - "Use lofted cylinder for trunk (tapered)"
+      - "Add simple canopy: sphere or cone shape on top"
+      - "Add decisions: tree_type (conifer/deciduous), trunk_taper"
+
 measurements:
   trunk_height:
     value: 8.0

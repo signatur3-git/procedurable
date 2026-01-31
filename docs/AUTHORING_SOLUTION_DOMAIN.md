@@ -13,7 +13,7 @@ This document complements `SOLUTION_DOMAIN.md` (geometry tools) by focusing on *
 ### 1.1 Random Number Generation
 **What it does:** Produce deterministic pseudo-random values from a seed
 **Used for:** All variation, reproducibility
-**Status:** ✅ Built (`src/core/Random.ts`)
+**Status:** ✅ Built (`src/platform/math/Random.ts`)
 **Implementation:** Seeded PRNG (xorshift or similar)
 
 ### 1.2 Weighted Choice
@@ -55,7 +55,7 @@ This document complements `SOLUTION_DOMAIN.md` (geometry tools) by focusing on *
 ### 2.1 Spatial Constraints (Placement)
 **What it does:** Position objects without overlap
 **Used for:** Scene layout, furniture arrangement
-**Status:** ✅ Built (`src/builder/Placement.ts`)
+**Status:** ✅ Built (`src/platform/scene/Placement.ts`)
 **Algorithm:** Candidate generation + collision filtering
 
 ### 2.2 Measurement Constraints
@@ -136,7 +136,7 @@ This document complements `SOLUTION_DOMAIN.md` (geometry tools) by focusing on *
 ### 4.1 Math Expressions
 **What it does:** Evaluate mathematical formulas
 **Used for:** Derived measurements, positions
-**Status:** ✅ Built (`src/core/MathService.ts`)
+**Status:** ✅ Built (`src/platform/math/MathService.ts`)
 **Features:** Arithmetic, trig, constants (pi), variables
 
 ### 4.2 Conditional Expressions
@@ -220,7 +220,7 @@ This document complements `SOLUTION_DOMAIN.md` (geometry tools) by focusing on *
 ### 6.3 Material Library
 **What it does:** Named colors and materials
 **Used for:** Reusable material definitions
-**Status:** ✅ Built (`src/builder/MaterialLibrary.ts`)
+**Status:** ✅ Built (`src/platform/materials/MaterialLibrary.ts`)
 
 ### 6.4 Builder Indexing
 **What it does:** List available builders with metadata
@@ -267,7 +267,7 @@ This document complements `SOLUTION_DOMAIN.md` (geometry tools) by focusing on *
 ### 7.5 MCP Protocol
 **What it does:** Model Context Protocol for AI agents
 **Used for:** AI-powered builder authoring
-**Status:** ✅ Built (`src/mcp/http-server.ts`)
+**Status:** ✅ Built (`src/servers/mcp/http-server.ts`)
 
 ### 7.6 Export Pipeline
 **What it does:** Convert output to standard formats
@@ -325,12 +325,12 @@ This document complements `SOLUTION_DOMAIN.md` (geometry tools) by focusing on *
 ### 9.1 Perlin/Simplex Noise
 **What it does:** Smooth, continuous pseudo-random values in N dimensions
 **Used for:** Terrain, organic variation, wood grain, cloud patterns
-**Status:** ✅ Built (Perlin 2D + 3D in `src/core/MathService.ts`)
+**Status:** ✅ Built (Perlin 2D + 3D in `src/platform/math/MathService.ts`)
 
 ### 9.2 Fractal Brownian Motion (FBM)
 **What it does:** Layered noise at multiple frequencies (octaves)
 **Used for:** Terrain detail, natural textures, clouds
-**Status:** ✅ Built (`fbm()` in `src/core/MathService.ts`)
+**Status:** ✅ Built (`fbm()` in `src/platform/math/MathService.ts`)
 
 ### 9.3 Voronoi Diagrams
 **What it does:** Partition space into cells based on seed points
@@ -383,7 +383,7 @@ This document complements `SOLUTION_DOMAIN.md` (geometry tools) by focusing on *
 ### 10.1 Coordinate-Based Seeding
 **What it does:** Deterministic seed from world position
 **Used for:** Reproducible chunks, infinite worlds
-**Status:** ✅ Built (`coordinateHash()` in `src/core/MathService.ts`)
+**Status:** ✅ Built (`coordinateHash()` in `src/platform/math/MathService.ts`)
 
 ### 10.2 Chunk Management
 **What it does:** Divide world into loadable/unloadable regions

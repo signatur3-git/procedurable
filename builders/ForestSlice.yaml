@@ -2,6 +2,31 @@ name: ForestSlice
 description: Demonstrates instancing output for world-scale scenes
 # Webhook test - this should trigger a hot reload notification
 
+quality:
+  target_tier: 1
+  current_tier: 0
+  tier_gaps:
+    - "Ground is a single quad (not even a box)"
+    - "Tree instances are boxes (Tree.yaml is Tier 0)"
+    - "No terrain variation or height displacement"
+  parts:
+    ground:
+      tier: 0
+      notes: "Single quad face"
+    trees:
+      tier: 0
+      notes: "Poisson-scattered Tree instances. Quality depends on Tree.yaml"
+  decision_coverage:
+    geometry_affecting:
+      - tree_count  # Controls Poisson scatter count
+    decorative_only: []
+    coverage_percentage: 100
+  upgrade_path:
+    to_tier_1:
+      - "Upgrade Tree.yaml to have canopy and cylindrical trunk"
+      - "Add terrain height variation using scalar field"
+      - "Add ground as a subdivided mesh with displacement"
+
 decisions:
   tree_count:
     type: count

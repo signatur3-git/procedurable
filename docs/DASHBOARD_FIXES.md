@@ -22,7 +22,7 @@ await overrideDecision(key, value ? 'true' : 'false');
 
 The `decision.override` command correctly converts `'true'` and `'false'` strings to boolean values.
 
-**File:** `src/dashboard/main.ts`
+**File:** `src/servers/dashboard/main.ts`
 
 ---
 
@@ -198,7 +198,7 @@ The decision override system was **working perfectly** the entire time! The conf
 
 ### Added Diagnostic Logging
 
-**File:** `src/authoring/server.ts`
+**File:** `src/servers/authoring/server.ts`
 
 Added logging to show exactly what overrides are being passed:
 
@@ -210,7 +210,7 @@ This helped identify that overrides WERE reaching the builder.
 
 ### Enhanced Dashboard Logging
 
-**File:** `src/dashboard/main.ts`
+**File:** `src/servers/dashboard/main.ts`
 
 ```typescript
 log(`Override result: ${JSON.stringify(overrideResult.results?.[0]?.data)}`);
@@ -235,9 +235,9 @@ Shows the result of the override command for debugging.
 
 | File | Change | Reason |
 |------|--------|--------|
-| `src/dashboard/main.ts` | `toggleDecision` sends `'true'/'false'` | Fix boolean type display |
+| `src/servers/dashboard/main.ts` | `toggleDecision` sends `'true'/'false'` | Fix boolean type display |
 | `builders/ConditionalTest.yaml` | Added conditional geometry (`when:` clauses) | Create circle vs square shapes |
-| `src/authoring/server.ts` | Added diagnostic logging | Help debug override flow |
+| `src/servers/authoring/server.ts` | Added diagnostic logging | Help debug override flow |
 
 ---
 

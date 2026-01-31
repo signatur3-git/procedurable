@@ -8,6 +8,63 @@ author: procedurable
 tags: [furniture, seating, dining]
 
 # =============================================================================
+# QUALITY
+# =============================================================================
+quality:
+  target_tier: 2
+  current_tier: 1
+
+  tier_gaps:
+    - "Back is a single flat face - no volume, no distinct style geometry despite 4 back_style options"
+    - "leg_style decision declared (round/square/tapered/turned) but not implemented - all legs use same circle loft"
+    - "seat_shape decision declared (square/rounded/contoured) but unused - seat is always a box"
+    - "seat_curve decision unused - no contour applied to seat"
+    - "No edge treatment (bevel/chamfer) on seat or back"
+    - "Single material throughout - no multi-material support"
+    - "back_recline only approximated via fixed multiplier, not actual angle"
+
+  parts:
+    seat:
+      tier: 1
+      notes: "Box with thickness - correct proportions but no shape variation or edge treatment"
+    legs:
+      tier: 1
+      notes: "Lofted cylinders with taper. Segment count changes for square style but cross-section doesn't truly change"
+    back:
+      tier: 0
+      notes: "Single quad face. back_style decision has 4 options but all produce identical flat face"
+    stretchers:
+      tier: 1
+      notes: "Conditional lofted cylinders connecting legs. Simple but correct when present"
+
+  decision_coverage:
+    geometry_affecting:
+      - leg_taper           # Changes bottom circle radius
+      - has_stretchers      # Adds/removes stretcher geometry
+      - stretcher_height    # Moves stretcher position
+      - back_recline        # Affects back top position (approximate)
+      - width_variation     # Scales seat width
+      - depth_variation     # Scales seat depth
+      - back_height_variation  # Scales back height
+      - slat_count          # Declared but back_style=="slat" geometry doesn't exist
+      - ladder_rung_count   # Declared but back_style=="ladder" geometry doesn't exist
+      - spindle_count       # Declared but back_style=="spindle" geometry doesn't exist
+    decorative_only:
+      - back_style          # 4 options, all produce same single quad
+      - leg_style           # 4 options, only square changes segment count
+      - seat_shape          # 3 options, completely unused
+      - seat_curve          # Unused in geometry
+    coverage_percentage: 50  # ~7/14 decisions meaningfully affect output
+
+  upgrade_path:
+    to_tier_2:
+      - "Implement back_style variants: solid panel (extruded box), slat (repeated thin boxes), ladder (horizontal rungs), spindle (repeated cylinders)"
+      - "Implement leg_style: round (current), square (box), tapered (current), turned (multi-radius loft)"
+      - "Implement seat_shape: square (current), rounded (extrude2d circle), contoured (subdivided with displacement)"
+      - "Add bevel/chamfer to seat edges (needs C2)"
+      - "Add multi-material: wood body + optional cushion material"
+
+# =============================================================================
 # DECISIONS - Virtual artist choices
 # =============================================================================
 decisions:

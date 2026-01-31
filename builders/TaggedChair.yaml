@@ -4,6 +4,26 @@ description: "Demo chair with semantic tags for scene graph queries"
 author: "AI Agent"
 tags: ["demo", "scene_graph", "semantic"]
 
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps:
+    - "has_armrests decision declared but no armrest geometry exists"
+    - "back is a flat face with no thickness"
+    - "single material"
+  parts:
+    seat: { tier: 1, notes: "box" }
+    back: { tier: 0, notes: "single flat face" }
+    legs: { tier: 1, notes: "lofted cylinders" }
+  decision_coverage:
+    has_armrests: "unused"
+    coverage: "0%"
+  upgrade_path:
+    - "Implement armrest geometry"
+    - "Add back thickness"
+    - "Multi-material"
+    - "Semantic tags already good"
+
 decisions:
   has_armrests:
     type: boolean

@@ -18,7 +18,7 @@
 
 ## Issue 1: Rotation Data Malformed ✅ FIXED
 
-**File:** `src/builder/YamlBuilderParser.ts` line 783
+**File:** `src/generation/builder/YamlBuilderParser.ts` line 783
 
 **Problem:** `p.rotation` was the entire object `{ x: 0, y: number, z: 0 }`, not just the y value.
 
@@ -37,7 +37,7 @@ rotation: { x: 0, y: p.rotation.y, z: 0 }
 
 ## Issue 2: Missing Scale Handling ✅ FIXED
 
-**File:** `src/dashboard/main.ts` line ~610
+**File:** `src/servers/dashboard/main.ts` line ~610
 
 **Problem:** `transform.scale` is `undefined` when scale=1 (backend optimization), but dashboard called `.setScalar(undefined)`.
 
@@ -117,8 +117,8 @@ Simple tree trunk builder for instancing:
 
 | File | Change | Reason |
 |------|--------|--------|
-| `src/builder/YamlBuilderParser.ts` | `p.rotation` → `p.rotation.y` | Fix rotation nesting |
-| `src/dashboard/main.ts` | Handle undefined scale | Fix scale default |
+| `src/generation/builder/YamlBuilderParser.ts` | `p.rotation` → `p.rotation.y` | Fix rotation nesting |
+| `src/servers/dashboard/main.ts` | Handle undefined scale | Fix scale default |
 | `builders/ForestSlice.yaml` | Use `Tree` instead of `TreeScatter` | Remove ground plane issue |
 | `builders/Tree.yaml` | **New file** | Clean instancable tree |
 

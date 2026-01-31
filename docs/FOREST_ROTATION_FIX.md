@@ -134,7 +134,7 @@ With this fix, trees in ForestSlice should now:
 
 | File | Change |
 |------|--------|
-| `src/builder/YamlBuilderParser.ts` | Changed `p.rotation` to `p.rotation.y` in compose call |
+| `src/generation/builder/YamlBuilderParser.ts` | Changed `p.rotation` to `p.rotation.y` in compose call |
 
 ---
 

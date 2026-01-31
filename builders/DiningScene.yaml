@@ -2,6 +2,42 @@
 version: "1.0"
 name: DiningScene
 description: Table with chairs - no overlaps
+quality:
+  target_tier: 2
+  current_tier: 1
+  tier_gaps:
+    - "Scene quality depends entirely on child builders (Table, DiningChair)"
+    - "Chair placement is rectangular only - no round-table radial placement"
+    - "No decorative objects (centerpiece, placemats)"
+    - "Single fixed floor level"
+  parts:
+    table:
+      tier: 1
+      notes: "Composed Table builder. Quality depends on Table.yaml"
+    chairs:
+      tier: 1
+      notes: "Placed DiningChair instances. Quality depends on DiningChair.yaml"
+  decision_coverage:
+    geometry_affecting:
+      - chair_count       # Number of chairs placed
+      - table_style       # Passed to Table (rectangular/round)
+      - chair_back_style  # Passed to DiningChair
+      - chair_leg_style   # Passed to DiningChair
+      - chair_seat_shape  # Passed to DiningChair
+      - chair_has_stretchers  # Passed to DiningChair
+      - chair_leg_taper   # Passed to DiningChair
+      - chair_back_recline    # Passed to DiningChair
+      - chair_seat_curve  # Passed to DiningChair
+      - table_width_var   # Passed to Table
+      - table_depth_var   # Passed to Table
+    decorative_only: []
+    coverage_percentage: 100
+  upgrade_path:
+    to_tier_2:
+      - "Add radial placement for round table style"
+      - "Add decorative objects (vase centerpiece, placemats)"
+      - "Upgrade child builders to Tier 2"
+
 decisions:
   chair_count:
     type: count

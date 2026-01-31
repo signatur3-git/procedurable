@@ -44,7 +44,7 @@ Implementation hints.
 
 | Track | Milestone | Stories | Done | Status |
 |-------|-----------|---------|------|--------|
-| A: Quality | A1: Quality Declaration | 3 | 1 | 🟡 In Progress |
+| A: Quality | A1: Quality Declaration | 3 | 2 | 🟡 In Progress |
 | A: Quality | A2: Quality Gates | 3 | 0 | ⬜ |
 | A: Quality | A3: Decision Coverage | 2 | 0 | ⬜ |
 | A: Quality | A4: Sophistication Plans | 2 | 0 | ⬜ |
@@ -95,24 +95,27 @@ The `quality:` section must be parseable by YamlBuilderParser but doesn't need t
 
 ### A1-002: Retrofit Existing Builders
 
-**Track:** A | **Status:** ⬜ | **Size:** M
+**Track:** A | **Status:** ✅ **COMPLETE** | **Size:** M
 **Dependencies:** A1-001
+**Completed:** 2026-01-31
 
 #### Context
 Every committed builder needs an honest `quality:` assessment. This forces a review of what each builder actually produces vs what it claims to produce.
 
-#### Acceptance Criteria
-- [ ] All builders in `builders/` have `quality:` section
-- [ ] Each builder has `target_tier`, `current_tier`, `tier_gaps` (if gap exists)
-- [ ] Each builder has per-part tier assessment
-- [ ] Decision coverage documented: which decisions change output, which are decorative
-- [ ] At least 3 builders identify specific upgrade paths to next tier
+#### Completed Work
+- ✅ All 20 production builders have `quality:` section (4 test fixtures excluded)
+- ✅ Each builder has `target_tier`, `current_tier`, `tier_gaps`
+- ✅ Each builder has per-part tier assessment
+- ✅ Decision coverage documented with geometry_affecting, decorative_only, coverage_percentage
+- ✅ All builders identify specific upgrade paths
 
-#### Files to Modify
+#### Key Findings
+- 1 builder at Tier 2 (Cushion), 10 at Tier 1, 9 at Tier 0
+- Major unused decisions: vase_style, mug_style, cushion_shape, has_armrests, furniture_count
+- Average decision coverage: ~55%
+
+#### Files Modified
 - All files in `builders/*.yaml`
-
-#### Notes
-Be brutally honest. If DiningChair's back is a floating quad, `current_tier: 1` and the gap says so. If a decision doesn't change geometry, document it as decorative.
 
 ---
 
@@ -198,7 +201,7 @@ Quality gates should run automatically when a builder executes and appear in tra
 
 #### Files to Modify
 - `src/generation/builder/TracedBuilder.ts`
-- `src/dashboard/main.ts`
+- `src/servers/dashboard/main.ts`
 
 ---
 
@@ -767,7 +770,7 @@ Dashboard should render material slots, not just vertex colors.
 - [ ] Works with existing builders (no visual regression)
 
 #### Files to Modify
-- `src/dashboard/main.ts`
+- `src/servers/dashboard/main.ts`
 
 ---
 
@@ -813,7 +816,7 @@ UVs should be visible in dashboard (checkerboard preview) and included in export
 - [ ] glTF export includes UV data (when C6 is built)
 
 #### Files to Modify
-- `src/dashboard/main.ts`
+- `src/servers/dashboard/main.ts`
 - `src/generation/builder/PSD.ts`
 
 ---

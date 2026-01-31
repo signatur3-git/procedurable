@@ -45,40 +45,42 @@ Every component in Procedurable, its responsibility, and its target-state capabi
 
 | Component | Location | Status | Page |
 |-----------|----------|--------|------|
-| Math primitives | `src/core/` | [exists] | [Math & Spatial](./math-spatial) |
-| Spatial algorithms | `src/core/` | [exists] | [Math & Spatial](./math-spatial) |
-| Geometry engines | `src/geometry/` | [exists] | [Geometry](./geometry) |
-| Text-to-shape | `src/text/` | [partial] | [Text](./text) |
-| Builder engine | `src/builder/` | [exists] | [Builder Engine](./builder) |
-| Scene & Composition | `src/builder/` | [partial] | [Scene](./scene) |
-| Materials | `src/builder/` | [minimal] | [Materials & Modifiers](./materials-modifiers) |
+| Math primitives | `src/platform/math/` | [exists] | [Math & Spatial](./math-spatial) |
+| Spatial algorithms | `src/platform/spatial/` | [exists] | [Math & Spatial](./math-spatial) |
+| Geometry engines | `src/platform/geometry/` | [exists] | [Geometry](./geometry) |
+| Text-to-shape | `src/generation/text/` | [partial] | [Text](./text) |
+| Builder engine | `src/generation/builder/` | [exists] | [Builder Engine](./builder) |
+| Scene & Composition | `src/platform/scene/` | [partial] | [Scene](./scene) |
+| Materials | `src/platform/materials/` | [minimal] | [Materials & Modifiers](./materials-modifiers) |
 | Modifiers | — | [planned] | [Materials & Modifiers](./materials-modifiers) |
-| Validation | `src/validation/` | [partial] | [Validation](./validation) |
-| Authoring server | `src/authoring/` | [exists] | [Authoring](./authoring) |
-| MCP server | `src/mcp/` | [exists] | [MCP](./mcp) |
+| Validation | `src/generation/validation/` | [partial] | [Validation](./validation) |
+| Authoring server | `src/servers/authoring/` | [exists] | [Authoring](./authoring) |
+| MCP server | `src/servers/mcp/` | [exists] | [MCP](./mcp) |
 | Storage | `src/storage/` | [exists] | [Storage](./storage) |
-| Dashboard | `src/dashboard/` | [exists] | [Dashboard](./dashboard) |
+| Dashboard | `src/servers/dashboard/` | [exists] | [Dashboard](./dashboard) |
 | Export | — | [planned] | [Export](./export) |
 
-## Target Folder Structure
+## Current Folder Structure
 
-After the planned restructuring (from CODE_STRUCTURE_EVALUATION):
+Restructured 2026-01-31 into domain-based organization:
 
 ```
 src/
-├── math/           Pure math: Vec3, Mat4, Transform, AABB, Spline, MathService
-├── spatial/        Algorithms using math: Scatter, PoissonDisk, ScalarField, Instance
-├── geometry/       Mesh data + creation: Mesh, Extrude, Sweep, Lathe, Subdivision, Path2D, Shape2D
-├── text/           Font parsing + text-to-geometry
-├── materials/      MaterialLibrary + future PBR pipeline
-├── modifiers/      ModifierStack: Subdivision, Bevel, Deformers
-├── scene/          SceneNode, SceneGraph, Placement, SharedContext
-├── builder/        TracedBuilder, YamlBuilderParser, ExpressionService
-├── validation/     Quality gates + mesh checks
-├── export/         OBJ, glTF exporters
-├── authoring/      DSL command server + handlers
-├── mcp/            MCP protocol servers
+├── platform/       Core infrastructure
+│   ├── math/           Pure math: Vec3, Mat4, Transform, AABB, Spline, MathService
+│   ├── spatial/        Algorithms: Scatter, PoissonDisk, ScalarField, Instance
+│   ├── geometry/       Mesh, Extrude, Sweep, Lathe, Subdivision, Path2D, Shape2D
+│   ├── scene/          SceneNode, SceneGraph, Placement, SharedContext
+│   └── materials/      MaterialLibrary + future PBR pipeline
+├── generation/     Content pipeline
+│   ├── builder/        TracedBuilder, YamlBuilderParser, ExpressionService
+│   ├── text/           Font parsing + text-to-geometry
+│   └── validation/     Quality gates + mesh checks
+├── servers/        External interfaces
+│   ├── authoring/      DSL command server + handlers
+│   ├── mcp/            MCP protocol servers
+│   └── dashboard/      Three.js preview UI
 ├── storage/        Persistence abstraction
-├── dashboard/      Three.js preview UI
-└── demos/          Example builders (Chair, Table, Person, etc.)
+├── demos/          Example builders (Chair, Table, Person, etc.)
+└── tests/          Test suites
 ```
