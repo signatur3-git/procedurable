@@ -10,3 +10,8 @@ coverage/
 *.iml
 
 /dist-mcp/
+
+# VitePress cache
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+
