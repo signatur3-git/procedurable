@@ -4,7 +4,7 @@
  * Handles conditional materials, named colors, and hex color parsing.
  */
 
-import { NAMED_COLORS, hexToRgb, RGBColor } from '../../platform/materials/MaterialLibrary';
+import { NAMED_COLORS, hexToRgb, RGBColor, MaterialSlot } from '../../platform/materials/MaterialLibrary';
 import type {
   YamlMaterial,
   YamlMaterialValue,
@@ -118,6 +118,32 @@ export function resolveMaterials(
 }
 
 /**
+ * Resolve all materials to full MaterialSlot objects (PBR-ready).
+ * Returns a map of material name -> MaterialSlot.
+ */
+export function resolveMaterialSlots(
+  yamlMaterials: Record<string, YamlMaterial> | undefined,
+  decisionValues: Map<string, any>
+): Map<string, MaterialSlot> {
+  const resolved = new Map<string, MaterialSlot>();
+
+  if (!yamlMaterials) return resolved;
+
+  for (const [name, material] of Object.entries(yamlMaterials)) {
+    const colorValue = resolveConditionalValue(material.color, decisionValues);
+    const color = resolveColor(colorValue);
+    const roughness = material.roughness !== undefined
+      ? resolveConditionalValue(material.roughness, decisionValues) : 0.5;
+    const metalness = material.metalness !== undefined
+      ? resolveConditionalValue(material.metalness, decisionValues) : 0.0;
+
+    resolved.set(name, { name, color, roughness, metalness });
+  }
+
+  return resolved;
+}
+
+/**
  * Resolve a color specification from geometry commands.
  * Can be a material name reference, hex color, or named color.
  */
@@ -140,4 +166,37 @@ export function resolveGeometryColor(
 
   // Named color or hex string
   return resolveColor(colorDef);
+}
+
+/**
+ * Resolve a geometry command's color/material reference to a material slot name.
+ * Returns the slot name if it's a $reference, undefined otherwise.
+ */
+export function resolveGeometryMaterialSlotName(
+  colorDef: string | { r: number; g: number; b: number } | undefined
+): string | undefined {
+  if (!colorDef || typeof colorDef !== 'string') return undefined;
+  if (colorDef.startsWith('$')) return colorDef.slice(1);
+  return undefined;
+}
+
+/**
+ * Resolve both color and material slot index from a color/material reference.
+ * When a $material reference is used and the slot exists, returns both.
+ * Backward compatible: non-$references resolve to color only.
+ */
+export function resolveGeometryMaterial(
+  colorDef: string | { r: number; g: number; b: number } | undefined,
+  materials: Map<string, RGBColor>,
+  _materialSlots: Map<string, MaterialSlot>,
+  mesh: { getMaterialSlotIndex(name: string): number }
+): { color?: RGBColor; materialSlotIndex?: number } {
+  const color = resolveGeometryColor(colorDef, materials);
+  const slotName = resolveGeometryMaterialSlotName(colorDef);
+  let materialSlotIndex: number | undefined;
+  if (slotName !== undefined) {
+    const idx = mesh.getMaterialSlotIndex(slotName);
+    if (idx !== -1) materialSlotIndex = idx;
+  }
+  return { color, materialSlotIndex };
 }

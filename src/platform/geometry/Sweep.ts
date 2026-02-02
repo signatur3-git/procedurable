@@ -112,6 +112,11 @@ export function lathe(
   const mesh = new Mesh();
   const closed = Math.abs(arcAngle - Math.PI * 2) < 0.001;
 
+  // Calculate height range for UV mapping
+  const minY = Math.min(...profile.map(p => p.y));
+  const maxY = Math.max(...profile.map(p => p.y));
+  const heightRange = maxY - minY || 1; // Avoid division by zero
+
   // Create vertices
   // For each segment, rotate the profile around Y axis
   const actualSegments = closed ? segments : segments + 1;
@@ -121,13 +126,20 @@ export function lathe(
     const cos = Math.cos(angle);
     const sin = Math.sin(angle);
 
-    for (const p of profile) {
-      // Rotate point around Y axis
-      const x = p.x * cos;
-      const y = p.y;
-      const z = p.x * sin;
+    // UV: u = angle / (2π), normalized to [0,1]
+    const u = angle / (Math.PI * 2);
 
-      mesh.addVertex(new Vertex(new Vec3(x, y, z)));
+    for (let p = 0; p < profile.length; p++) {
+      const pt = profile[p];
+      // Rotate point around Y axis
+      const x = pt.x * cos;
+      const y = pt.y;
+      const z = pt.x * sin;
+
+      // UV: v = height_t (normalized position along profile)
+      const v = (pt.y - minY) / heightRange;
+
+      mesh.addVertex(new Vertex(new Vec3(x, y, z), { uv: [u, v] }));
     }
   }
 
@@ -189,9 +201,9 @@ export function sweep(
 
   const profileLen = profile.points.length;
 
-  // Create vertices along the path
+  // Create vertices along the path with UVs
   for (let s = 0; s <= segments; s++) {
-    const t = s / segments;
+    const t = s / segments;  // path_t: [0, 1] along path
     const frame = path.getFrame(t);
 
     // Calculate scale and twist at this point
@@ -200,7 +212,11 @@ export function sweep(
     const twistCos = Math.cos(twistAngle);
     const twistSin = Math.sin(twistAngle);
 
-    for (const p of profile.points) {
+    for (let pIdx = 0; pIdx < profile.points.length; pIdx++) {
+      const p = profile.points[pIdx];
+      // profile_t: position around profile [0, 1]
+      const profileT = profile.closed ? pIdx / profileLen : pIdx / (profileLen - 1 || 1);
+
       // Apply twist to profile point
       const px = p.x * twistCos - p.y * twistSin;
       const py = p.x * twistSin + p.y * twistCos;
@@ -214,7 +230,8 @@ export function sweep(
         .add(frame.normal.mul(spx))
         .add(frame.binormal.mul(spy));
 
-      mesh.addVertex(new Vertex(worldPos));
+      // UV: (profile_t, path_t)
+      mesh.addVertex(new Vertex(worldPos, { uv: [profileT, t] }));
     }
   }
 

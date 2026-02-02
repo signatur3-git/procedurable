@@ -31,7 +31,7 @@ describe('GeometryCommandHandler', () => {
     it('should list all registered handlers', () => {
       const registry = createStandardRegistry();
 
-      expect(registry.size).toBe(17);
+      expect(registry.size).toBe(22);
       const keys = registry.getHandlers().map(h => h.commandKey);
 
       // Primitive geometry
@@ -71,6 +71,7 @@ describe('GeometryCommandHandler', () => {
         builder,
         decisionValues: new Map(),
         materials: new Map(),
+        materialSlots: new Map(),
         processGeometry: async () => {},
         evaluateExpression: (expr: string | number) => typeof expr === 'number' ? expr : parseFloat(expr) || 0,
         interpolateName: (name: string) => name
@@ -92,8 +93,8 @@ describe('GeometryCommandHandler', () => {
         context
       );
 
-      // Box creates 8 vertices
-      expect(builder.getMesh().vertices.length).toBe(8);
+      // Box creates 24 vertices (4 per face for proper UVs)
+      expect(builder.getMesh().vertices.length).toBe(24);
       // Box creates 6 faces
       expect(builder.getMesh().faces.length).toBe(6);
     });
@@ -109,6 +110,7 @@ describe('GeometryCommandHandler', () => {
         builder,
         decisionValues: new Map(),
         materials: new Map(),
+        materialSlots: new Map(),
         processGeometry: async () => {},
         evaluateExpression: (expr: string | number) => typeof expr === 'number' ? expr : parseFloat(expr) || 0,
         interpolateName: (name: string) => name

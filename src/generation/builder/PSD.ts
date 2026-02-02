@@ -110,6 +110,37 @@ export interface PSDMaterial {
 }
 
 // ============================================================================
+// Ports (B5-001: Attachment Points)
+// ============================================================================
+
+/**
+ * Port - Named attachment point for composition
+ *
+ * Ports define where child builders can attach to parent builders.
+ * When composing, a child's port can snap to a parent's port, auto-computing
+ * offset and rotation from port alignment.
+ */
+export interface PSDPort {
+  /** Port name (e.g., "table_surface", "lamp_base") */
+  name: string;
+
+  /** Position in local space [x, y, z] */
+  position: [number, number, number];
+
+  /** Normal direction (outward-facing) [x, y, z] */
+  normal: [number, number, number];
+
+  /** Optional up vector for full orientation [x, y, z] */
+  up?: [number, number, number];
+
+  /** Optional reference to a named edge loop */
+  loop?: string;
+
+  /** Optional metadata (e.g., snap type, constraints) */
+  metadata?: Record<string, any>;
+}
+
+// ============================================================================
 // Geometry
 // ============================================================================
 
@@ -177,6 +208,9 @@ export interface PSDMeshPrim extends PSDPrimBase {
 
   /** Per-face material slot index into scene.materials[]. Length = triangle count. */
   materialSlots: number[];
+
+  /** Named attachment points (B5-001) */
+  ports?: PSDPort[];
 
   // ---- Phase 3 stubs (rigging) ----
 
@@ -377,15 +411,21 @@ function serializeMeshGeometry(mesh: Mesh): PSDGeometry {
   const normals: number[] = [];
   const indices: number[] = [];
   const colors: number[] = [];
+  const uvs: number[] = [];
   let hasColors = false;
+  let hasUVs = false;
 
   const defaultColor: FaceColor = { r: 0.545, g: 0.353, b: 0.169 };
   let vertIdx = 0;
 
   for (const face of triangulated.faces) {
-    const v0 = triangulated.vertices[face.indices[0]].position;
-    const v1 = triangulated.vertices[face.indices[1]].position;
-    const v2 = triangulated.vertices[face.indices[2]].position;
+    const vert0 = triangulated.vertices[face.indices[0]];
+    const vert1 = triangulated.vertices[face.indices[1]];
+    const vert2 = triangulated.vertices[face.indices[2]];
+
+    const v0 = vert0.position;
+    const v1 = vert1.position;
+    const v2 = vert2.position;
 
     // Face normal for flat shading
     const edge1x = v1.x - v0.x, edge1y = v1.y - v0.y, edge1z = v1.z - v0.z;
@@ -405,11 +445,21 @@ function serializeMeshGeometry(mesh: Mesh): PSDGeometry {
     if (face.color) hasColors = true;
     colors.push(c.r, c.g, c.b, c.r, c.g, c.b, c.r, c.g, c.b);
 
+    // UVs (if present on vertices)
+    const uv0 = vert0.attributes.uv || [0, 0];
+    const uv1 = vert1.attributes.uv || [0, 0];
+    const uv2 = vert2.attributes.uv || [0, 0];
+    if (vert0.attributes.uv || vert1.attributes.uv || vert2.attributes.uv) {
+      hasUVs = true;
+    }
+    uvs.push(uv0[0], uv0[1], uv1[0], uv1[1], uv2[0], uv2[1]);
+
     vertIdx += 3;
   }
 
   const geom: PSDGeometry = { vertices, normals, indices };
   if (hasColors) geom.colors = colors;
+  if (hasUVs) geom.uvs = uvs;
   return geom;
 }
 
@@ -461,6 +511,21 @@ export function serializeToPSD(output: TracedOutput): PSDScene {
     const meshPath = `${rootPath}/mesh`;
     rootChildren.push(meshPath);
 
+    // Convert ports from TracedOutput (B5-001)
+    const ports: PSDPort[] = [];
+    if (output.ports) {
+      for (const [_name, port] of output.ports) {
+        ports.push({
+          name: port.name,
+          position: [port.position.x, port.position.y, port.position.z],
+          normal: [port.normal.x, port.normal.y, port.normal.z],
+          up: port.up ? [port.up.x, port.up.y, port.up.z] : undefined,
+          loop: port.loop,
+          metadata: port.metadata
+        });
+      }
+    }
+
     const meshPrim: PSDMeshPrim = {
       path: meshPath,
       type: 'Mesh',
@@ -472,6 +537,7 @@ export function serializeToPSD(output: TracedOutput): PSDScene {
       children: [],
       geometry: serializeMeshGeometry(output.mesh),
       materialSlots: mergedSlots,
+      ports: ports.length > 0 ? ports : undefined,
       skeleton: null,
       jointWeights: [] as []
     };
@@ -597,6 +663,7 @@ export interface DeserializedPSD {
   vertices: number[];
   normals: number[];
   colors: number[];
+  uvs: number[];
   triangleCount: number;
 
   /** Instance data for non-merged geometry */
@@ -625,6 +692,7 @@ export function deserializePSD(scene: PSDScene): DeserializedPSD {
   const vertices: number[] = [];
   const normals: number[] = [];
   const colors: number[] = [];
+  const uvs: number[] = [];
   let triangleCount = 0;
 
   const instances: DeserializedPSD['instances'] = [];
@@ -637,6 +705,17 @@ export function deserializePSD(scene: PSDScene): DeserializedPSD {
       const geom = prim.geometry;
       vertices.push(...geom.vertices);
       normals.push(...geom.normals);
+
+      // UVs (if present)
+      if (geom.uvs) {
+        uvs.push(...geom.uvs);
+      } else {
+        // Fill with zeros for missing UVs (2 per vertex, 3 vertices per triangle)
+        const vertexCount = geom.vertices.length / 3;
+        for (let i = 0; i < vertexCount; i++) {
+          uvs.push(0, 0);
+        }
+      }
 
       // Reconstruct colors from materialSlots
       const meshPrim = prim as PSDMeshPrim;
@@ -685,6 +764,7 @@ export function deserializePSD(scene: PSDScene): DeserializedPSD {
     vertices,
     normals,
     colors,
+    uvs,
     triangleCount,
     instances,
     materials: scene.materials,

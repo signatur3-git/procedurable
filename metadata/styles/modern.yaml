@@ -1,0 +1,54 @@
+# Style Palettes
+# Design styles with colors, materials, and proportions
+
+key: styles/modern
+createdAt: "2026-02-02T00:00:00.000Z"
+modifiedAt: "2026-02-02T00:00:00.000Z"
+description: Modern/contemporary design style - clean lines, minimal ornamentation
+tags:
+  - style
+  - modern
+  - contemporary
+
+value:
+  name: Modern
+  description: Clean lines, minimal ornamentation, geometric forms
+
+  colors:
+    primary:
+      - { name: white, hex: "#FFFFFF", rgb: [1.0, 1.0, 1.0] }
+      - { name: black, hex: "#1A1A1A", rgb: [0.1, 0.1, 0.1] }
+      - { name: charcoal, hex: "#333333", rgb: [0.2, 0.2, 0.2] }
+    accent:
+      - { name: chrome, hex: "#C0C0C0", rgb: [0.75, 0.75, 0.75] }
+      - { name: mustard, hex: "#FFDB58", rgb: [1.0, 0.86, 0.35] }
+      - { name: teal, hex: "#008080", rgb: [0.0, 0.5, 0.5] }
+    neutral:
+      - { name: light_grey, hex: "#E0E0E0", rgb: [0.88, 0.88, 0.88] }
+      - { name: warm_grey, hex: "#9E9E9E", rgb: [0.62, 0.62, 0.62] }
+
+  materials:
+    primary:
+      - { name: glass, roughness: 0.1, metalness: 0.0 }
+      - { name: polished_steel, roughness: 0.2, metalness: 1.0 }
+      - { name: white_lacquer, roughness: 0.3, metalness: 0.0 }
+    secondary:
+      - { name: light_oak, roughness: 0.6, metalness: 0.0 }
+      - { name: walnut, roughness: 0.5, metalness: 0.0 }
+      - { name: concrete, roughness: 0.8, metalness: 0.0 }
+
+  proportions:
+    edge_radius: 0.005        # Minimal edge rounding
+    leg_taper: 0.0            # No taper (straight legs)
+    bevel_width: 0.002        # Very subtle bevels
+    symmetry: bilateral       # Usually symmetric
+
+  ornamentation:
+    level: minimal
+    allowed:
+      - subtle_texture
+      - geometric_pattern
+    forbidden:
+      - carved_details
+      - turned_elements
+      - decorative_molding

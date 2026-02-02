@@ -2,6 +2,7 @@
  * Bevel Operation Tests (C2-002)
  *
  * Tests for mesh edge beveling and chamfering.
+ * Uses createBoxWithSharedVertices for proper edge topology.
  */
 
 import { describe, it, expect } from '@jest/globals';
@@ -10,7 +11,7 @@ import { MeshOperations } from '../../platform/geometry/MeshOperations';
 describe('Bevel Operation (C2-002)', () => {
   describe('chamfer (1 segment)', () => {
     it('should bevel all edges of a box', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
       const edges = box.getEdges();
 
       // Chamfer all 12 edges
@@ -23,7 +24,7 @@ describe('Bevel Operation (C2-002)', () => {
     });
 
     it('should produce valid mesh geometry', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
       const edges = box.getSharpEdges(Math.PI / 6); // All edges
 
       const beveled = MeshOperations.bevel(box, edges, 0.1, 1);
@@ -38,7 +39,7 @@ describe('Bevel Operation (C2-002)', () => {
     });
 
     it('should bevel only selected edges', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
 
       // Only bevel top edges (4 edges)
       const topEdges = box.getEdges().filter(edge => {
@@ -54,7 +55,7 @@ describe('Bevel Operation (C2-002)', () => {
     });
 
     it('should respect bevel width', () => {
-      const box = MeshOperations.createBox(2, 2, 2);
+      const box = MeshOperations.createBoxWithSharedVertices(2, 2, 2);
       const edges = box.getEdges();
 
       const smallBevel = MeshOperations.bevel(box, edges, 0.05, 1);
@@ -71,7 +72,7 @@ describe('Bevel Operation (C2-002)', () => {
 
   describe('smooth bevel (2+ segments)', () => {
     it('should create smooth bevel with 2 segments', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
       const edges = box.getEdges();
 
       const chamfer = MeshOperations.bevel(box, edges, 0.1, 1);
@@ -82,7 +83,7 @@ describe('Bevel Operation (C2-002)', () => {
     });
 
     it('should create even smoother bevel with 4 segments', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
       const edges = box.getEdges();
 
       const seg2 = MeshOperations.bevel(box, edges, 0.1, 2);
@@ -95,7 +96,7 @@ describe('Bevel Operation (C2-002)', () => {
 
   describe('color preservation', () => {
     it('should preserve vertex colors during bevel', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
 
       // Set colors on all vertices
       for (const v of box.vertices) {

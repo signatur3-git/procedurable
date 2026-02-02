@@ -1,0 +1,79 @@
+# Furniture Domain Knowledge
+# Standard dimensions and clearances for furniture building
+
+key: dimensions/furniture
+createdAt: "2026-02-02T00:00:00.000Z"
+modifiedAt: "2026-02-02T00:00:00.000Z"
+description: Standard furniture dimensions based on ergonomic standards
+tags:
+  - furniture
+  - dimensions
+  - ergonomics
+
+value:
+  # Seating
+  chair:
+    seat_height:
+      min: 0.40  # meters
+      standard: 0.45
+      max: 0.50
+      description: "Standard dining/office chair seat height"
+    seat_width:
+      min: 0.40
+      standard: 0.45
+      max: 0.55
+    seat_depth:
+      min: 0.38
+      standard: 0.42
+      max: 0.48
+    backrest_height:
+      min: 0.30
+      standard: 0.40
+      max: 0.50
+    total_height:
+      min: 0.80
+      standard: 0.90
+      max: 1.10
+    armrest_height:
+      standard: 0.65
+      description: "Height from floor to armrest top"
+
+  # Tables
+  table:
+    dining:
+      height:
+        min: 0.72
+        standard: 0.75
+        max: 0.78
+      width:
+        min: 0.80
+        standard: 1.00
+        max: 1.40
+      depth:
+        min: 0.80
+        standard: 1.00
+        max: 1.20
+    coffee:
+      height:
+        min: 0.35
+        standard: 0.45
+        max: 0.55
+    desk:
+      height:
+        min: 0.70
+        standard: 0.74
+        max: 0.78
+
+  # Clearances
+  clearance:
+    chair_to_table: 0.30       # Space between chair back and table when seated
+    chair_behind: 0.60         # Space needed behind chair for movement
+    walkway: 0.90              # Minimum walkway width
+    between_seats: 0.50        # Minimum space between chair seats
+    table_to_wall: 0.90        # Space between table and wall for seating
+
+  # Proportions
+  proportions:
+    leg_thickness_ratio: 0.04  # Leg thickness as ratio of table width
+    apron_height_ratio: 0.08   # Apron height as ratio of table height
+    stretcher_position: 0.20   # Stretcher position as ratio from floor

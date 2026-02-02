@@ -23,6 +23,11 @@ import { RadialArrayCommandHandler } from './RadialArrayCommand';
 import { WhenCommandHandler, IfCommandHandler, RepeatCommandHandler } from './ControlFlowCommands';
 import { Extrude2DCommandHandler } from './Extrude2DCommand';
 import { DisplaceCommandHandler } from './DisplaceCommand';
+import { BendCommandHandler } from './BendCommand';
+import { TwistCommandHandler } from './TwistCommand';
+import { TaperCommandHandler } from './TaperCommand';
+import { MirrorCommandHandler } from './MirrorCommand';
+import { MeshRadialArrayCommandHandler } from './MeshRadialArrayCommand';
 
 // Export individual handlers for direct use
 export { BoxCommandHandler } from './BoxCommand';
@@ -39,6 +44,11 @@ export { SubdivideCommandHandler } from './SubdivideCommand';
 export { RadialArrayCommandHandler } from './RadialArrayCommand';
 export { WhenCommandHandler, IfCommandHandler, RepeatCommandHandler } from './ControlFlowCommands';
 export { DisplaceCommandHandler } from './DisplaceCommand';
+export { BendCommandHandler } from './BendCommand';
+export { TwistCommandHandler } from './TwistCommand';
+export { TaperCommandHandler } from './TaperCommand';
+export { MirrorCommandHandler } from './MirrorCommand';
+export { MeshRadialArrayCommandHandler } from './MeshRadialArrayCommand';
 
 /**
  * Create a new registry with all standard geometry command handlers registered.
@@ -72,6 +82,13 @@ export function createStandardRegistry(): GeometryCommandRegistry {
 
   // Deformers
   registry.register(new DisplaceCommandHandler());
+  registry.register(new BendCommandHandler());
+  registry.register(new TwistCommandHandler());
+  registry.register(new TaperCommandHandler());
+
+  // Symmetry
+  registry.register(new MirrorCommandHandler());
+  registry.register(new MeshRadialArrayCommandHandler());
 
   return registry;
 }
@@ -102,4 +119,10 @@ export const STANDARD_COMMAND_KEYS = [
   'repeat',
   // Deformers
   'displace',
+  'bend',
+  'twist',
+  'taper',
+  // Symmetry
+  'mirror',
+  'mesh_radial_array',
 ] as const;

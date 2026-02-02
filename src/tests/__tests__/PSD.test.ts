@@ -412,5 +412,51 @@ describe('PSD v0.1', () => {
       // Triangle count from PSD should match deserialized
       expect(deserialized.triangleCount).toBe(meshPrim.geometry.indices.length / 3);
     });
+
+    it('should include UV data in PSD when available (C4-002)', async () => {
+      const yaml: YamlBuilderDefinition = {
+        version: '1.0',
+        name: 'UVTest',
+        geometry: [{ box: { name: 'uv_box', center: { x: 0, y: 0, z: 0 }, size: { x: 1, y: 1, z: 1 } } }]
+      };
+
+      const output = await parseAndExecuteBuilder(yaml, { seed: 42 });
+      const scene = serializeToPSD(output);
+      const meshPrim = scene.prims['/UVTest/mesh'] as PSDMeshPrim;
+
+      // Box should have UVs
+      expect(meshPrim.geometry.uvs).toBeDefined();
+      expect(meshPrim.geometry.uvs!.length).toBeGreaterThan(0);
+
+      // UVs should be 2 floats per vertex
+      const vertexCount = meshPrim.geometry.vertices.length / 3;
+      expect(meshPrim.geometry.uvs!.length).toBe(vertexCount * 2);
+
+      // UVs should be in [0,1] range
+      for (let i = 0; i < meshPrim.geometry.uvs!.length; i++) {
+        expect(meshPrim.geometry.uvs![i]).toBeGreaterThanOrEqual(0);
+        expect(meshPrim.geometry.uvs![i]).toBeLessThanOrEqual(1);
+      }
+    });
+
+    it('should include UVs in deserialized data (C4-002)', async () => {
+      const yaml: YamlBuilderDefinition = {
+        version: '1.0',
+        name: 'UVDeserialize',
+        geometry: [{ box: { name: 'uv_box', center: { x: 0, y: 0, z: 0 }, size: { x: 1, y: 1, z: 1 } } }]
+      };
+
+      const output = await parseAndExecuteBuilder(yaml, { seed: 42 });
+      const scene = serializeToPSD(output);
+      const deserialized = deserializePSD(scene);
+
+      // Deserialized should have UVs
+      expect(deserialized.uvs).toBeDefined();
+      expect(deserialized.uvs.length).toBeGreaterThan(0);
+
+      // UVs should be 2 floats per vertex
+      const vertexCount = deserialized.vertices.length / 3;
+      expect(deserialized.uvs.length).toBe(vertexCount * 2);
+    });
   });
 });

@@ -4,7 +4,7 @@
 
 import { BaseGeometryCommandHandler, GeometryCommandContext } from '../GeometryCommandHandler';
 import type { YamlGeometryCommand, YamlColor, YamlProfile } from '../YamlBuilderTypes';
-import { resolveGeometryColor } from '../MaterialResolver';
+import { resolveGeometryMaterial } from '../MaterialResolver';
 import { resolveProfile } from '../ProfileResolver';
 import { lathe as latheGeometry } from '../../../platform/geometry/Sweep';
 
@@ -22,7 +22,7 @@ export class LatheCommandHandler extends BaseGeometryCommandHandler {
 
   async execute(cmd: YamlGeometryCommand, context: GeometryCommandContext): Promise<void> {
     const latheCmd = cmd as LatheCommandDef;
-    const { builder, materials, evaluateExpression } = context;
+    const { builder, materials, materialSlots, evaluateExpression } = context;
 
     const latheName = latheCmd.lathe;
 
@@ -45,10 +45,10 @@ export class LatheCommandHandler extends BaseGeometryCommandHandler {
     // Generate mesh using lathe function
     const latheMesh = latheGeometry(profile.points, segments, angle);
 
-    // Apply color if specified
-    const color = resolveGeometryColor(latheCmd.color, materials);
+    // Resolve color and material slot
+    const { color, materialSlotIndex } = resolveGeometryMaterial(latheCmd.color, materials, materialSlots, builder.mesh);
 
     // Merge the lathe mesh into builder's mesh
-    builder.mergeMesh(latheName, latheMesh, color);
+    builder.mergeMesh(latheName, latheMesh, color, materialSlotIndex);
   }
 }

@@ -4,7 +4,7 @@
 
 import { BaseGeometryCommandHandler, GeometryCommandContext } from '../GeometryCommandHandler';
 import type { YamlGeometryCommand, YamlColor, YamlProfile, YamlSpline } from '../YamlBuilderTypes';
-import { resolveGeometryColor } from '../MaterialResolver';
+import { resolveGeometryMaterial } from '../MaterialResolver';
 import { resolveProfile, resolveSpline } from '../ProfileResolver';
 import { sweep as sweepGeometry } from '../../../platform/geometry/Sweep';
 
@@ -24,7 +24,7 @@ export class SweepCommandHandler extends BaseGeometryCommandHandler {
 
   async execute(cmd: YamlGeometryCommand, context: GeometryCommandContext): Promise<void> {
     const sweepCmd = cmd as SweepCommandDef;
-    const { builder, materials, evaluateExpression } = context;
+    const { builder, materials, materialSlots, evaluateExpression } = context;
 
     const sweepName = sweepCmd.sweep;
 
@@ -57,7 +57,7 @@ export class SweepCommandHandler extends BaseGeometryCommandHandler {
       scaleEnd: evalOpt(sweepCmd.scaleEnd)
     });
 
-    const color = resolveGeometryColor(sweepCmd.color, materials);
-    builder.mergeMesh(sweepName, sweepMesh, color);
+    const { color, materialSlotIndex } = resolveGeometryMaterial(sweepCmd.color, materials, materialSlots, builder.mesh);
+    builder.mergeMesh(sweepName, sweepMesh, color, materialSlotIndex);
   }
 }

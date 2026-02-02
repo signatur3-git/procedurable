@@ -18,9 +18,11 @@ derived:       # → ExpressionService.evaluateNumeric
 geometry:      # → TracedBuilder geometry methods (ordered steps)
 compose:       # → TracedBuilder.compose (recursive execution)
 placement:     # → Placement engine
-quality:       # → [planned] ValidationAPI tier checks
-modifiers:     # → [planned] ModifierStack
-materials:     # → [planned] MaterialResolver
+quality:       # → ValidationAPI tier checks ✅
+modifiers:     # → Deformers (noise, bend, twist, taper) ✅
+materials:     # → MaterialSlots with PBR properties ✅
+ports:         # → Attachment points for negotiation ✅
+requirements:  # → Request/offer protocol ✅
 ```
 
 If a section references a capability that doesn't exist, the parser rejects it with a clear error. This makes the YAML format the **definitive inventory of platform capabilities**.
@@ -48,6 +50,7 @@ interface TracedOutput {
   measurements: TracedValue[]       // Every measurement, with value + source
   traces: TraceEntry[]              // Execution log
   validation: ValidationResult      // Quality checks
+  skeleton: TracedSkeleton | null   // Joint hierarchy (Phase 3)
   metadata: {
     name: string
     seed: number
@@ -60,7 +63,8 @@ interface TracedOutput {
 This is consumed by:
 - **Dashboard** — renders mesh, displays traces
 - **Agent** — inspects decisions, validates quality, plans next steps
-- **Export** — converts mesh to OBJ/glTF
+- **PSD Scene** — serializes to scene description format
+- **Export** — converts mesh to glTF with materials, UVs, and hierarchy
 
 ## Expression Resolution
 

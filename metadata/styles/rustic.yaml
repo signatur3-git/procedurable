@@ -1,0 +1,55 @@
+# Style Palettes - Rustic
+# Warm, natural, handcrafted aesthetic
+
+key: styles/rustic
+createdAt: "2026-02-02T00:00:00.000Z"
+modifiedAt: "2026-02-02T00:00:00.000Z"
+description: Rustic design style - warm, natural, handcrafted feel
+tags:
+  - style
+  - rustic
+  - traditional
+
+value:
+  name: Rustic
+  description: Warm, natural materials, handcrafted appearance, organic forms
+
+  colors:
+    primary:
+      - { name: natural_oak, hex: "#C19A6B", rgb: [0.76, 0.60, 0.42] }
+      - { name: dark_walnut, hex: "#5C4033", rgb: [0.36, 0.25, 0.20] }
+      - { name: honey_pine, hex: "#DEB887", rgb: [0.87, 0.72, 0.53] }
+    accent:
+      - { name: wrought_iron, hex: "#2C2C2C", rgb: [0.17, 0.17, 0.17] }
+      - { name: copper, hex: "#B87333", rgb: [0.72, 0.45, 0.20] }
+      - { name: forest_green, hex: "#228B22", rgb: [0.13, 0.55, 0.13] }
+    neutral:
+      - { name: cream, hex: "#FFFDD0", rgb: [1.0, 0.99, 0.82] }
+      - { name: linen, hex: "#FAF0E6", rgb: [0.98, 0.94, 0.90] }
+
+  materials:
+    primary:
+      - { name: reclaimed_wood, roughness: 0.8, metalness: 0.0 }
+      - { name: rough_oak, roughness: 0.7, metalness: 0.0 }
+      - { name: distressed_pine, roughness: 0.75, metalness: 0.0 }
+    secondary:
+      - { name: wrought_iron, roughness: 0.6, metalness: 0.8 }
+      - { name: leather, roughness: 0.5, metalness: 0.0 }
+      - { name: stone, roughness: 0.9, metalness: 0.0 }
+
+  proportions:
+    edge_radius: 0.01         # Soft, rounded edges
+    leg_taper: 0.15           # Moderate taper
+    bevel_width: 0.008        # Visible bevels
+    symmetry: approximate     # Slight asymmetry acceptable
+
+  ornamentation:
+    level: moderate
+    allowed:
+      - turned_legs
+      - carved_details
+      - wood_grain_texture
+      - visible_joinery
+    forbidden:
+      - geometric_patterns
+      - chrome_accents

@@ -491,6 +491,44 @@ const handlers: CommandHandler[] = [
         }
       };
     }
+  },
+
+  // B5-001: Query ports (attachment points)
+  {
+    action: 'get_ports',
+    description: 'Get attachment ports from the last builder run (B5-001)',
+    usage: 'scene.get_ports [prim_path]',
+    execute: async (cmd: ParsedCommand, context: any): Promise<CommandResult> => {
+      if (!context.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const output = context.lastRun;
+      const ports: any[] = [];
+
+      // Get ports from TracedOutput
+      if (output.ports) {
+        for (const [name, port] of output.ports) {
+          ports.push({
+            name,
+            position: { x: port.position.x, y: port.position.y, z: port.position.z },
+            normal: { x: port.normal.x, y: port.normal.y, z: port.normal.z },
+            up: port.up ? { x: port.up.x, y: port.up.y, z: port.up.z } : undefined,
+            loop: port.loop,
+            metadata: port.metadata
+          });
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          builderName: output.builderName,
+          count: ports.length,
+          ports
+        }
+      };
+    }
   }
 ];
 

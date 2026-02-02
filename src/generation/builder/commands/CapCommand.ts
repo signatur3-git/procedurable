@@ -4,7 +4,7 @@
 
 import { BaseGeometryCommandHandler, GeometryCommandContext } from '../GeometryCommandHandler';
 import type { YamlGeometryCommand, YamlColor } from '../YamlBuilderTypes';
-import { resolveGeometryColor } from '../MaterialResolver';
+import { resolveGeometryMaterial } from '../MaterialResolver';
 
 interface CapCommandDef {
   cap: string;
@@ -18,12 +18,12 @@ export class CapCommandHandler extends BaseGeometryCommandHandler {
 
   async execute(cmd: YamlGeometryCommand, context: GeometryCommandContext): Promise<void> {
     const capCmd = cmd as CapCommandDef;
-    const { builder, materials, interpolateName } = context;
+    const { builder, materials, materialSlots, interpolateName } = context;
 
     const capName = interpolateName(capCmd.cap);
     const loopRef = interpolateName(capCmd.loop);
-    const color = resolveGeometryColor(capCmd.color, materials);
+    const { color, materialSlotIndex } = resolveGeometryMaterial(capCmd.color, materials, materialSlots, builder.mesh);
 
-    builder.capLoop(capName, loopRef, capCmd.flip ?? false, color);
+    builder.capLoop(capName, loopRef, capCmd.flip ?? false, color, materialSlotIndex);
   }
 }

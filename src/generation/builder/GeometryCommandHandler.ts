@@ -7,7 +7,7 @@
 
 import { TracedBuilder } from './TracedBuilder';
 import type { YamlGeometryCommand } from './YamlBuilderTypes';
-import type { RGBColor } from '../../platform/materials/MaterialLibrary';
+import type { RGBColor, MaterialSlot } from '../../platform/materials/MaterialLibrary';
 
 /**
  * Context passed to geometry command handlers during execution.
@@ -19,8 +19,11 @@ export interface GeometryCommandContext {
   /** Map of decision names to their resolved values */
   decisionValues: Map<string, any>;
 
-  /** Map of material names to resolved RGB colors */
+  /** Map of material names to resolved RGB colors (backward compat) */
   materials: Map<string, RGBColor>;
+
+  /** Map of material names to full MaterialSlot objects (PBR-ready) */
+  materialSlots: Map<string, MaterialSlot>;
 
   /** Function to recursively process nested geometry commands */
   processGeometry: (commands: YamlGeometryCommand[]) => Promise<void>;

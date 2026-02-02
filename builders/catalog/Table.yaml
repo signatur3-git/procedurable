@@ -41,7 +41,7 @@ quality:
       - "Add edge profile to tabletop (bevel/roundover, needs C2)"
       - "Add apron/skirt geometry under top"
       - "Add multi-material: top surface + leg material"
-      - "Round table legs should use radial placement instead of corner positions"
+      # Round table radial placement now implemented (2026-02-03)
 
 # =============================================================================
 # DECISIONS
@@ -115,6 +115,7 @@ measurements:
     value: 16
     source: "Circle segments for round table"
 
+
 # =============================================================================
 # DERIVED VALUES
 # =============================================================================
@@ -123,16 +124,37 @@ derived:
   half_depth: "table_depth / 2"
   leg_height: "table_height - top_thickness"
 
-  # For rectangular table
-  leg_x: "half_width - leg_inset"
-  leg_z: "half_depth - leg_inset"
-  neg_leg_x: "-leg_x"
-  neg_leg_z: "-leg_z"
+  # For rectangular table - legs at corners
+  rect_leg_x: "half_width - leg_inset"
+  rect_leg_z: "half_depth - leg_inset"
 
-  # For round table
+  # For round table - legs on a circle at 45° intervals
   table_radius: "table_width / 2"
   leg_radius: "table_radius - leg_inset"
-  leg_angle_step: "pi / 2"  # 4 legs at 90 degree intervals
+  leg_angle_offset: "pi / 4"  # 45 degrees
+
+  # Round leg positions using trig (at 45°, 135°, 225°, 315°)
+  round_leg_fl_x: "leg_radius * cos(leg_angle_offset)"
+  round_leg_fl_z: "leg_radius * sin(leg_angle_offset)"
+  round_leg_fr_x: "-leg_radius * cos(leg_angle_offset)"
+  round_leg_fr_z: "leg_radius * sin(leg_angle_offset)"
+  round_leg_br_x: "-leg_radius * cos(leg_angle_offset)"
+  round_leg_br_z: "-leg_radius * sin(leg_angle_offset)"
+  round_leg_bl_x: "leg_radius * cos(leg_angle_offset)"
+  round_leg_bl_z: "-leg_radius * sin(leg_angle_offset)"
+
+  # is_round flag (1 for round, 0 for rectangular)
+  is_round: "eq(table_style, 'round')"
+
+  # Final leg positions - conditional based on table style using if(condition, then, else)
+  leg_fl_x: "if(is_round, round_leg_fl_x, -rect_leg_x)"
+  leg_fl_z: "if(is_round, round_leg_fl_z, rect_leg_z)"
+  leg_fr_x: "if(is_round, round_leg_fr_x, rect_leg_x)"
+  leg_fr_z: "if(is_round, round_leg_fr_z, rect_leg_z)"
+  leg_br_x: "if(is_round, round_leg_br_x, rect_leg_x)"
+  leg_br_z: "if(is_round, round_leg_br_z, -rect_leg_z)"
+  leg_bl_x: "if(is_round, round_leg_bl_x, -rect_leg_x)"
+  leg_bl_z: "if(is_round, round_leg_bl_z, -rect_leg_z)"
 
 # =============================================================================
 # GEOMETRY
@@ -205,36 +227,37 @@ geometry:
 
 # =============================================================================
 # COMPOSITION - Four legs using Leg sub-builder
-# For rectangular: legs at corners using leg_x, leg_z
-# For round: uses same corner positions (visually acceptable)
+# For rectangular: legs at corners
+# For round: legs on circle at 45° intervals (always under the plate)
+# Leg positions are pre-computed in measurements section with conditionals
 # =============================================================================
 
 compose:
   leg_fl:
-    builder: Leg
-    offset: { x: "neg_leg_x", y: 0, z: "leg_z" }
+    builder: catalog/components/Leg
+    offset: { x: "leg_fl_x", y: 0, z: "leg_fl_z" }
     overrides:
       style: $leg_style
-      height: $leg_height
+      height: "leg_height"
 
   leg_fr:
-    builder: Leg
-    offset: { x: "leg_x", y: 0, z: "leg_z" }
+    builder: catalog/components/Leg
+    offset: { x: "leg_fr_x", y: 0, z: "leg_fr_z" }
     overrides:
       style: $leg_style
-      height: $leg_height
+      height: "leg_height"
 
   leg_br:
-    builder: Leg
-    offset: { x: "leg_x", y: 0, z: "neg_leg_z" }
+    builder: catalog/components/Leg
+    offset: { x: "leg_br_x", y: 0, z: "leg_br_z" }
     overrides:
       style: $leg_style
-      height: $leg_height
+      height: "leg_height"
 
   leg_bl:
-    builder: Leg
-    offset: { x: "neg_leg_x", y: 0, z: "neg_leg_z" }
+    builder: catalog/components/Leg
+    offset: { x: "leg_bl_x", y: 0, z: "leg_bl_z" }
     overrides:
       style: $leg_style
-      height: $leg_height
+      height: "leg_height"
 

@@ -4,7 +4,7 @@
 
 import { BaseGeometryCommandHandler, GeometryCommandContext } from '../GeometryCommandHandler';
 import type { YamlGeometryCommand, YamlColor } from '../YamlBuilderTypes';
-import { resolveGeometryColor } from '../MaterialResolver';
+import { resolveGeometryMaterial } from '../MaterialResolver';
 
 interface LoftCommandDef {
   loft: string;
@@ -18,13 +18,13 @@ export class LoftCommandHandler extends BaseGeometryCommandHandler {
 
   async execute(cmd: YamlGeometryCommand, context: GeometryCommandContext): Promise<void> {
     const loftCmd = cmd as LoftCommandDef;
-    const { builder, materials, interpolateName } = context;
+    const { builder, materials, materialSlots, interpolateName } = context;
 
     const loftName = interpolateName(loftCmd.loft);
     const fromLoop = interpolateName(loftCmd.from);
     const toLoop = interpolateName(loftCmd.to);
-    const color = resolveGeometryColor(loftCmd.color, materials);
+    const { color, materialSlotIndex } = resolveGeometryMaterial(loftCmd.color, materials, materialSlots, builder.mesh);
 
-    builder.loftLoops(loftName, fromLoop, toLoop, color);
+    builder.loftLoops(loftName, fromLoop, toLoop, color, materialSlotIndex);
   }
 }

@@ -155,7 +155,7 @@ export interface SourceLocation {
  * Trace entry - links output to source
  */
 export interface TraceEntry {
-  type: 'measurement' | 'vertex' | 'loop' | 'face' | 'loft' | 'modifier';
+  type: 'measurement' | 'vertex' | 'loop' | 'face' | 'loft' | 'modifier' | 'port';
   name: string;
   source: SourceLocation;
   details: Record<string, any>;
@@ -192,6 +192,18 @@ export interface LoopParams {
 }
 
 /**
+ * Traced port - Named attachment point for composition (B5-001)
+ */
+export interface TracedPort {
+  name: string;
+  position: Vec3;
+  normal: Vec3;
+  up?: Vec3;
+  loop?: string;  // Reference to a named loop
+  metadata?: Record<string, any>;
+}
+
+/**
  * Complete traced output
  */
 export interface TracedOutput {
@@ -202,6 +214,7 @@ export interface TracedOutput {
   measurements: Map<string, { value: number; source?: string }>;
   decisions: Map<string, TracedDecision>;  // All "virtual artist" choices
   loops: Map<string, { indices: number[]; purpose: LoopPurpose }>;
+  ports: Map<string, TracedPort>;  // Named attachment points (B5-001)
   subBuilders: Map<string, TracedOutput>;  // Composed sub-builders
   instances?: Array<{  // NEW: Instance data for efficient rendering
     id: string;
@@ -313,15 +326,16 @@ export class TracedBuilder {
   private seed: number;
   private rng: SeededRandom;
   public context: ExpressionContext;  // Public for YAML parser access
-  private mesh: Mesh;
+  public mesh: Mesh;  // Public for material slot access from commands
   public traces: Map<string, TraceEntry>;  // Public for YAML parser access
   public measurements: Map<string, { value: number; source?: string }>;  // Public for YAML parser access
   public decisions: Map<string, TracedDecision>;  // Public for YAML parser access
   private decisionOverrides: Map<string, any>;
   private constraints: Map<string, any>;  // Constraints from parent builder (P2-M2d-002)
   private vertices: Map<string, number>;  // name → index
-  private loops: Map<string, { indices: number[]; purpose: LoopPurpose }>;
-  private subBuilders: Map<string, TracedOutput>;  // Composed sub-builders
+  public loops: Map<string, { indices: number[]; purpose: LoopPurpose }>;  // Public for B5-003
+  private ports: Map<string, TracedPort>;  // Named attachment points (B5-001)
+  public subBuilders: Map<string, TracedOutput>;  // Composed sub-builders (public for B5-003 blend zones)
   private instances: Array<{  // Instance data for non-merged compositions (P2-M2c-003)
     id: string;
     builderName: string;
@@ -348,6 +362,7 @@ export class TracedBuilder {
     this.constraints = new Map();
     this.vertices = new Map();
     this.loops = new Map();
+    this.ports = new Map();  // B5-001: Attachment points
     this.subBuilders = new Map();
     this.instances = [];
     this.startTime = Date.now();
@@ -754,7 +769,9 @@ export class TracedBuilder {
       const pos = centerVec.add(tangent1.mul(x)).add(tangent2.mul(z));
 
       const vertexName = `${name}_v${i}`;
-      const index = this.mesh.addVertex(new Vertex(pos));
+      // Assign UV: u = circumferential position [0,1], v = 0 (placeholder, updated by loftLoops)
+      const u = i / segments;
+      const index = this.mesh.addVertex(new Vertex(pos, { uv: [u, 0] }));
       this.vertices.set(vertexName, index);
       indices.push(index);
     }
@@ -813,6 +830,66 @@ export class TracedBuilder {
   }
 
   // ==========================================================================
+  // PORTS (B5-001: Attachment Points)
+  // ==========================================================================
+
+  /**
+   * Register a named attachment point (port) for composition
+   *
+   * Ports define where child builders can attach. A port has:
+   * - position: Location in local space
+   * - normal: Outward-facing direction (for alignment)
+   * - up: Optional up vector for full orientation
+   * - loop: Optional reference to a named edge loop
+   */
+  registerPort(
+    name: string,
+    position: Vec3,
+    normal: Vec3,
+    options?: { up?: Vec3; loop?: string; metadata?: Record<string, any> }
+  ): this {
+    const port: TracedPort = {
+      name,
+      position,
+      normal,
+      up: options?.up,
+      loop: options?.loop,
+      metadata: options?.metadata
+    };
+
+    this.ports.set(name, port);
+
+    this.traces.set(`port:${name}`, {
+      type: 'port',
+      name,
+      source: { builderName: this.name },
+      details: {
+        position: { x: position.x, y: position.y, z: position.z },
+        normal: { x: normal.x, y: normal.y, z: normal.z },
+        up: options?.up ? { x: options.up.x, y: options.up.y, z: options.up.z } : undefined,
+        loop: options?.loop,
+        metadata: options?.metadata
+      }
+    });
+
+    return this;
+  }
+
+  /**
+   * Get a registered port by name
+   */
+  getPort(name: string): TracedPort | undefined {
+    return this.ports.get(name);
+  }
+
+  /**
+   * Get all registered ports
+   */
+  getPorts(): Map<string, TracedPort> {
+    return this.ports;
+  }
+
+  // ==========================================================================
   // FACES
   // ==========================================================================
 
@@ -820,7 +897,7 @@ export class TracedBuilder {
    * Create a face from named vertices (traced)
    * @param color Optional RGB color in 0-1 range
    */
-  createFace(name: string, vertexNames: string[], color?: { r: number; g: number; b: number }): this {
+  createFace(name: string, vertexNames: string[], color?: { r: number; g: number; b: number }, materialSlotIndex?: number): this {
     const indices = vertexNames.map(vn => {
       const idx = this.vertices.get(vn);
       if (idx === undefined) {
@@ -829,7 +906,43 @@ export class TracedBuilder {
       return idx;
     });
 
-    this.mesh.addFace(new Face(indices, color));
+    // Assign planar UV projection if vertices don't already have UVs
+    const faceVerts = indices.map(i => this.mesh.vertices[i]);
+    const hasExistingUVs = faceVerts.some(v => v.attributes.uv);
+    if (!hasExistingUVs && faceVerts.length >= 3) {
+      // Compute face plane and project vertices to get UVs
+      const positions = faceVerts.map(v => v.position);
+      const edge1 = positions[1].sub(positions[0]);
+      const edge2 = positions[positions.length - 1].sub(positions[0]);
+      const normal = edge1.cross(edge2).normalize();
+
+      // Create tangent frame on face plane
+      let tangentU = edge1.normalize();
+      let tangentV = normal.cross(tangentU).normalize();
+
+      // Project all positions onto tangent frame
+      const projected = positions.map(p => ({
+        u: p.dot(tangentU),
+        v: p.dot(tangentV)
+      }));
+
+      // Normalize to [0, 1]
+      const minU = Math.min(...projected.map(p => p.u));
+      const maxU = Math.max(...projected.map(p => p.u));
+      const minV = Math.min(...projected.map(p => p.v));
+      const maxV = Math.max(...projected.map(p => p.v));
+      const rangeU = maxU - minU || 1;
+      const rangeV = maxV - minV || 1;
+
+      for (let i = 0; i < faceVerts.length; i++) {
+        faceVerts[i].attributes.uv = [
+          (projected[i].u - minU) / rangeU,
+          (projected[i].v - minV) / rangeV
+        ];
+      }
+    }
+
+    this.mesh.addFace(new Face(indices, color, materialSlotIndex));
 
     this.traces.set(`face:${name}`, {
       type: 'face',
@@ -863,7 +976,7 @@ export class TracedBuilder {
    * Face winding ensures outward-facing normals when loop1 is "above" loop2
    * (i.e., lofting from top to bottom of a cylinder).
    */
-  loftLoops(name: string, loopName1: string, loopName2: string, color?: { r: number; g: number; b: number }): this {
+  loftLoops(name: string, loopName1: string, loopName2: string, color?: { r: number; g: number; b: number }, materialSlotIndex?: number): this {
     const loop1 = this.loops.get(loopName1);
     const loop2 = this.loops.get(loopName2);
 
@@ -874,6 +987,15 @@ export class TracedBuilder {
     }
 
     const n = loop1.indices.length;
+
+    // Update UV v-coordinates: loop2 vertices get v=1 (loop1 stays at v=0 from createCircleLoop)
+    for (let i = 0; i < n; i++) {
+      const v2 = this.mesh.vertices[loop2.indices[i]];
+      if (v2.attributes.uv) {
+        v2.attributes.uv = [v2.attributes.uv[0], 1];
+      }
+    }
+
     for (let i = 0; i < n; i++) {
       const next = (i + 1) % n;
       // Face winding: loop1[next] -> loop2[next] -> loop2[i] -> loop1[i]
@@ -886,7 +1008,7 @@ export class TracedBuilder {
         loop2.indices[next],
         loop2.indices[i],
         loop1.indices[i]
-      ], color));
+      ], color, materialSlotIndex));
     }
 
     this.traces.set(`loft:${name}`, {
@@ -910,12 +1032,23 @@ export class TracedBuilder {
    * Cap a loop with a face (traced)
    * @param color Optional RGB color for the cap face
    */
-  capLoop(name: string, loopName: string, reverse: boolean = false, color?: { r: number; g: number; b: number }): this {
+  capLoop(name: string, loopName: string, reverse: boolean = false, color?: { r: number; g: number; b: number }, materialSlotIndex?: number): this {
     const loop = this.loops.get(loopName);
     if (!loop) throw new Error(`Loop '${loopName}' not found for cap '${name}'`);
 
-    const indices = reverse ? [...loop.indices].reverse() : loop.indices;
-    this.mesh.addFace(new Face(indices, color));
+    // Create new vertices for the cap with radial UVs (don't reuse loft vertices — need separate UVs)
+    const loopLen = loop.indices.length;
+    const capIndices: number[] = [];
+    for (let i = 0; i < loopLen; i++) {
+      const angle = (i / loopLen) * Math.PI * 2;
+      const origVertex = this.mesh.vertices[loop.indices[i]];
+      const capVertex = origVertex.clone();
+      capVertex.attributes.uv = [0.5 + Math.cos(angle) * 0.5, 0.5 + Math.sin(angle) * 0.5];
+      capIndices.push(this.mesh.addVertex(capVertex));
+    }
+
+    const indices = reverse ? [...capIndices].reverse() : capIndices;
+    this.mesh.addFace(new Face(indices, color, materialSlotIndex));
 
     this.traces.set(`face:${name}`, {
       type: 'face',
@@ -1036,7 +1169,10 @@ export class TracedBuilder {
       // Apply offset
       pos = pos.add(new Vec3(offset.x, offset.y, offset.z));
 
-      const newIndex = this.mesh.addVertex(new Vertex(pos));
+      // Clone vertex to preserve attributes (UVs, normals, colors), then update position
+      const newVertex = v.clone();
+      newVertex.position = pos;
+      const newIndex = this.mesh.addVertex(newVertex);
       vertexMap.set(i, newIndex);
 
       // Register vertex with prefixed name
@@ -1160,21 +1296,21 @@ export class TracedBuilder {
    * Merge an external mesh into this builder's mesh
    * Used for lathe, sweep, and other geometry operations
    */
-  mergeMesh(name: string, externalMesh: Mesh, color?: { r: number; g: number; b: number }): void {
+  mergeMesh(name: string, externalMesh: Mesh, color?: { r: number; g: number; b: number }, materialSlotIndex?: number): void {
     // Track vertex index mapping
     const vertexMap = new Map<number, number>();
 
-    // Add all vertices from external mesh
+    // Add all vertices from external mesh (preserving attributes like UVs)
     for (let i = 0; i < externalMesh.vertices.length; i++) {
       const v = externalMesh.vertices[i];
-      const newIndex = this.mesh.addVertex(new Vertex(v.position.clone()));
+      const newIndex = this.mesh.addVertex(v.clone());
       vertexMap.set(i, newIndex);
     }
 
-    // Add all faces with remapped indices and optional color
+    // Add all faces with remapped indices and optional color/slot
     for (const face of externalMesh.faces) {
       const newIndices = face.indices.map(idx => vertexMap.get(idx)!);
-      this.mesh.addFace(new Face(newIndices, color));
+      this.mesh.addFace(new Face(newIndices, color, materialSlotIndex));
     }
 
     // Add trace
@@ -1222,6 +1358,7 @@ export class TracedBuilder {
       measurements: this.measurements,
       decisions: this.decisions,
       loops: this.loops,
+      ports: this.ports,  // B5-001: Attachment points
       subBuilders: this.subBuilders,
       instances: this.instances.length > 0 ? this.instances : undefined,  // Include if any instances
       validation: {

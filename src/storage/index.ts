@@ -6,4 +6,4 @@
 
 export * from './StorageProvider.js';
 export * from './FileSystemStorage.js';
-
+export * from './MetadataStore.js';

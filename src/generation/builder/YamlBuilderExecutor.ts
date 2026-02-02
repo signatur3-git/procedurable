@@ -24,7 +24,7 @@ import {
 } from './ExpressionService';
 
 // Import resolution helpers
-import { resolveMaterials } from './MaterialResolver';
+import { resolveMaterials, resolveMaterialSlots } from './MaterialResolver';
 
 // Import command registry
 import { createStandardRegistry } from './commands';
@@ -214,6 +214,12 @@ export async function executeBuilder(
   // ==========================================================================
 
   const materials = resolveMaterials(yaml.materials, decisionValues);
+  const materialSlots = resolveMaterialSlots(yaml.materials, decisionValues);
+
+  // Register material slots on the mesh
+  for (const slot of materialSlots.values()) {
+    builder.mesh.addMaterialSlot(slot);
+  }
 
   // ==========================================================================
   // PHASE 2.6: Store Profiles, Splines, Shapes
@@ -255,7 +261,7 @@ export async function executeBuilder(
   if (yaml.geometry) {
     try {
       ctx.push('geometry');
-      await processGeometry(yaml.geometry, builder, decisionValues, materials, ctx);
+      await processGeometry(yaml.geometry, builder, decisionValues, materials, materialSlots, ctx);
     } catch (err: any) {
       throw ctx.wrapError(err);
     } finally {
@@ -296,7 +302,8 @@ export async function executeBuilder(
               composition,
               builder,
               decisionValues,
-              options.builderResolver
+              options.builderResolver,
+              seed
             );
           }
         } else {
@@ -305,7 +312,8 @@ export async function executeBuilder(
             composition,
             builder,
             decisionValues,
-            options.builderResolver
+            options.builderResolver,
+            seed
           );
         }
       } catch (err: any) {
@@ -327,6 +335,201 @@ export async function executeBuilder(
       try {
         ctx.push(`placement.${placement.mode}`);
         await processPlacement(placement, builder, decisionValues, options.builderResolver, seed);
+      } catch (err: any) {
+        throw ctx.wrapError(err);
+      } finally {
+        ctx.pop();
+      }
+    }
+  }
+
+  // ==========================================================================
+  // PHASE 6: Process Ports (B5-001: Attachment Points)
+  // ==========================================================================
+
+  if (yaml.ports) {
+    for (const [portName, portDef] of Object.entries(yaml.ports as Record<string, any>)) {
+      try {
+        ctx.push(`ports.${portName}`);
+
+        // Evaluate position
+        const evalCtx = createContext(builder, decisionValues);
+        const posX = typeof portDef.position?.x === 'number'
+          ? portDef.position.x
+          : exprEvalNumeric(String(portDef.position?.x ?? '0'), evalCtx);
+        const posY = typeof portDef.position?.y === 'number'
+          ? portDef.position.y
+          : exprEvalNumeric(String(portDef.position?.y ?? '0'), evalCtx);
+        const posZ = typeof portDef.position?.z === 'number'
+          ? portDef.position.z
+          : exprEvalNumeric(String(portDef.position?.z ?? '0'), evalCtx);
+
+        // Evaluate normal
+        const normalX = typeof portDef.normal?.x === 'number'
+          ? portDef.normal.x
+          : exprEvalNumeric(String(portDef.normal?.x ?? '0'), evalCtx);
+        const normalY = typeof portDef.normal?.y === 'number'
+          ? portDef.normal.y
+          : exprEvalNumeric(String(portDef.normal?.y ?? '1'), evalCtx);
+        const normalZ = typeof portDef.normal?.z === 'number'
+          ? portDef.normal.z
+          : exprEvalNumeric(String(portDef.normal?.z ?? '0'), evalCtx);
+
+        // Optional up vector
+        let up: Vec3 | undefined;
+        if (portDef.up) {
+          up = new Vec3(
+            typeof portDef.up.x === 'number' ? portDef.up.x : exprEvalNumeric(String(portDef.up.x ?? '0'), evalCtx),
+            typeof portDef.up.y === 'number' ? portDef.up.y : exprEvalNumeric(String(portDef.up.y ?? '0'), evalCtx),
+            typeof portDef.up.z === 'number' ? portDef.up.z : exprEvalNumeric(String(portDef.up.z ?? '1'), evalCtx)
+          );
+        }
+
+        builder.registerPort(
+          portName,
+          new Vec3(posX, posY, posZ),
+          new Vec3(normalX, normalY, normalZ),
+          {
+            up,
+            loop: portDef.loop,
+            metadata: portDef.metadata
+          }
+        );
+      } catch (err: any) {
+        throw ctx.wrapError(err);
+      } finally {
+        ctx.pop();
+      }
+    }
+  }
+
+  // ==========================================================================
+  // PHASE 7: Process Requirements (B5-002: Request/Offer Negotiation)
+  // ==========================================================================
+
+  if (yaml.requirements && options?.sharedContext) {
+    for (const [reqId, reqDef] of Object.entries(yaml.requirements as Record<string, any>)) {
+      try {
+        ctx.push(`requirements.${reqId}`);
+
+        const evalCtx = createContext(builder, decisionValues);
+
+        // Evaluate position
+        const posX = typeof reqDef.position?.x === 'number'
+          ? reqDef.position.x
+          : exprEvalNumeric(String(reqDef.position?.x ?? '0'), evalCtx);
+        const posZ = typeof reqDef.position?.z === 'number'
+          ? reqDef.position.z
+          : exprEvalNumeric(String(reqDef.position?.z ?? '0'), evalCtx);
+
+        // Evaluate dimensions
+        const width = reqDef.width !== undefined
+          ? (typeof reqDef.width === 'number' ? reqDef.width : exprEvalNumeric(String(reqDef.width), evalCtx))
+          : undefined;
+        const depth = reqDef.depth !== undefined
+          ? (typeof reqDef.depth === 'number' ? reqDef.depth : exprEvalNumeric(String(reqDef.depth), evalCtx))
+          : undefined;
+        const radius = reqDef.radius !== undefined
+          ? (typeof reqDef.radius === 'number' ? reqDef.radius : exprEvalNumeric(String(reqDef.radius), evalCtx))
+          : undefined;
+        const maxSlope = reqDef.max_slope !== undefined
+          ? (typeof reqDef.max_slope === 'number' ? reqDef.max_slope : exprEvalNumeric(String(reqDef.max_slope), evalCtx))
+          : undefined;
+
+        // Publish requirement to shared context
+        options.sharedContext.publishRequirement({
+          id: reqId,
+          publisher: yaml.name,
+          type: reqDef.type,
+          shape: reqDef.shape || 'rectangle',
+          position: { x: posX, z: posZ },
+          width,
+          depth,
+          radius,
+          maxSlope,
+          priority: reqDef.priority,
+          metadata: reqDef.metadata
+        });
+
+        // Trace the requirement
+        builder.trace(`requirement:${reqId}`, {
+          type: reqDef.type,
+          shape: reqDef.shape || 'rectangle',
+          position: { x: posX, z: posZ },
+          width,
+          depth,
+          radius,
+          maxSlope
+        });
+      } catch (err: any) {
+        throw ctx.wrapError(err);
+      } finally {
+        ctx.pop();
+      }
+    }
+  }
+
+  // ==========================================================================
+  // PHASE 8: Process Offers (B5-002: Request/Offer Negotiation)
+  // ==========================================================================
+
+  if (yaml.offers && options?.sharedContext) {
+    for (const [offerId, offerDef] of Object.entries(yaml.offers as Record<string, any>)) {
+      try {
+        ctx.push(`offers.${offerId}`);
+
+        const evalCtx = createContext(builder, decisionValues);
+
+        // Evaluate offer values
+        const fulfilled = typeof offerDef.fulfilled === 'boolean'
+          ? offerDef.fulfilled
+          : (typeof offerDef.fulfilled === 'string' ? exprEvalCondition(offerDef.fulfilled, evalCtx) : true);
+
+        const elevation = offerDef.elevation !== undefined
+          ? (typeof offerDef.elevation === 'number' ? offerDef.elevation : exprEvalNumeric(String(offerDef.elevation), evalCtx))
+          : undefined;
+
+        const slope = offerDef.slope !== undefined
+          ? (typeof offerDef.slope === 'number' ? offerDef.slope : exprEvalNumeric(String(offerDef.slope), evalCtx))
+          : undefined;
+
+        const slopeDirection = offerDef.slope_direction !== undefined
+          ? (typeof offerDef.slope_direction === 'number' ? offerDef.slope_direction : exprEvalNumeric(String(offerDef.slope_direction), evalCtx))
+          : undefined;
+
+        // Evaluate position if provided
+        let position: { x: number; y: number; z: number } | undefined;
+        if (offerDef.position) {
+          position = {
+            x: typeof offerDef.position.x === 'number' ? offerDef.position.x : exprEvalNumeric(String(offerDef.position.x ?? '0'), evalCtx),
+            y: typeof offerDef.position.y === 'number' ? offerDef.position.y : exprEvalNumeric(String(offerDef.position.y ?? '0'), evalCtx),
+            z: typeof offerDef.position.z === 'number' ? offerDef.position.z : exprEvalNumeric(String(offerDef.position.z ?? '0'), evalCtx)
+          };
+        }
+
+        // Publish offer to shared context
+        options.sharedContext.publishOffer({
+          requirementId: offerDef.for_requirement,
+          publisher: yaml.name,
+          fulfilled,
+          elevation,
+          slope,
+          slopeDirection,
+          boundaryLoop: offerDef.boundary_loop,
+          position,
+          data: offerDef.data
+        });
+
+        // Trace the offer
+        builder.trace(`offer:${offerId}`, {
+          forRequirement: offerDef.for_requirement,
+          fulfilled,
+          elevation,
+          slope,
+          slopeDirection,
+          boundaryLoop: offerDef.boundary_loop,
+          position
+        });
       } catch (err: any) {
         throw ctx.wrapError(err);
       } finally {
@@ -380,6 +583,7 @@ async function processGeometry(
   builder: TracedBuilder,
   decisionValues: Map<string, any>,
   materials: Map<string, { r: number; g: number; b: number }>,
+  materialSlots: Map<string, import('../../platform/materials/MaterialLibrary').MaterialSlot>,
   ctx: ParsingContext
 ): Promise<void> {
   // Create command context for registry-based handlers
@@ -387,8 +591,9 @@ async function processGeometry(
     builder,
     decisionValues,
     materials,
+    materialSlots,
     processGeometry: async (cmds: YamlGeometryCommand[]) => {
-      await processGeometry(cmds, builder, decisionValues, materials, ctx);
+      await processGeometry(cmds, builder, decisionValues, materials, materialSlots, ctx);
     },
     evaluateExpression: (expr: string | number) => {
       if (typeof expr === 'number') return expr;
@@ -475,15 +680,45 @@ async function processComposition(
   composition: YamlComposition,
   builder: TracedBuilder,
   decisionValues: Map<string, any>,
-  builderResolver: (name: string) => ((seed: number, overrides?: Record<string, any>) => TracedOutput | Promise<TracedOutput>) | null
+  builderResolver: (name: string) => ((seed: number, overrides?: Record<string, any>) => TracedOutput | Promise<TracedOutput>) | null,
+  seed?: number
 ): Promise<void> {
   const childBuilderFn = builderResolver(composition.builder);
   if (!childBuilderFn) {
     throw new Error(`Builder '${composition.builder}' not found`);
   }
 
-  // Prepare overrides with constraints
-  const childOverrides: Record<string, any> = { ...composition.overrides };
+  // Prepare overrides - evaluate string expressions in parent context
+  const childOverrides: Record<string, any> = {};
+  if (composition.overrides) {
+    for (const [key, value] of Object.entries(composition.overrides)) {
+      if (typeof value === 'string') {
+        // Check if it's a $decision reference
+        if (value.startsWith('$')) {
+          const decName = value.slice(1);
+          if (decisionValues.has(decName)) {
+            childOverrides[key] = decisionValues.get(decName);
+          } else {
+            // Try to get from builder context
+            const ctxVal = builder.context.get(decName);
+            childOverrides[key] = ctxVal !== undefined ? ctxVal : value;
+          }
+        } else {
+          // Evaluate as expression in parent context
+          try {
+            childOverrides[key] = evaluateExpression(value, decisionValues, builder);
+          } catch {
+            // If evaluation fails, pass as-is (might be a choice string like "round")
+            childOverrides[key] = value;
+          }
+        }
+      } else {
+        childOverrides[key] = value;
+      }
+    }
+  }
+
+  // Add constraints
   if (composition.constraints) {
     childOverrides.__constraints__ = {};
     for (const [key, value] of Object.entries(composition.constraints)) {
@@ -496,17 +731,34 @@ async function processComposition(
   }
 
   // Build offset/rotation/scale for compose
-  const offset = composition.offset ? {
+  let offset = composition.offset ? {
     x: evaluatePositionComponent(composition.offset.x, builder),
     y: evaluatePositionComponent(composition.offset.y, builder),
     z: evaluatePositionComponent(composition.offset.z, builder)
   } : undefined;
 
-  const rotation = composition.rotation ? {
+  let rotation = composition.rotation ? {
     x: evaluatePositionComponent(composition.rotation.x, builder),
     y: evaluatePositionComponent(composition.rotation.y, builder),
     z: evaluatePositionComponent(composition.rotation.z, builder)
   } : undefined;
+
+  // B5-001: Port-based attachment - compute offset/rotation from port alignment
+  if (composition.attach_to) {
+    const attachResult = await computePortAttachment(
+      composition.attach_to,
+      composition.my_port,
+      builder,
+      childBuilderFn,
+      childOverrides,
+      seed ?? 1
+    );
+    if (attachResult) {
+      // Merge with any explicit offset/rotation (explicit takes precedence)
+      offset = offset ?? attachResult.offset;
+      rotation = rotation ?? attachResult.rotation;
+    }
+  }
 
   // Use TracedBuilder.compose which handles everything properly
   await builder.compose(instanceName, childBuilderFn, {
@@ -516,6 +768,24 @@ async function processComposition(
     overrides: childOverrides,
     asInstance: composition.asInstance
   });
+
+  // B5-003: Process blend zone if specified
+  if (composition.blend_zone) {
+    // Get child output from subBuilders (compose stores it there)
+    const childOutput = builder.subBuilders.get(instanceName);
+    if (childOutput) {
+      await processBlendZone(
+        composition.blend_zone,
+        instanceName,
+        builder,
+        childOutput,
+        decisionValues,
+        offset,
+        rotation,
+        composition.scale
+      );
+    }
+  }
 }
 
 // ============================================================================
@@ -547,6 +817,7 @@ async function processPlacement(
   if (placement.overrides) {
     for (const [key, value] of Object.entries(placement.overrides)) {
       if (typeof value === 'string') {
+        // Check for $parent. prefix (legacy)
         const refMatch = value.match(/^\$parent\.(.+)$/);
         if (refMatch) {
           const parentKey = refMatch[1];
@@ -556,8 +827,23 @@ async function processPlacement(
             const evaluated = builder.context.get(parentKey);
             if (evaluated !== undefined) resolvedOverrides[key] = evaluated;
           }
+        } else if (value.startsWith('$')) {
+          // Handle $decision reference
+          const decName = value.slice(1);
+          if (decisionValues.has(decName)) {
+            resolvedOverrides[key] = decisionValues.get(decName);
+          } else {
+            // Try to get from builder context
+            const ctxVal = builder.context.get(decName);
+            resolvedOverrides[key] = ctxVal !== undefined ? ctxVal : value;
+          }
         } else {
-          resolvedOverrides[key] = value;
+          // Try to evaluate as expression, otherwise pass as-is
+          try {
+            resolvedOverrides[key] = evaluateExpression(value, decisionValues, builder);
+          } catch {
+            resolvedOverrides[key] = value;
+          }
         }
       } else {
         resolvedOverrides[key] = value;
@@ -682,4 +968,334 @@ function evaluatePositionComponent(value: string | number, builder: TracedBuilde
   } catch (e: any) {
     throw new Error(`Failed to evaluate position '${value}': ${e.message}`);
   }
+}
+
+// ============================================================================
+// B5-003: BLEND ZONE PROCESSING
+// ============================================================================
+
+import { MeshOperations } from '../../platform/geometry/MeshOperations';
+import { EdgeLoop } from '../../platform/geometry/EdgeLoop';
+import { Vertex } from '../../platform/geometry/Vertex';
+import { Face } from '../../platform/geometry/Face';
+import { YamlBlendZone } from './YamlBuilderTypes';
+
+/**
+ * Process a blend zone between parent and child builder loops.
+ *
+ * The blend zone creates transition geometry between two loops using loft.
+ */
+async function processBlendZone(
+  blendZone: YamlBlendZone,
+  childInstanceName: string,
+  parentBuilder: TracedBuilder,
+  childOutput: TracedOutput,
+  decisionValues: Map<string, any>,
+  childOffset?: { x: number; y: number; z: number },
+  childRotation?: { x: number; y: number; z: number },
+  childScale?: number
+): Promise<void> {
+  // Get child's loop (my_loop is the loop in the child builder)
+  const childLoopData = childOutput.loops.get(blendZone.my_loop);
+  if (!childLoopData) {
+    throw new Error(`Blend zone: loop '${blendZone.my_loop}' not found in child builder '${childInstanceName}'`);
+  }
+
+  // Resolve their_loop - can be "loop_name" (parent) or "builder.loop_name" (sibling)
+  let parentLoopData: { indices: number[]; purpose: string } | undefined;
+  let parentMesh = parentBuilder.mesh;
+
+  const theirLoopParts = blendZone.their_loop.split('.');
+  if (theirLoopParts.length === 1) {
+    // Parent's loop
+    parentLoopData = parentBuilder.loops.get(blendZone.their_loop);
+    if (!parentLoopData) {
+      throw new Error(`Blend zone: loop '${blendZone.their_loop}' not found in parent builder`);
+    }
+  } else {
+    // Sibling builder's loop - format: "siblingName.loopName"
+    const [siblingName, loopName] = theirLoopParts;
+    const siblingOutput = parentBuilder.subBuilders.get(siblingName);
+    if (!siblingOutput) {
+      throw new Error(`Blend zone: sibling builder '${siblingName}' not found`);
+    }
+    parentLoopData = siblingOutput.loops.get(loopName);
+    if (!parentLoopData) {
+      throw new Error(`Blend zone: loop '${loopName}' not found in sibling builder '${siblingName}'`);
+    }
+    parentMesh = siblingOutput.mesh;
+  }
+
+  // Convert loop indices to EdgeLoop with actual vertex positions
+  // Child loop - needs transform applied
+  const childVertices: Vertex[] = [];
+  for (const idx of childLoopData.indices) {
+    const v = childOutput.mesh.vertices[idx];
+    let pos = v.position.clone();
+
+    // Apply child transform
+    if (childScale && childScale !== 1) {
+      pos = pos.mul(childScale);
+    }
+    if (childRotation) {
+      pos = rotatePointEuler(pos, childRotation);
+    }
+    if (childOffset) {
+      pos = pos.add(new Vec3(childOffset.x, childOffset.y, childOffset.z));
+    }
+
+    childVertices.push(new Vertex(pos));
+  }
+  const childLoop = new EdgeLoop(childVertices);
+
+  // Parent loop - already in parent's coordinate space
+  const parentVertices: Vertex[] = [];
+  for (const idx of parentLoopData.indices) {
+    const v = parentMesh.vertices[idx];
+    parentVertices.push(new Vertex(v.position.clone()));
+  }
+  const parentLoop = new EdgeLoop(parentVertices);
+
+  // Evaluate segments
+  const segments = blendZone.segments !== undefined
+    ? (typeof blendZone.segments === 'number'
+        ? blendZone.segments
+        : evaluateExpression(String(blendZone.segments), decisionValues, parentBuilder))
+    : 1;
+
+  // Create blend mesh
+  const blendMesh = MeshOperations.createBlendZone(parentLoop, childLoop, {
+    segments,
+    alignLoops: blendZone.align !== false
+  });
+
+  // Merge blend mesh into parent builder
+  const vertexMap = new Map<number, number>();
+  for (let i = 0; i < blendMesh.vertices.length; i++) {
+    const v = blendMesh.vertices[i];
+    const newIndex = parentBuilder.mesh.addVertex(v);
+    vertexMap.set(i, newIndex);
+  }
+
+  for (const blendFace of blendMesh.faces) {
+    const newIndices = blendFace.indices.map(idx => vertexMap.get(idx)!);
+    parentBuilder.mesh.addFace(new Face(newIndices));
+  }
+
+  // Add trace
+  parentBuilder.trace(`blend_zone:${childInstanceName}`, {
+    myLoop: blendZone.my_loop,
+    theirLoop: blendZone.their_loop,
+    method: blendZone.method || 'loft',
+    segments,
+    verticesAdded: blendMesh.vertices.length,
+    facesAdded: blendMesh.faces.length
+  });
+}
+
+/**
+ * Rotate a point using Euler angles (Y-X-Z order)
+ */
+function rotatePointEuler(p: Vec3, rotation: { x: number; y: number; z: number }): Vec3 {
+  let { x, y, z } = { x: p.x, y: p.y, z: p.z };
+
+  // Rotate around Y axis
+  if (rotation.y !== 0) {
+    const cosY = Math.cos(rotation.y);
+    const sinY = Math.sin(rotation.y);
+    const nx = x * cosY + z * sinY;
+    const nz = -x * sinY + z * cosY;
+    x = nx;
+    z = nz;
+  }
+
+  // Rotate around X axis
+  if (rotation.x !== 0) {
+    const cosX = Math.cos(rotation.x);
+    const sinX = Math.sin(rotation.x);
+    const ny = y * cosX - z * sinX;
+    const nz = y * sinX + z * cosX;
+    y = ny;
+    z = nz;
+  }
+
+  // Rotate around Z axis
+  if (rotation.z !== 0) {
+    const cosZ = Math.cos(rotation.z);
+    const sinZ = Math.sin(rotation.z);
+    const nx = x * cosZ - y * sinZ;
+    const ny = x * sinZ + y * cosZ;
+    x = nx;
+    y = ny;
+  }
+
+  return new Vec3(x, y, z);
+}
+
+// ============================================================================
+// B5-001: PORT-BASED ATTACHMENT
+// ============================================================================
+
+/**
+ * Compute offset and rotation to attach child port to parent/sibling port.
+ *
+ * @param attachTo Target port reference: "port_name" for parent, "sibling.port_name" for sibling
+ * @param myPort Child's port name (optional, defaults to first port or origin)
+ * @param parentBuilder The parent builder
+ * @param childBuilderFn Function to build the child
+ * @param childOverrides Overrides for child builder
+ * @param seed Random seed
+ * @returns Computed offset and rotation, or undefined if ports not found
+ */
+async function computePortAttachment(
+  attachTo: string,
+  myPort: string | undefined,
+  parentBuilder: TracedBuilder,
+  childBuilderFn: (seed: number, overrides?: Record<string, any>) => TracedOutput | Promise<TracedOutput>,
+  childOverrides: Record<string, any>,
+  seed: number
+): Promise<{ offset: { x: number; y: number; z: number }; rotation: { x: number; y: number; z: number } } | undefined> {
+
+  // Parse the attach_to reference
+  let targetPort: { position: Vec3; normal: Vec3; up?: Vec3 } | undefined;
+
+  if (attachTo.includes('.')) {
+    // Sibling reference: "sibling_name.port_name"
+    const [siblingName, portName] = attachTo.split('.');
+    const siblingOutput = parentBuilder.subBuilders.get(siblingName);
+    if (siblingOutput?.ports) {
+      const port = siblingOutput.ports.get(portName);
+      if (port) {
+        targetPort = {
+          position: port.position.clone(),
+          normal: port.normal.clone(),
+          up: port.up?.clone()
+        };
+      }
+    }
+  } else {
+    // Parent port reference
+    const parentPorts = parentBuilder.getPorts();
+    const port = parentPorts.get(attachTo);
+    if (port) {
+      targetPort = {
+        position: port.position.clone(),
+        normal: port.normal.clone(),
+        up: port.up?.clone()
+      };
+    }
+  }
+
+  if (!targetPort) {
+    console.warn(`[attach_to] Target port '${attachTo}' not found`);
+    return undefined;
+  }
+
+  // Build child to get its ports
+  const childOutput = await childBuilderFn(seed ?? 1, childOverrides);
+
+  // Find the child's port to use for attachment
+  let sourcePort: { position: Vec3; normal: Vec3; up?: Vec3 } | undefined;
+
+  if (childOutput.ports && childOutput.ports.size > 0) {
+    let portData: { position: Vec3; normal: Vec3; up?: Vec3 } | undefined;
+
+    if (myPort) {
+      const p = childOutput.ports.get(myPort);
+      if (p) {
+        portData = { position: p.position.clone(), normal: p.normal.clone(), up: p.up?.clone() };
+      }
+    } else {
+      // Default to first port
+      const firstPort = childOutput.ports.values().next().value;
+      if (firstPort) {
+        portData = { position: firstPort.position.clone(), normal: firstPort.normal.clone(), up: firstPort.up?.clone() };
+      }
+    }
+
+    if (portData) {
+      sourcePort = portData;
+    }
+  }
+
+  if (!sourcePort) {
+    // Default: use origin with Y-up normal
+    sourcePort = {
+      position: new Vec3(0, 0, 0),
+      normal: new Vec3(0, 1, 0),
+      up: new Vec3(0, 0, 1)
+    };
+  }
+
+  // Compute rotation to align normals (child normal should face opposite to target normal)
+  // For now, we do a simple Y-rotation alignment for horizontal surfaces
+  // Full 3D rotation would require quaternions or axis-angle computation
+
+  const rotation = computePortRotation(sourcePort.normal, targetPort.normal.mul(-1));
+
+  // Compute offset: position child so its port aligns with target port
+  // After rotation, the child's port moves - we need to account for that
+  const rotatedSourcePos = rotatePointEuler(sourcePort.position, rotation);
+  const offset = {
+    x: targetPort.position.x - rotatedSourcePos.x,
+    y: targetPort.position.y - rotatedSourcePos.y,
+    z: targetPort.position.z - rotatedSourcePos.z
+  };
+
+  return { offset, rotation };
+}
+
+/**
+ * Compute Euler rotation to align sourceNormal to targetNormal.
+ * Simplified version that handles common cases (horizontal/vertical surfaces).
+ */
+function computePortRotation(
+  sourceNormal: Vec3,
+  targetNormal: Vec3
+): { x: number; y: number; z: number } {
+  // Normalize both vectors
+  const src = sourceNormal.normalize();
+  const tgt = targetNormal.normalize();
+
+  // Simple case: if normals are already aligned, no rotation needed
+  const dot = src.x * tgt.x + src.y * tgt.y + src.z * tgt.z;
+  if (Math.abs(dot - 1) < 0.001) {
+    return { x: 0, y: 0, z: 0 };
+  }
+
+  // Simple case: both pointing up (Y+), no rotation
+  if (Math.abs(src.y - 1) < 0.001 && Math.abs(tgt.y - 1) < 0.001) {
+    return { x: 0, y: 0, z: 0 };
+  }
+
+  // Simple case: source is Y+, target is in XZ plane (horizontal surface)
+  if (Math.abs(src.y - 1) < 0.001 && Math.abs(tgt.y) < 0.001) {
+    // Need to rotate 90° around appropriate axis
+    const angle = Math.atan2(tgt.x, tgt.z);
+    return { x: Math.PI / 2, y: angle, z: 0 };
+  }
+
+  // Simple case: source is Y-, need to flip 180° around X
+  if (Math.abs(src.y + 1) < 0.001 && Math.abs(tgt.y - 1) < 0.001) {
+    return { x: Math.PI, y: 0, z: 0 };
+  }
+
+  // General case: compute Y rotation for XZ alignment, then X rotation for Y alignment
+  const srcXZ = Math.sqrt(src.x * src.x + src.z * src.z);
+  const tgtXZ = Math.sqrt(tgt.x * tgt.x + tgt.z * tgt.z);
+
+  let yRot = 0;
+  if (srcXZ > 0.001 && tgtXZ > 0.001) {
+    const srcAngle = Math.atan2(src.x, src.z);
+    const tgtAngle = Math.atan2(tgt.x, tgt.z);
+    yRot = tgtAngle - srcAngle;
+  }
+
+  // X rotation to match vertical component
+  let xRot = 0;
+  const srcPitch = Math.atan2(src.y, srcXZ);
+  const tgtPitch = Math.atan2(tgt.y, tgtXZ);
+  xRot = tgtPitch - srcPitch;
+
+  return { x: xRot, y: yRot, z: 0 };
 }

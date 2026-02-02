@@ -2,9 +2,11 @@
 
 How an AI agent interacts with Procedurable to author and refine 3D content.
 
-## The Target Loop
+> **Updated:** 2026-02-03 (Phase 2 complete)
 
-In the fully realized system, an agent follows this workflow:
+## The Agent Loop
+
+With Phase 2 complete, agents can follow this full workflow:
 
 ```
  1. DISCOVER    → What builders exist? What can I do?
@@ -19,7 +21,7 @@ In the fully realized system, an agent follows this workflow:
 10. REASON      → Query scenes semantically, compute spatial relationships
 ```
 
-## Available Agent Actions (Current)
+## Available Agent Actions
 
 ### Discover
 
@@ -82,21 +84,29 @@ scene.query_by_tag seating                → spatial query
 scene.get_bounds table                    → bounding box
 ```
 
-## Target Agent Actions (Planned)
-
-### Quality-Driven Refinement [A Track]
+### Quality-Driven Refinement ✅
 
 ```
-quality.validate DiningChair tier=2    → check against Tier 2 criteria
-→ Returns machine-readable suggestions:
-→ { action: "add_geometry", target: "back", reason: "face_count < 6",
-→   current_value: 1, required_value: 6 }
-
+builder.quality                        → run quality gates
+builder.quality tier=2                 → check against Tier 2 criteria
 quality.coverage DiningChair           → test all decision options
 quality.plan DiningChair tier=2        → generate sophistication plan
 ```
 
-### Builder Authoring [B4]
+The response includes machine-readable `suggestions` array:
+```json
+{
+  "action": "add_material",
+  "target": "mesh",
+  "reason": "Tier 2 requires at least 2 distinct materials",
+  "metric": "distinct_colors",
+  "current_value": 1,
+  "required_value": 2,
+  "tier": 2
+}
+```
+
+### Builder Authoring ✅
 
 ```
 builder.create BookShelf template=shelving   → scaffold new builder
@@ -107,7 +117,7 @@ builder.snapshot BookShelf                   → save current state for rollback
 builder.restore BookShelf <snapshot_id>      → revert to previous state
 ```
 
-### Knowledge Accumulation [B3]
+### Knowledge Accumulation ✅
 
 ```
 world.set furniture.dining.chair.seat_height 0.45
@@ -117,7 +127,7 @@ world.set styles.modern.materials [oak, steel, linen]
 world.set styles.modern.decision_defaults.leg_style tapered_round
 ```
 
-### Scene Description & Queries [B2]
+### Scene Description & Queries ✅
 
 ```
 scene.save DiningRoom                → persist current scene
@@ -130,7 +140,7 @@ scene.distance catapult gate         → spatial relationship
 scene.prims_within gate 20           → proximity search
 ```
 
-### Builder Negotiation [B5]
+### Builder Negotiation ✅
 
 ```
 # Level 1: Attachment points
@@ -150,7 +160,7 @@ scene.get_offers house_1             → see what terrain offered to house
 scene.get_blend_zones road           → inspect transition geometry
 ```
 
-### Symmetry Operations [C7]
+### Symmetry Operations ✅
 
 ```
 # In YAML geometry steps:

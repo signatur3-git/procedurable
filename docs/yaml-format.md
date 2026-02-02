@@ -150,15 +150,18 @@ modifiers:
     width: 0.003
     segments: 2
 
-# ── Materials (planned) ───────────────────────────
-# Named material slot assignments.
+# ── Materials ─────────────────────────────────────
+# Named material slots with PBR properties (C3-001).
+# Geometry commands reference these with $-prefix.
 materials:
   frame:
-    slot: primary_wood
-    default: oak
-  cushion:
-    slot: fabric
-    default: linen_cream
+    color: wood_oak         # named color, hex, or conditional
+    roughness: 0.8          # 0.0-1.0, default 0.5
+    metalness: 0.0          # 0.0-1.0, default 0.0
+  hardware:
+    color: metal_steel
+    roughness: 0.2
+    metalness: 0.9
 ```
 
 ## Variable References

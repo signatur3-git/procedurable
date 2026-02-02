@@ -26,16 +26,17 @@ export function mirror(
   const newMesh = new Mesh();
   const originalVertexCount = mesh.vertices.length;
 
-  // Copy original vertices
+  // Copy original vertices (preserving attributes)
   for (const v of mesh.vertices) {
-    newMesh.addVertex(new Vertex(v.position.clone()));
+    newMesh.addVertex(v.clone());
   }
 
   // Add mirrored vertices
   const mirroredIndices: Map<number, number> = new Map();
 
   for (let i = 0; i < originalVertexCount; i++) {
-    const pos = mesh.vertices[i].position;
+    const v = mesh.vertices[i];
+    const pos = v.position;
 
     // Check if vertex is on the mirror plane
     const axisValue = axis === 'x' ? pos.x : axis === 'y' ? pos.y : pos.z;
@@ -44,7 +45,7 @@ export function mirror(
       // On mirror plane - reuse same vertex
       mirroredIndices.set(i, i);
     } else {
-      // Create mirrored vertex
+      // Create mirrored vertex (preserving attributes)
       let mirroredPos: Vec3;
       if (axis === 'x') {
         mirroredPos = new Vec3(-pos.x, pos.y, pos.z);
@@ -54,20 +55,22 @@ export function mirror(
         mirroredPos = new Vec3(pos.x, pos.y, -pos.z);
       }
 
-      const newIndex = newMesh.addVertex(new Vertex(mirroredPos));
+      const newVertex = v.clone();
+      newVertex.position = mirroredPos;
+      const newIndex = newMesh.addVertex(newVertex);
       mirroredIndices.set(i, newIndex);
     }
   }
 
-  // Copy original faces
+  // Copy original faces (preserving color and material slot)
   for (const face of mesh.faces) {
-    newMesh.addFace(new Face([...face.indices]));
+    newMesh.addFace(new Face([...face.indices], face.color, face.materialSlotIndex));
   }
 
-  // Add mirrored faces (reversed winding)
+  // Add mirrored faces (reversed winding, preserving color and material slot)
   for (const face of mesh.faces) {
     const mirroredFaceIndices = face.indices.map(i => mirroredIndices.get(i)!).reverse();
-    newMesh.addFace(new Face(mirroredFaceIndices));
+    newMesh.addFace(new Face(mirroredFaceIndices, face.color, face.materialSlotIndex));
   }
 
   return newMesh;
@@ -85,11 +88,14 @@ export function scale(mesh: Mesh, scaleVec: Vec3 | number): Mesh {
 
   for (const v of mesh.vertices) {
     const pos = v.position;
-    newMesh.addVertex(new Vertex(new Vec3(pos.x * s.x, pos.y * s.y, pos.z * s.z)));
+    // Preserve all vertex attributes (including UVs)
+    const newVertex = v.clone();
+    newVertex.position = new Vec3(pos.x * s.x, pos.y * s.y, pos.z * s.z);
+    newMesh.addVertex(newVertex);
   }
 
   for (const face of mesh.faces) {
-    newMesh.addFace(new Face([...face.indices]));
+    newMesh.addFace(new Face([...face.indices], face.color, face.materialSlotIndex));
   }
 
   return newMesh;
@@ -102,11 +108,15 @@ export function translate(mesh: Mesh, offset: Vec3): Mesh {
   const newMesh = new Mesh();
 
   for (const v of mesh.vertices) {
-    newMesh.addVertex(new Vertex(v.position.add(offset)));
+    // Preserve all vertex attributes (including UVs)
+    const newVertex = v.clone();
+    newVertex.position = v.position.add(offset);
+    newMesh.addVertex(newVertex);
   }
 
   for (const face of mesh.faces) {
-    newMesh.addFace(new Face([...face.indices]));
+    const newFace = new Face([...face.indices], face.color, face.materialSlotIndex);
+    newMesh.addFace(newFace);
   }
 
   return newMesh;
@@ -130,11 +140,15 @@ export function rotate(mesh: Mesh, axis: Vec3, angle: number): Mesh {
       .add(k.cross(p).mul(sin))
       .add(k.mul(k.dot(p) * (1 - cos)));
 
-    newMesh.addVertex(new Vertex(rotated));
+    // Preserve all vertex attributes (including UVs)
+    const newVertex = v.clone();
+    newVertex.position = rotated;
+    newMesh.addVertex(newVertex);
   }
 
   for (const face of mesh.faces) {
-    newMesh.addFace(new Face([...face.indices]));
+    const newFace = new Face([...face.indices], face.color, face.materialSlotIndex);
+    newMesh.addFace(newFace);
   }
 
   return newMesh;
@@ -146,25 +160,25 @@ export function rotate(mesh: Mesh, axis: Vec3, angle: number): Mesh {
 export function merge(mesh1: Mesh, mesh2: Mesh): Mesh {
   const newMesh = new Mesh();
 
-  // Add vertices from mesh1
+  // Add vertices from mesh1 (preserving attributes)
   for (const v of mesh1.vertices) {
-    newMesh.addVertex(new Vertex(v.position.clone()));
+    newMesh.addVertex(v.clone());
   }
 
-  // Add vertices from mesh2
+  // Add vertices from mesh2 (preserving attributes)
   const offset = mesh1.vertices.length;
   for (const v of mesh2.vertices) {
-    newMesh.addVertex(new Vertex(v.position.clone()));
+    newMesh.addVertex(v.clone());
   }
 
-  // Add faces from mesh1
+  // Add faces from mesh1 (preserving color and material slot)
   for (const face of mesh1.faces) {
-    newMesh.addFace(new Face([...face.indices]));
+    newMesh.addFace(new Face([...face.indices], face.color, face.materialSlotIndex));
   }
 
-  // Add faces from mesh2 (with index offset)
+  // Add faces from mesh2 (with index offset, preserving color and material slot)
   for (const face of mesh2.faces) {
-    newMesh.addFace(new Face(face.indices.map(i => i + offset)));
+    newMesh.addFace(new Face(face.indices.map(i => i + offset), face.color, face.materialSlotIndex));
   }
 
   return newMesh;

@@ -10,10 +10,12 @@
  * - Boolean conditions
  * - Numeric comparisons
  * - Access to decisions, measurements, derived values, and constraints
+ * - Access to offers from SharedContext (B5-002)
  */
 
 import { evaluate as mathEvaluate } from '../../platform/math/MathService';
 import { TracedBuilder } from './TracedBuilder';
+import type { SpatialOffer } from './SharedContext';
 
 /**
  * Evaluation context containing all available values
@@ -25,6 +27,8 @@ export interface EvaluationContext {
   measurements: Record<string, number>;
   /** Constraints from parent builders */
   constraints: Record<string, any>;
+  /** Offers from SharedContext (B5-002) */
+  offers?: Map<string, SpatialOffer>;
 }
 
 /**
@@ -32,12 +36,14 @@ export interface EvaluationContext {
  */
 export function buildEvaluationContext(
   builder: TracedBuilder,
-  decisionValues: Map<string, any>
+  decisionValues: Map<string, any>,
+  offers?: Map<string, SpatialOffer>
 ): EvaluationContext {
   return {
     decisions: decisionValues,
     measurements: builder.context.toObject(),
-    constraints: builder.getConstraints()
+    constraints: builder.getConstraints(),
+    offers
   };
 }
 
@@ -80,6 +86,37 @@ export function buildVariables(ctx: EvaluationContext): Record<string, any> {
     }
   }
 
+  // B5-002: Add offer data with __offer_ prefix (accessible as $offer.reqId.field)
+  if (ctx.offers) {
+    for (const [reqId, offer] of ctx.offers) {
+      if (offer.elevation !== undefined) {
+        variables[`__offer_${reqId}_elevation`] = offer.elevation;
+      }
+      if (offer.slope !== undefined) {
+        variables[`__offer_${reqId}_slope`] = offer.slope;
+      }
+      if (offer.slopeDirection !== undefined) {
+        variables[`__offer_${reqId}_slope_direction`] = offer.slopeDirection;
+      }
+      if (offer.position) {
+        variables[`__offer_${reqId}_x`] = offer.position.x;
+        variables[`__offer_${reqId}_y`] = offer.position.y;
+        variables[`__offer_${reqId}_z`] = offer.position.z;
+      }
+      variables[`__offer_${reqId}_fulfilled`] = offer.fulfilled ? 1 : 0;
+      // Add any custom data fields
+      if (offer.data) {
+        for (const [key, value] of Object.entries(offer.data)) {
+          if (typeof value === 'number') {
+            variables[`__offer_${reqId}_${key}`] = value;
+          } else if (typeof value === 'boolean') {
+            variables[`__offer_${reqId}_${key}`] = value ? 1 : 0;
+          }
+        }
+      }
+    }
+  }
+
   return variables;
 }
 
@@ -93,8 +130,10 @@ export function buildVariables(ctx: EvaluationContext): Record<string, any> {
 export function evaluateNumeric(expr: string, ctx: EvaluationContext): number {
   const variables = buildVariables(ctx);
 
-  // Transform @ prefix to __constraint_
-  const transformedExpr = expr.replace(/@(\w+)/g, '__constraint_$1');
+  // Transform @ prefix to __constraint_ and $offer. to __offer_
+  let transformedExpr = expr.replace(/@(\w+)/g, '__constraint_$1');
+  // Transform $offer.reqId.field to __offer_reqId_field
+  transformedExpr = transformedExpr.replace(/\$offer\.(\w+)\.(\w+)/g, '__offer_$1_$2');
 
   try {
     const result = mathEvaluate(transformedExpr, variables);
@@ -214,9 +253,10 @@ export function evaluatePosition(value: string | number, ctx: EvaluationContext)
  */
 export function createContext(
   builder: TracedBuilder,
-  decisionValues: Map<string, any>
+  decisionValues: Map<string, any>,
+  offers?: Map<string, SpatialOffer>
 ): EvaluationContext {
-  return buildEvaluationContext(builder, decisionValues);
+  return buildEvaluationContext(builder, decisionValues, offers);
 }
 
 /**

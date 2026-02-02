@@ -56,6 +56,7 @@ const state = {
   currentSeed: 1,
   cell: null as CellState | null,
   animationId: null as number | null,
+  showUVPreview: false,  // C4-002: Toggle for UV checkerboard preview
 };
 
 // DOM Elements
@@ -77,6 +78,39 @@ const elements = {
   logPanel: document.getElementById('log-panel') as HTMLElement,
   detailPanel: document.getElementById('detail-panel') as HTMLElement,
 };
+
+// C4-002: Create checkerboard texture for UV preview
+let checkerboardTexture: THREE.Texture | null = null;
+
+function getCheckerboardTexture(): THREE.Texture {
+  if (checkerboardTexture) return checkerboardTexture;
+
+  // Create a 64x64 checkerboard pattern
+  const size = 64;
+  const data = new Uint8Array(size * size * 4);
+
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      // 8x8 checker grid
+      const isWhite = ((Math.floor(x / 8) + Math.floor(y / 8)) % 2) === 0;
+      const value = isWhite ? 255 : 100;
+      data[i] = value;     // R
+      data[i + 1] = value; // G
+      data[i + 2] = value; // B
+      data[i + 3] = 255;   // A
+    }
+  }
+
+  const texture = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2, 2);  // Repeat the pattern
+  texture.needsUpdate = true;
+
+  checkerboardTexture = texture;
+  return texture;
+}
 
 // Logging
 function log(message: string, level: 'info' | 'success' | 'error' = 'info') {
@@ -566,7 +600,7 @@ async function updateMainMesh() {
       const meshData = meshResult.data;
 
       // Debug logging for mesh data
-      log(`Mesh data: ${meshData.vertexCount} vertices, ${meshData.triangleCount} triangles, hasColors=${meshData.hasColors}`);
+      log(`Mesh data: ${meshData.vertexCount} vertices, ${meshData.triangleCount} triangles, hasColors=${meshData.hasColors}, hasUVs=${meshData.hasUVs || false}`);
 
       // Only create mesh if there's actual geometry
       if (meshData.vertices && meshData.vertices.length > 0) {
@@ -580,17 +614,38 @@ async function updateMainMesh() {
           geometry.setAttribute('color', new THREE.Float32BufferAttribute(meshData.colors, 3));
         }
 
+        // Add UVs if available
+        if (meshData.uvs && meshData.uvs.length > 0) {
+          geometry.setAttribute('uv', new THREE.Float32BufferAttribute(meshData.uvs, 2));
+        }
+
         geometry.computeBoundingSphere();
 
-        // Create material - use vertex colors if available
-        const material = new THREE.MeshStandardMaterial({
-          color: meshData.hasColors ? 0xffffff : 0x8b5a2b,  // White base if using vertex colors
-          vertexColors: meshData.hasColors,  // Enable vertex colors
-          roughness: 0.7,
-          metalness: 0.1,
-          flatShading: true,
-          side: THREE.DoubleSide  // Show both sides of faces
-        });
+        // Create material - use checkerboard if UV preview mode, else vertex colors or default
+        const hasUVs = meshData.uvs && meshData.uvs.length > 0;
+        let material: THREE.MeshStandardMaterial;
+
+        if (state.showUVPreview && hasUVs) {
+          // UV preview mode: show checkerboard texture
+          material = new THREE.MeshStandardMaterial({
+            map: getCheckerboardTexture(),
+            roughness: 0.5,
+            metalness: 0.0,
+            flatShading: true,
+            side: THREE.DoubleSide
+          });
+          log(`Using UV checkerboard preview`);
+        } else {
+          // Normal mode: use vertex colors if available
+          material = new THREE.MeshStandardMaterial({
+            color: meshData.hasColors ? 0xffffff : 0x8b5a2b,
+            vertexColors: meshData.hasColors,
+            roughness: 0.7,
+            metalness: 0.1,
+            flatShading: true,
+            side: THREE.DoubleSide
+          });
+        }
 
         const mesh = new THREE.Mesh(geometry, material);
         group.add(mesh);
@@ -834,6 +889,16 @@ function setupEventHandlers() {
 
   // Handle window resize
   window.addEventListener('resize', resizeMainCell);
+
+  // C4-002: Keyboard shortcut 'u' to toggle UV preview mode
+  window.addEventListener('keydown', async (e) => {
+    if (e.key === 'u' || e.key === 'U') {
+      state.showUVPreview = !state.showUVPreview;
+      log(`UV Preview: ${state.showUVPreview ? 'ON' : 'OFF'}`, 'info');
+      // Re-render current view
+      await runCurrentSeed();
+    }
+  });
 }
 
 // Decision override functions (exposed globally for HTML onclick handlers)

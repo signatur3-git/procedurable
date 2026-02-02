@@ -12,7 +12,7 @@
 
 import { BaseGeometryCommandHandler, GeometryCommandContext } from '../GeometryCommandHandler';
 import type { YamlGeometryCommand, YamlColor, YamlShape, YamlPathSegment } from '../YamlBuilderTypes';
-import { resolveGeometryColor } from '../MaterialResolver';
+import { resolveGeometryMaterial } from '../MaterialResolver';
 import { TracedBuilder } from '../TracedBuilder';
 import { Shape2D } from '../../../platform/geometry/Shape2D';
 import { extrude2D } from '../../../platform/geometry/Extrude';
@@ -27,7 +27,7 @@ import { Mesh } from '../../../platform/geometry/Mesh';
 import { Vertex } from '../../../platform/geometry/Vertex';
 import { Face } from '../../../platform/geometry/Face';
 import type { PathSegment } from '../../../platform/geometry/Path2D';
-import type { RGBColor } from '../../../platform/materials/MaterialLibrary';
+import type { RGBColor, MaterialSlot } from '../../../platform/materials/MaterialLibrary';
 
 interface Extrude2DCommandDef {
   extrude2d: string;
@@ -44,7 +44,7 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
 
   async execute(cmd: YamlGeometryCommand, context: GeometryCommandContext): Promise<void> {
     const extCmd = cmd as Extrude2DCommandDef;
-    const { builder, materials, evaluateExpression } = context;
+    const { builder, materials, materialSlots, evaluateExpression } = context;
 
     const extrudeName = extCmd.extrude2d;
     const shapeDef = (builder as any)._yamlShapes?.get(extCmd.shape) as YamlShape | undefined;
@@ -81,11 +81,11 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
         break;
       case 'text':
         // Text shapes are handled specially with hole-aware extrusion
-        await this.handleTextShape(extCmd, shapeDef, builder, materials, evaluateExpression, depth, offset, centerX, centerZ);
+        await this.handleTextShape(extCmd, shapeDef, builder, materials, materialSlots, evaluateExpression, depth, offset, centerX, centerZ);
         return; // Early return - text handling does its own extrusion
       case 'boolean':
         // Boolean shapes may produce holes
-        const boolResult = await this.handleBooleanShape(extCmd, shapeDef, builder, materials, evaluateExpression, depth, offset);
+        const boolResult = await this.handleBooleanShape(extCmd, shapeDef, builder, materials, materialSlots, evaluateExpression, depth, offset);
         if (boolResult.hasHoles) {
           return; // Early return - boolean with holes does its own extrusion
         }
@@ -117,8 +117,8 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
     // Extrude the shape
     const extruded = extrude2D(shape, extrudeParams);
 
-    // Get color for faces
-    const color = resolveGeometryColor(extCmd.color, materials);
+    // Resolve color and material slot
+    const { color, materialSlotIndex } = resolveGeometryMaterial(extCmd.color, materials, materialSlots, builder.mesh);
 
     // Convert to Mesh format
     const meshVertices = extruded.vertices.map((v: any, i: number) => {
@@ -126,10 +126,10 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
       return new Vertex(v, { normal });
     });
 
-    const meshFaces = extruded.faces.map((face: number[]) => new Face(face, color));
+    const meshFaces = extruded.faces.map((face: number[]) => new Face(face, color, materialSlotIndex));
     const extrudedMesh = new Mesh(meshVertices, meshFaces);
 
-    builder.mergeMesh(extrudeName, extrudedMesh, color);
+    builder.mergeMesh(extrudeName, extrudedMesh, color, materialSlotIndex);
   }
 
   private createRect(
@@ -244,6 +244,7 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
     shapeDef: YamlShape,
     builder: TracedBuilder,
     materials: Map<string, RGBColor>,
+    materialSlots: Map<string, MaterialSlot>,
     evaluateExpression: (v: string | number) => number,
     depth: number,
     offset: number,
@@ -308,7 +309,7 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
       };
     }
 
-    const textColor = resolveGeometryColor(extCmd.color, materials);
+    const { color: textColor, materialSlotIndex } = resolveGeometryMaterial(extCmd.color, materials, materialSlots, builder.mesh);
 
     // Extrude each letter with its holes
     for (let groupIdx = 0; groupIdx < letterGroups.length; groupIdx++) {
@@ -328,9 +329,9 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
         return new Vertex(v, { normal });
       });
 
-      const meshFaces = extrudedLetter.faces.map((face: number[]) => new Face(face, textColor));
+      const meshFaces = extrudedLetter.faces.map((face: number[]) => new Face(face, textColor, materialSlotIndex));
       const letterMesh = new Mesh(meshVertices, meshFaces);
-      builder.mergeMesh(`${extCmd.extrude2d}_${groupIdx}`, letterMesh, textColor);
+      builder.mergeMesh(`${extCmd.extrude2d}_${groupIdx}`, letterMesh, textColor, materialSlotIndex);
     }
   }
 
@@ -339,6 +340,7 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
     shapeDef: YamlShape,
     builder: TracedBuilder,
     materials: Map<string, RGBColor>,
+    materialSlots: Map<string, MaterialSlot>,
     evaluateExpression: (v: string | number) => number,
     depth: number,
     offset: number
@@ -417,16 +419,16 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
       };
 
       const extruded = extrude2DWithHoles(boolResult.outer, boolResult.holes, extrudeParams);
-      const boolColor = resolveGeometryColor(extCmd.color, materials);
+      const { color: boolColor, materialSlotIndex } = resolveGeometryMaterial(extCmd.color, materials, materialSlots, builder.mesh);
 
       const meshVertices = extruded.vertices.map((v: any, i: number) => {
         const normal = extruded.normals[i];
         return new Vertex(v, { normal });
       });
 
-      const meshFaces = extruded.faces.map((face: number[]) => new Face(face, boolColor));
+      const meshFaces = extruded.faces.map((face: number[]) => new Face(face, boolColor, materialSlotIndex));
       const extrudedMesh = new Mesh(meshVertices, meshFaces);
-      builder.mergeMesh(extCmd.extrude2d, extrudedMesh, boolColor);
+      builder.mergeMesh(extCmd.extrude2d, extrudedMesh, boolColor, materialSlotIndex);
 
       return { shape: null, hasHoles: true };
     }

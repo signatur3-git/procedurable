@@ -44,6 +44,7 @@ export interface ExtrudedGeometry {
   vertices: Vec3[];
   faces: number[][];  // Indices into vertices array
   normals: Vec3[];    // Per-vertex normals
+  uvs?: [number, number][];  // Per-vertex UV coordinates
 }
 
 /**
@@ -64,21 +65,42 @@ export function extrude2D(shape: Shape2D, params: ExtrudeParams): ExtrudedGeomet
   const vertices: Vec3[] = [];
   const faces: number[][] = [];
   const normals: Vec3[] = [];
+  const uvs: [number, number][] = [];
 
   const pointCount = shape.points.length;
+
+  // Calculate perimeter for UV mapping
+  let perimeter = 0;
+  const distances: number[] = [0];
+  for (let i = 0; i < pointCount; i++) {
+    const p1 = shape.points[i];
+    const p2 = shape.points[(i + 1) % pointCount];
+    perimeter += Math.sqrt((p2.x - p1.x) ** 2 + (p2.z - p1.z) ** 2);
+    if (i < pointCount - 1) {
+      distances.push(perimeter);
+    }
+  }
 
   // Generate vertices for front and back faces
   const yFront = offset;
   const yBack = offset + depth;
 
-  // Front face vertices (at Y = offset)
-  for (const p of shape.points) {
+  // Front face vertices (at Y = offset) with UVs
+  for (let i = 0; i < pointCount; i++) {
+    const p = shape.points[i];
     vertices.push(new Vec3(p.x, yFront, p.z));
+    // UV for sides: (perimeter_t, 0) at front
+    const u = distances[i] / perimeter;
+    uvs.push([u, 0]);
   }
 
-  // Back face vertices (at Y = offset + depth)
-  for (const p of shape.points) {
+  // Back face vertices (at Y = offset + depth) with UVs
+  for (let i = 0; i < pointCount; i++) {
+    const p = shape.points[i];
     vertices.push(new Vec3(p.x, yBack, p.z));
+    // UV for sides: (perimeter_t, 1) at back
+    const u = distances[i] / perimeter;
+    uvs.push([u, 1]);
   }
 
   // Generate side faces (quads between front and back)
@@ -96,7 +118,7 @@ export function extrude2D(shape: Shape2D, params: ExtrudeParams): ExtrudedGeomet
     faces.push([i1, i4, i2]);
   }
 
-  // Generate caps
+  // Generate caps (UVs for caps use XZ projection, normalized to [0,1])
   if (caps === 'front' || caps === 'both') {
     const frontFace = triangulatePolygon(shape, true);
     faces.push(...frontFace);
@@ -112,7 +134,7 @@ export function extrude2D(shape: Shape2D, params: ExtrudeParams): ExtrudedGeomet
   // Calculate normals for all vertices
   calculateNormals(vertices, faces, normals);
 
-  return { vertices, faces, normals };
+  return { vertices, faces, normals, uvs };
 }
 
 /**

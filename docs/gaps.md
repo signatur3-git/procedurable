@@ -2,118 +2,119 @@
 
 Honest accounting of what's missing and what we're unsure about.
 
-## Critical Gaps
+> **Updated:** 2026-02-03 (Phase 2 complete)
 
-These block the core vision of "agents author content without writing code."
+## Critical Gaps — Resolved in Phase 2 ✅
 
-### Gap 1: ~~No Quality Gates~~ — Partially Resolved ✅
+These gaps previously blocked the core vision. All were resolved in Phase 2.
 
-**Impact:** Agents produce Tier 1 output and don't know it's insufficient. There's no automated signal that says "this isn't done yet."
+### Gap 1: ~~No Quality Gates~~ — Resolved ✅
 
-**Blocks:** Quality-driven iteration loop. Without gates, agents can't self-assess.
+**Impact:** ~~Agents produce Tier 1 output and don't know it's insufficient.~~
 
-**Status:** A2-001 implemented. `evaluateQualityTier()` checks Tier 1 and Tier 2 gates, returns machine-readable `QualityGateSuggestion` objects with `{ action, target, reason, metric, current_value, required_value, tier }`. DSL command `builder.quality [tier=N]` available. Remaining: A2-002 (decision coverage gates), A2-003 (auto-run during build).
+**Resolution:** A2 complete. `evaluateQualityTier()` checks Tier 0/1/2 gates, returns machine-readable `QualityGateSuggestion` objects. Decision coverage testing (A3) and sophistication plans (A4) also complete.
 
-### Gap 2: No 2D Booleans
+### Gap 2: ~~No 2D Booleans~~ — Resolved ✅
 
-**Impact:** Can't do polygon subtraction. Text with holes (A, O, P, etc.) renders incorrectly. Gear profiles can't be cut. Architectural openings impossible.
+**Impact:** ~~Can't do polygon subtraction. Text with holes renders incorrectly.~~
 
-**Blocks:** Text domain, mechanical domain, architectural domain.
+**Resolution:** C1 complete. Union/subtract/intersect polygons work. Text holes, gear profiles, and architectural openings all supported.
 
-**Fix:** C1 (2D boolean implementation). This is the highest-priority geometry capability.
+### Gap 3: ~~No Bevel~~ — Resolved ✅
 
-### Gap 3: No Bevel
+**Impact:** ~~Everything looks like a programmer made it. Sharp edges everywhere.~~
 
-**Impact:** Everything looks like a programmer made it. Sharp edges everywhere. Single biggest visual quality gap.
+**Resolution:** C2 complete. Bevel and chamfer operations available on all geometry.
 
-**Blocks:** Tier 2 quality for any builder.
+### Gap 4: ~~No Builder Authoring via DSL~~ — Resolved ✅
 
-**Fix:** C2 (bevel & chamfer). Depends on robust edge detection.
+**Impact:** ~~Agents must edit YAML files directly.~~
 
-### Gap 4: No Builder Authoring via DSL
+**Resolution:** B4 complete. Template generation, section editing, and sophistication-guided creation all via DSL commands.
 
-**Impact:** Agents must edit YAML files directly (via `storage.save`) instead of using structured commands. Error-prone, no validation during authoring.
+### Gap 5: ~~No Knowledge Persistence~~ — Resolved ✅
 
-**Blocks:** Fluid agent authoring loop.
+**Impact:** ~~Every agent session starts from zero.~~
 
-**Fix:** B4 (builder authoring commands). Agents should be able to `builder.add_decision`, `builder.add_geometry_step`, etc.
+**Resolution:** B3 complete. MetadataStore with domain knowledge (furniture dimensions, style palettes, material properties).
 
-### Gap 5: No Knowledge Persistence
+## Significant Gaps — Resolved in Phase 2 ✅
 
-**Impact:** Every agent session starts from zero. Domain insights are lost.
+### Gap 6: ~~No Material Slots~~ — Resolved ✅
 
-**Blocks:** Knowledge accumulation, consistent quality across sessions.
+**Resolution:** C3 complete. Named PBR-ready material slots with per-face assignment.
 
-**Fix:** B3 (world metadata store).
+### Gap 7: ~~No UV Coordinates~~ — Resolved ✅
 
-## Significant Gaps
+**Resolution:** C4 complete. Automatic UV generation (box, lathe, sweep, extrude).
 
-These affect quality and completeness but don't block the core workflow.
+### Gap 8: ~~No Scene Description Format~~ — Resolved ✅
 
-### Gap 6: No Material Slots
+**Resolution:** B2 complete. PSD v0.1 with serialization, tag aggregation, spatial queries, overview/drill-down.
 
-Vertex colors only. Can't assign proper materials, can't export with PBR, can't meet Tier 2 multi-material requirement.
+### Gap 9: ~~No glTF Export~~ — Resolved ✅
 
-**Fix:** C3. Moderate effort.
+**Resolution:** C6 complete. glTF 2.0 with geometry, materials, UVs, scenes, and instances.
 
-### Gap 7: No UV Coordinates
+### Gap 10: ~~No Deformers~~ — Resolved ✅
 
-No texture mapping. Required for glTF export with textures.
+**Resolution:** C5 complete. Noise, bend, twist, and taper deformers.
 
-**Fix:** C4. Depends on C3.
+### Gap 11: ~~No Symmetry Operations~~ — Resolved ✅
 
-### Gap 8: No Scene Description Format
+**Resolution:** C7 complete. Mirror and radial array operations.
 
-Can't save/load/export complete scenes. Composition is runtime-only.
+### Gap 12: ~~No Builder Negotiation~~ — Resolved ✅
 
-**Fix:** B2. Moderate effort. Will include tag aggregation, summary/drill-down queries, and spatial relationship queries for agent scene reasoning.
+**Resolution:** B5 complete. Attachment points (ports), request/offer protocol, transition zone blending via loft.
 
-### Gap 9: No glTF Export
+## Remaining Gaps — Phase 3 Targets
 
-Only OBJ export (no materials, no hierarchy). Can't get results into other tools.
-
-**Fix:** C6. Depends on C3, C4.
-
-### Gap 10: No Deformers
-
-No organic variation. Everything is mathematically perfect, which reads as fake.
-
-**Fix:** C5. Significant effort.
-
-### Gap 11: No Symmetry Operations
-
-No mirror or radial array. Builders must manually duplicate and transform geometry, which is verbose and error-prone. Essential for mechanical parts, furniture, and any style with intentional repetition.
-
-**Fix:** C7 (mirror, radial array). Can start any time — no dependencies.
-
-### Gap 12: No Builder Negotiation
-
-Builders are composed one-directionally: parent passes data to children. No mechanism for children to influence each other or the environment. A house can't tell terrain "flatten here." Two builders can't blend geometry at their shared boundary.
-
-**Fix:** B5 (builder negotiation protocol). Three levels:
-1. Attachment points — ports for snap-together composition
-2. Request/offer protocol — builders publish requirements, environment responds with offers
-3. Transition zone blending — shared boundary geometry via loft
+## Remaining Gaps — Phase 3 Targets
 
 ### Gap 13: No Style System
 
 Styles (Art Deco, Mid-Century Modern, Industrial) can't be applied as composable concerns. No mechanism for style-conditional decision defaults, role-based builder resolution, or cross-builder proportion rules.
 
-**Fix:** Extends B3 (style definitions as structured metadata) + B4 (style-aware builder creation) + B5 (proportion constraints). See `VISION_EXAMPLES.md` Scenes #9 and #10.
+**Phase 3 Fix:** Track F (F1 executable constraints, F2 style definitions, F3 role-based composition). See `VISION_EXAMPLES.md` Scenes #9 and #10.
+
+### Gap 14: No Rigging / Animation Data
+
+Exported models are static geometry only. No skeleton, weights, or morph targets for animation.
+
+**Phase 3 Fix:** Track E (E1 skeleton declaration, E2 vertex weights, E3 morph targets, E4 glTF skeleton export).
+
+### Gap 15: No Terrain Generation
+
+No height field mesh generation. Terrain must be authored as flat geometry.
+
+**Phase 3 Fix:** G1 (height field mesh with chunk-aligned tiling, pad flattening via B5 negotiation).
+
+### Gap 16: No LOD System
+
+No view-dependent generation or level-of-detail selection. All geometry is full resolution.
+
+**Phase 3 Fix:** G2 (LOD-conditional composition, distance-based tier selection).
+
+### Gap 17: No Procedural Textures
+
+Materials are flat colors only. No wood grain, stone variation, or patina patterns.
+
+**Phase 3 Fix:** G3 (UV-space noise evaluation, material layering with blend modes and masks).
 
 ## Gaps Identified from Vision Examples
 
-`VISION_EXAMPLES.md` contains 13 stress-test scenarios that revealed 25 specific gaps. The most important ones not listed above:
+`VISION_EXAMPLES.md` contains 13 stress-test scenarios that revealed 25 specific gaps. Many were resolved in Phase 2:
 
-| Gap | Impact | Where It's Tracked |
-|-----|--------|-------------------|
-| Tag aggregation in PSD | Agents can't reason about large scenes | Added to B2-003 |
-| Summary/paginated scene queries | MCP responses too large for complex scenes | Added to B2-003 |
-| Spatial relationship queries | Agents can't compute distances or proximity | Added to B2-003 |
-| Machine-readable gate suggestions | Agents can't programmatically act on gate failures | Added to A2-001 |
-| Structured domain models | Chess rules, music notation too complex for flat key-value | Extends B3 |
-| Morph targets / blend shapes | Character variation, LOD blending | Phase 3 |
-| Procedural textures | Wood grain, stone variation without image textures | After C3/C4 |
+| Gap | Status | Resolution |
+|-----|--------|------------|
+| Tag aggregation in PSD | ✅ Resolved | B2-003 complete |
+| Summary/paginated scene queries | ✅ Resolved | B2-003 complete |
+| Spatial relationship queries | ✅ Resolved | B2-003 complete |
+| Machine-readable gate suggestions | ✅ Resolved | A2 complete |
+| Structured domain models | ⬜ Phase 3 | F1 executable constraints |
+| Morph targets / blend shapes | ⬜ Phase 3 | E3 morph target system |
+| Procedural textures | ⬜ Phase 3 | G3 procedural textures |
 
 See `VISION_EXAMPLES.md` Gap Inventory for the complete list of 25 gaps with severity ratings and priority recommendations.
 

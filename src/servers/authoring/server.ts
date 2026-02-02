@@ -28,6 +28,7 @@ import { sceneNamespace } from './commands/scene';
 import { geometryNamespace } from './commands/geometry';
 import { textNamespace } from './commands/text';
 import { psdNamespace } from './commands/psd';
+import { metadataNamespace } from './commands/metadata';
 import { parseAndExecuteBuilder, parseYamlWithLibrary } from '../../generation/builder/YamlBuilderParser';
 import { TracedOutput } from '../../generation/builder/TracedBuilder';
 import { proceduralFontRegistry } from '../../generation/text/ProceduralFont';
@@ -53,6 +54,7 @@ registry.registerNamespace(sceneNamespace);
 registry.registerNamespace(geometryNamespace);
 registry.registerNamespace(textNamespace);
 registry.registerNamespace(psdNamespace);
+registry.registerNamespace(metadataNamespace);
 
 // Global state
 let activeBuilder: string | null = null;

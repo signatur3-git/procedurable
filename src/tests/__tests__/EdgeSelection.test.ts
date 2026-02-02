@@ -2,6 +2,7 @@
  * Edge Selection Tests (C2-001)
  *
  * Tests for mesh edge detection and selection functionality.
+ * Uses createBoxWithSharedVertices for proper edge topology.
  */
 
 import { describe, it, expect } from '@jest/globals';
@@ -12,7 +13,7 @@ import { Vec3 } from '../../platform/math/Vec3';
 describe('Edge Selection (C2-001)', () => {
   describe('getEdges', () => {
     it('should return all edges of a box', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
       const edges = box.getEdges();
 
       // A box has 12 edges
@@ -20,7 +21,7 @@ describe('Edge Selection (C2-001)', () => {
     });
 
     it('should have correct vertex references', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
       const edges = box.getEdges();
 
       for (const edge of edges) {
@@ -34,7 +35,7 @@ describe('Edge Selection (C2-001)', () => {
     });
 
     it('should have two adjacent faces for interior edges', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
       const edges = box.getEdges();
 
       // All box edges are shared by exactly 2 faces
@@ -47,7 +48,7 @@ describe('Edge Selection (C2-001)', () => {
 
   describe('getSharpEdges', () => {
     it('should find all edges on a box (90 degree edges)', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
 
       // All edges of a box are 90 degrees (PI/2 radians)
       // Threshold of 80 degrees should find all edges
@@ -58,7 +59,7 @@ describe('Edge Selection (C2-001)', () => {
     });
 
     it('should not find edges below threshold', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
 
       // Threshold of 100 degrees - box edges are 90 degrees, should not match
       const threshold100 = (100 * Math.PI) / 180;
@@ -68,7 +69,7 @@ describe('Edge Selection (C2-001)', () => {
     });
 
     it('should find edges at 30 degree threshold on box', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
 
       // 30 degrees = common bevel threshold
       const threshold30 = Math.PI / 6;
@@ -81,7 +82,7 @@ describe('Edge Selection (C2-001)', () => {
 
   describe('getBoundaryEdges', () => {
     it('should return empty for closed box mesh', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
       const boundaryEdges = box.getBoundaryEdges();
 
       // A closed box has no boundary edges
@@ -106,7 +107,7 @@ describe('Edge Selection (C2-001)', () => {
 
   describe('tagEdges', () => {
     it('should tag edges matching selector', () => {
-      const box = MeshOperations.createBox(1, 1, 1);
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
 
       // Tag edges that are vertical (aligned with Y axis)
       const tagged = box.tagEdges((edge, mesh) => {
@@ -122,7 +123,7 @@ describe('Edge Selection (C2-001)', () => {
     });
 
     it('should tag edges by position', () => {
-      const box = MeshOperations.createBox(2, 2, 2);
+      const box = MeshOperations.createBoxWithSharedVertices(2, 2, 2);
 
       // Tag edges at the top (Y = 1)
       const tagged = box.tagEdges((edge, mesh) => {
@@ -135,7 +136,7 @@ describe('Edge Selection (C2-001)', () => {
     });
 
     it('should retrieve tagged edges by tag name', () => {
-      const box = MeshOperations.createBox(2, 2, 2);
+      const box = MeshOperations.createBoxWithSharedVertices(2, 2, 2);
 
       // Tag vertical edges
       box.tagEdges((edge, mesh) => {
@@ -162,7 +163,7 @@ describe('Edge Selection (C2-001)', () => {
 
   describe('edge utility methods', () => {
     it('getEdgeMidpoint should return center of edge', () => {
-      const box = MeshOperations.createBox(2, 2, 2);
+      const box = MeshOperations.createBoxWithSharedVertices(2, 2, 2);
       const edges = box.getEdges();
 
       // Find an edge and verify midpoint
@@ -177,7 +178,7 @@ describe('Edge Selection (C2-001)', () => {
     });
 
     it('getEdgeDirection should return normalized direction', () => {
-      const box = MeshOperations.createBox(2, 2, 2);
+      const box = MeshOperations.createBoxWithSharedVertices(2, 2, 2);
       const edges = box.getEdges();
 
       for (const edge of edges) {
@@ -188,7 +189,7 @@ describe('Edge Selection (C2-001)', () => {
     });
 
     it('getEdgeLength should return correct length', () => {
-      const box = MeshOperations.createBox(2, 3, 4);
+      const box = MeshOperations.createBoxWithSharedVertices(2, 3, 4);
       const edges = box.getEdges();
 
       // All edges should have length 2, 3, or 4

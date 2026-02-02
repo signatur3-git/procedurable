@@ -4,7 +4,7 @@
 
 import { BaseGeometryCommandHandler, GeometryCommandContext } from '../GeometryCommandHandler';
 import type { YamlGeometryCommand, YamlColor } from '../YamlBuilderTypes';
-import { resolveGeometryColor } from '../MaterialResolver';
+import { resolveGeometryMaterial } from '../MaterialResolver';
 
 interface FaceCommandDef {
   face: string;
@@ -19,15 +19,15 @@ export class FaceCommandHandler extends BaseGeometryCommandHandler {
 
   async execute(cmd: YamlGeometryCommand, context: GeometryCommandContext): Promise<void> {
     const faceCmd = cmd as FaceCommandDef;
-    const { builder, materials, interpolateName } = context;
+    const { builder, materials, materialSlots, interpolateName } = context;
 
     const faceName = interpolateName(faceCmd.face);
-    const color = resolveGeometryColor(faceCmd.color, materials);
+    const { color, materialSlotIndex } = resolveGeometryMaterial(faceCmd.color, materials, materialSlots, builder.mesh);
 
     if (faceCmd.vertices && faceCmd.vertices.length >= 3) {
       // Interpolate vertex references
       const vertices = faceCmd.vertices.map(v => interpolateName(v));
-      builder.createFace(faceName, vertices, color);
+      builder.createFace(faceName, vertices, color, materialSlotIndex);
     } else if (faceCmd.loop) {
       // Create face from loop - need to get loop vertices
       console.warn(`Face from loop not yet implemented: ${faceName}`);

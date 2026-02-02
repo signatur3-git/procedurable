@@ -6,9 +6,9 @@ Mesh data structures and shape creation engines. This is the layer that turns ab
 
 | Class | Role |
 |-------|------|
-| `Mesh` | Core container: vertices + faces. Supports clone, merge, triangulate, computeNormals, computeAABB |
+| `Mesh` | Core container: vertices + faces + materialSlots. Supports clone, merge, triangulate, computeNormals, computeAABB |
 | `Vertex` | Position + optional color, normal. Future: UV, bone weights |
-| `Face` | Polygon with vertex indices. Supports n-gons, auto-triangulation |
+| `Face` | Polygon with vertex indices + optional color and materialSlotIndex. Supports n-gons, auto-triangulation |
 | `EdgeLoop` | Ring of connected edges — input for sweep/loft operations |
 | `Path2D` | 2D path with line segments, quadratic/cubic bezier curves, arcs |
 | `Shape2D` | Closed 2D polygon — input for extrude/lathe. Handles winding order |

@@ -2,6 +2,7 @@
 import { Face } from './Face';
 import { Vec3 } from '../math/Vec3';
 import { AABB } from '../math/AABB';
+import type { MaterialSlot } from '../materials/MaterialLibrary';
 
 /**
  * Represents an edge in a mesh with adjacent face information.
@@ -26,10 +27,12 @@ function edgeKey(a: number, b: number): string {
 export class Mesh {
   public vertices: Vertex[];
   public faces: Face[];
+  public materialSlots: MaterialSlot[];
 
-  constructor(vertices: Vertex[] = [], faces: Face[] = []) {
+  constructor(vertices: Vertex[] = [], faces: Face[] = [], materialSlots: MaterialSlot[] = []) {
     this.vertices = vertices;
     this.faces = faces;
+    this.materialSlots = materialSlots;
   }
 
   addVertex(vertex: Vertex): number {
@@ -41,17 +44,90 @@ export class Mesh {
     this.faces.push(face);
   }
 
+  /**
+   * Add or get a material slot by name. Returns the slot index.
+   * If a slot with the same name already exists, returns its index.
+   */
+  addMaterialSlot(slot: MaterialSlot): number {
+    const existing = this.materialSlots.findIndex(s => s.name === slot.name);
+    if (existing !== -1) return existing;
+    this.materialSlots.push(slot);
+    return this.materialSlots.length - 1;
+  }
+
+  /**
+   * Get material slot index by name, or -1 if not found.
+   */
+  getMaterialSlotIndex(name: string): number {
+    return this.materialSlots.findIndex(s => s.name === name);
+  }
+
   clone(): Mesh {
     return new Mesh(
       this.vertices.map(v => v.clone()),
-      this.faces.map(f => f.clone())
+      this.faces.map(f => f.clone()),
+      this.materialSlots.map(s => ({ ...s, color: { ...s.color } }))
     );
+  }
+
+  /**
+   * Weld vertices at the same position into shared vertices.
+   * Remaps face indices so coincident vertices share a single index.
+   * Useful before topology operations like bevel that need shared-vertex topology.
+   */
+  weldVertices(tolerance: number = 1e-6): Mesh {
+    const result = new Mesh([], [], [...this.materialSlots]);
+    // Map: old vertex index -> new vertex index
+    const vertexMap = new Map<number, number>();
+
+    for (let i = 0; i < this.vertices.length; i++) {
+      const pos = this.vertices[i].position;
+      // Check if we already have a vertex at this position
+      let found = -1;
+      for (let j = 0; j < result.vertices.length; j++) {
+        const existingPos = result.vertices[j].position;
+        if (Math.abs(pos.x - existingPos.x) < tolerance &&
+            Math.abs(pos.y - existingPos.y) < tolerance &&
+            Math.abs(pos.z - existingPos.z) < tolerance) {
+          found = j;
+          break;
+        }
+      }
+      if (found >= 0) {
+        vertexMap.set(i, found);
+      } else {
+        vertexMap.set(i, result.vertices.length);
+        result.addVertex(this.vertices[i].clone());
+      }
+    }
+
+    // Remap face indices
+    for (const face of this.faces) {
+      const newIndices = face.indices.map(i => vertexMap.get(i)!);
+      const newFace = new Face(newIndices, face.color ? { ...face.color } : undefined, face.materialSlotIndex);
+      result.addFace(newFace);
+    }
+
+    return result;
   }
 
   merge(other: Mesh): Mesh {
     const offset = this.vertices.length;
+    // Build slot index remapping: other's slot indices -> this mesh's slot indices
+    const slotRemap = new Map<number, number>();
+    for (let i = 0; i < other.materialSlots.length; i++) {
+      const newIdx = this.addMaterialSlot(other.materialSlots[i]);
+      slotRemap.set(i, newIdx);
+    }
     this.vertices.push(...other.vertices.map(v => v.clone()));
-    this.faces.push(...other.faces.map(f => new Face(f.indices.map(i => i + offset))));
+    for (const f of other.faces) {
+      const newFace = new Face(
+        f.indices.map(i => i + offset),
+        f.color ? { ...f.color } : undefined,
+        f.materialSlotIndex !== undefined ? (slotRemap.get(f.materialSlotIndex) ?? f.materialSlotIndex) : undefined
+      );
+      this.faces.push(newFace);
+    }
     return this;
   }
 
@@ -60,7 +136,8 @@ export class Mesh {
     for (const face of this.faces) {
       triangulatedFaces.push(...face.triangulate());
     }
-    return new Mesh(this.vertices, triangulatedFaces);
+    // Preserve material slots in the triangulated mesh
+    return new Mesh(this.vertices, triangulatedFaces, [...this.materialSlots]);
   }
 
   /**

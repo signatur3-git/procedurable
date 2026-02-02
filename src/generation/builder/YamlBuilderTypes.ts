@@ -30,6 +30,9 @@ export interface YamlBuilderDefinition {
   profiles?: Record<string, YamlProfile>;    // 2D profile definitions for lathe/sweep
   splines?: Record<string, YamlSpline>;      // 3D spline paths for sweep
   shapes?: Record<string, YamlShape>;        // 2D shape definitions for extrusion (P2-M3)
+  ports?: Record<string, YamlPort>;          // Attachment points (B5-001)
+  requirements?: Record<string, YamlRequirement>;  // Spatial requirements (B5-002)
+  offers?: Record<string, YamlOffer>;              // Offers in response to requirements (B5-002)
   geometry?: YamlGeometryCommand[];
   compose?: Record<string, YamlComposition>;
   placement?: YamlPlacement | YamlPlacement[];  // Constraint-based placement (P2-M2), supports array
@@ -156,6 +159,76 @@ export interface YamlColor {
 // ============================================================================
 // PROFILES & SPLINES (P2-M1b)
 // ============================================================================
+
+// ============================================================================
+// PORTS (B5-001: Attachment Points)
+// ============================================================================
+
+/**
+ * Port definition - named attachment point for composition
+ */
+export interface YamlPort {
+  /** Position in local space */
+  position: YamlPosition;
+  /** Normal direction (outward-facing) */
+  normal: YamlPosition;
+  /** Optional up vector for full orientation */
+  up?: YamlPosition;
+  /** Optional reference to a named edge loop */
+  loop?: string;
+  /** Optional metadata */
+  metadata?: Record<string, any>;
+}
+
+// ============================================================================
+// REQUIREMENTS & OFFERS (B5-002: Request/Offer Negotiation)
+// ============================================================================
+
+/**
+ * Spatial requirement - what this builder needs from the environment
+ */
+export interface YamlRequirement {
+  /** Type of requirement (e.g., 'terrain_clearance', 'flat_pad') */
+  type: string;
+  /** Shape of the area needed */
+  shape: 'rectangle' | 'circle' | 'polygon';
+  /** Position in world space (can be expressions) */
+  position: { x: string | number; z: string | number };
+  /** Width (for rectangle) */
+  width?: string | number;
+  /** Depth (for rectangle) */
+  depth?: string | number;
+  /** Radius (for circle) */
+  radius?: string | number;
+  /** Maximum allowed slope (0-1) */
+  max_slope?: string | number;
+  /** Priority (higher = more important) */
+  priority?: number;
+  /** Custom metadata */
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Offer - response to a requirement from another builder
+ */
+export interface YamlOffer {
+  /** The requirement ID this offer responds to (from another builder) */
+  for_requirement: string;
+  /** Whether the requirement was fulfilled */
+  fulfilled: boolean | string;  // Can be expression
+  /** Elevation provided */
+  elevation?: string | number;
+  /** Slope provided (0-1) */
+  slope?: string | number;
+  /** Slope direction in radians */
+  slope_direction?: string | number;
+  /** Name of boundary loop created */
+  boundary_loop?: string;
+  /** Position of the cleared area */
+  position?: YamlPosition;
+  /** Custom data */
+  data?: Record<string, any>;
+}
 
 /**
  * 2D Profile definition for lathe/sweep operations
@@ -287,7 +360,13 @@ export type YamlGeometryCommand =
   // Edge Bevel (C2-003)
   | { bevel: string; mesh: string; width: number | string; segments?: number | string; angle_threshold?: number | string }
   // Deformers (C5)
-  | { displace: string; amplitude?: number | string; frequency?: number | string; seed?: number };
+  | { displace: string; amplitude?: number | string; frequency?: number | string; seed?: number }
+  | { bend: string; axis?: 'x' | 'y' | 'z'; angle?: number | string; center?: { x?: number | string; y?: number | string; z?: number | string } }
+  | { twist: string; axis?: 'x' | 'y' | 'z'; angle?: number | string; center?: { x?: number | string; y?: number | string; z?: number | string } }
+  | { taper: string; axis?: 'x' | 'y' | 'z'; start_scale?: number | string; end_scale?: number | string; center?: { x?: number | string; y?: number | string; z?: number | string } }
+  // Symmetry (C7)
+  | { mirror: string; plane?: 'x' | 'y' | 'z' | { point?: { x?: number | string; y?: number | string; z?: number | string }; normal?: { x?: number | string; y?: number | string; z?: number | string } }; weld?: boolean }
+  | { mesh_radial_array: string; axis?: 'x' | 'y' | 'z' | { point?: { x?: number | string; y?: number | string; z?: number | string }; direction?: { x?: number | string; y?: number | string; z?: number | string } }; count: number | string; angle?: number | string; include_original?: boolean };
 
 // ============================================================================
 // COMPOSITION
@@ -319,6 +398,36 @@ export interface YamlComposition {
   };
   /** If true, output as instance data instead of merging mesh (P2-M2c-003) */
   asInstance?: boolean;
+  /** Blend zone for transition between this builder and parent (B5-003) */
+  blend_zone?: YamlBlendZone;
+  /**
+   * Port-based attachment (B5-001): snap child port to parent/sibling port
+   * Format: "parent_port_name" for parent, or "sibling.port_name" for sibling
+   */
+  attach_to?: string;
+  /**
+   * Which port on this (child) builder to use for attachment
+   * Default: first port defined, or auto-compute from bounds
+   */
+  my_port?: string;
+}
+
+/**
+ * Blend zone configuration for transition geometry (B5-003)
+ */
+export interface YamlBlendZone {
+  /** Name of loop in current builder to blend from */
+  my_loop: string;
+  /** Loop reference from parent or sibling: "builder_name.loop_name" or just "loop_name" for parent */
+  their_loop: string;
+  /** Blending method */
+  method?: 'loft' | 'bridge';
+  /** Number of intermediate segments (default 1 = direct connection) */
+  segments?: number | string;
+  /** Material for the blend mesh */
+  material?: string;
+  /** Whether to align loops to minimize twist (default true) */
+  align?: boolean;
 }
 
 // ============================================================================

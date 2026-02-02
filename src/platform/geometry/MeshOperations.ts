@@ -100,6 +100,70 @@ export class MeshOperations {
   static createBox(width: number, height: number, depth: number): Mesh {
     const mesh = new Mesh();
     const hw = width / 2, hh = height / 2, hd = depth / 2;
+
+    // Create vertices per-face for proper UVs (24 vertices for 6 faces)
+    // Each face has 4 vertices with UV coordinates [0,0], [1,0], [1,1], [0,1]
+
+    // Back face (-Z) - looking from behind
+    const backStart = mesh.vertices.length;
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, -hd), { uv: [0, 0] })); // bottom-left
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, -hd), { uv: [1, 0] }));  // bottom-right
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, -hd), { uv: [1, 1] }));   // top-right
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, -hd), { uv: [0, 1] }));  // top-left
+    mesh.addFace(new Face([backStart + 3, backStart + 2, backStart + 1, backStart + 0]));
+
+    // Front face (+Z) - looking from front
+    const frontStart = mesh.vertices.length;
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, hd), { uv: [0, 0] }));
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, hd), { uv: [1, 0] }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, hd), { uv: [1, 1] }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, hd), { uv: [0, 1] }));
+    mesh.addFace(new Face([frontStart + 0, frontStart + 1, frontStart + 2, frontStart + 3]));
+
+    // Left face (-X)
+    const leftStart = mesh.vertices.length;
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, -hd), { uv: [0, 0] }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, hd), { uv: [1, 0] }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, hd), { uv: [1, 1] }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, -hd), { uv: [0, 1] }));
+    mesh.addFace(new Face([leftStart + 0, leftStart + 1, leftStart + 2, leftStart + 3]));
+
+    // Right face (+X)
+    const rightStart = mesh.vertices.length;
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, -hd), { uv: [0, 0] }));
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, hd), { uv: [1, 0] }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, hd), { uv: [1, 1] }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, -hd), { uv: [0, 1] }));
+    mesh.addFace(new Face([rightStart + 3, rightStart + 2, rightStart + 1, rightStart + 0]));
+
+    // Top face (+Y)
+    const topStart = mesh.vertices.length;
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, -hd), { uv: [0, 0] }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, -hd), { uv: [1, 0] }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, hd), { uv: [1, 1] }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, hd), { uv: [0, 1] }));
+    mesh.addFace(new Face([topStart + 3, topStart + 2, topStart + 1, topStart + 0]));
+
+    // Bottom face (-Y)
+    const bottomStart = mesh.vertices.length;
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, -hd), { uv: [0, 0] }));
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, -hd), { uv: [1, 0] }));
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, hd), { uv: [1, 1] }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, hd), { uv: [0, 1] }));
+    mesh.addFace(new Face([bottomStart + 0, bottomStart + 1, bottomStart + 2, bottomStart + 3]));
+
+    mesh.calculateNormals();
+    return mesh;
+  }
+
+  /**
+   * Create a box mesh with shared vertices.
+   * Use this for topology-sensitive operations like edge detection and bevel.
+   * For UV-correct boxes with per-face UVs, use createBox().
+   */
+  static createBoxWithSharedVertices(width: number, height: number, depth: number): Mesh {
+    const mesh = new Mesh();
+    const hw = width / 2, hh = height / 2, hd = depth / 2;
     // Vertices:
     // 0: -x, -y, -z (back-bottom-left)
     // 1: +x, -y, -z (back-bottom-right)
@@ -129,6 +193,7 @@ export class MeshOperations {
     mesh.calculateNormals();
     return mesh;
   }
+
   static createSphere(radius: number, segments: number, rings: number): Mesh {
     const mesh = new Mesh();
     for (let ring = 0; ring <= rings; ring++) {
@@ -542,7 +607,746 @@ export class MeshOperations {
 
     return result;
   }
+
+  /**
+   * Bend mesh around an axis perpendicular to the bend direction.
+   *
+   * @param mesh The mesh to bend
+   * @param axis The axis along which bending occurs ('x', 'y', or 'z')
+   * @param angle Total bend angle in radians (positive = bend toward positive perpendicular direction)
+   * @param center Center point of the bend operation (defaults to mesh center on the bend axis)
+   * @returns New mesh with bent vertices
+   *
+   * Example: bend along Y axis bends the mesh so top/bottom curve toward X (or Z)
+   */
+  static bend(mesh: Mesh, axis: 'x' | 'y' | 'z', angle: number, center?: Vec3): Mesh {
+    const result = mesh.clone();
+
+    // Get mesh bounds to determine the bend range
+    const bounds = result.getAABB();
+    const meshCenter = center ?? bounds.center;
+
+    // Get the extent along the bend axis
+    let axisMin: number, axisMax: number;
+    switch (axis) {
+      case 'x': axisMin = bounds.min.x; axisMax = bounds.max.x; break;
+      case 'y': axisMin = bounds.min.y; axisMax = bounds.max.y; break;
+      case 'z': axisMin = bounds.min.z; axisMax = bounds.max.z; break;
+    }
+    const axisLength = axisMax - axisMin;
+
+    if (axisLength < 1e-6 || Math.abs(angle) < 1e-6) {
+      return result; // No bending needed
+    }
+
+    // Calculate bend radius: arc length = radius * angle
+    // We want the mesh to span the full angle, so radius = axisLength / angle
+    const radius = axisLength / Math.abs(angle);
+
+    // For each vertex, compute its bent position
+    for (const vertex of result.vertices) {
+      const pos = vertex.position;
+
+      // Get coordinate along bend axis (relative to mesh center on that axis)
+      let axisCoord: number, perpCoord: number;
+      switch (axis) {
+        case 'x':
+          axisCoord = pos.x - meshCenter.x;
+          perpCoord = pos.z - meshCenter.z;
+          break;
+        case 'y':
+          axisCoord = pos.y - meshCenter.y;
+          perpCoord = pos.x - meshCenter.x;
+          break;
+        case 'z':
+          axisCoord = pos.z - meshCenter.z;
+          perpCoord = pos.x - meshCenter.x;
+          break;
+      }
+
+      // Normalize axis coordinate to [-0.5, 0.5] range (relative to mesh extent)
+      const t = axisCoord / axisLength;
+
+      // Calculate the bend angle at this point (proportional to position along axis)
+      const bendAngle = t * angle;
+
+      // Calculate new position on the bent arc
+      // The vertex rotates around a point at distance 'radius' from the mesh
+      const newRadius = radius + perpCoord;
+      const newAxisCoord = newRadius * Math.sin(bendAngle);
+      const newPerpCoord = radius - newRadius * Math.cos(bendAngle);
+
+      // Apply the transformation back to 3D coordinates
+      switch (axis) {
+        case 'x':
+          vertex.position = new Vec3(
+            meshCenter.x + newAxisCoord,
+            pos.y,
+            meshCenter.z + newPerpCoord
+          );
+          break;
+        case 'y':
+          vertex.position = new Vec3(
+            meshCenter.x + newPerpCoord,
+            meshCenter.y + newAxisCoord,
+            pos.z
+          );
+          break;
+        case 'z':
+          vertex.position = new Vec3(
+            meshCenter.x + newPerpCoord,
+            pos.y,
+            meshCenter.z + newAxisCoord
+          );
+          break;
+      }
+    }
+
+    // Recalculate normals after bending
+    result.calculateNormals();
+
+    return result;
+  }
+
+  /**
+   * Twist mesh around an axis.
+   *
+   * @param mesh The mesh to twist
+   * @param axis The axis to twist around ('x', 'y', or 'z')
+   * @param angle Total twist angle in radians over the full extent of the mesh
+   * @param center Center point of the twist operation (defaults to mesh center)
+   * @returns New mesh with twisted vertices
+   *
+   * Example: twist around Y axis rotates vertices in XZ plane, with rotation
+   * proportional to Y position (bottom = no rotation, top = full rotation)
+   */
+  static twist(mesh: Mesh, axis: 'x' | 'y' | 'z', angle: number, center?: Vec3): Mesh {
+    const result = mesh.clone();
+
+    // Get mesh bounds to determine the twist range
+    const bounds = result.getAABB();
+    const twistCenter = center ?? bounds.center;
+
+    // Get the extent along the twist axis
+    let axisMin: number, axisMax: number;
+    switch (axis) {
+      case 'x': axisMin = bounds.min.x; axisMax = bounds.max.x; break;
+      case 'y': axisMin = bounds.min.y; axisMax = bounds.max.y; break;
+      case 'z': axisMin = bounds.min.z; axisMax = bounds.max.z; break;
+    }
+    const axisLength = axisMax - axisMin;
+
+    if (axisLength < 1e-6 || Math.abs(angle) < 1e-6) {
+      return result; // No twisting needed
+    }
+
+    // For each vertex, rotate it around the axis proportionally to its position
+    for (const vertex of result.vertices) {
+      const pos = vertex.position;
+
+      // Get coordinate along twist axis and perpendicular coordinates
+      let axisCoord: number, perpX: number, perpY: number;
+      switch (axis) {
+        case 'x':
+          axisCoord = pos.x;
+          perpX = pos.y - twistCenter.y;
+          perpY = pos.z - twistCenter.z;
+          break;
+        case 'y':
+          axisCoord = pos.y;
+          perpX = pos.x - twistCenter.x;
+          perpY = pos.z - twistCenter.z;
+          break;
+        case 'z':
+          axisCoord = pos.z;
+          perpX = pos.x - twistCenter.x;
+          perpY = pos.y - twistCenter.y;
+          break;
+      }
+
+      // Calculate twist angle at this point (proportional to position along axis)
+      // Centered: mid-point gets no twist, ends get ±angle/2
+      const t = (axisCoord - (axisMin + axisMax) / 2) / axisLength;
+      const twistAngle = t * angle;
+
+      // Rotate perpendicular coordinates around the axis
+      const cos = Math.cos(twistAngle);
+      const sin = Math.sin(twistAngle);
+      const newPerpX = perpX * cos - perpY * sin;
+      const newPerpY = perpX * sin + perpY * cos;
+
+      // Apply the transformation back to 3D coordinates
+      switch (axis) {
+        case 'x':
+          vertex.position = new Vec3(
+            pos.x,
+            twistCenter.y + newPerpX,
+            twistCenter.z + newPerpY
+          );
+          break;
+        case 'y':
+          vertex.position = new Vec3(
+            twistCenter.x + newPerpX,
+            pos.y,
+            twistCenter.z + newPerpY
+          );
+          break;
+        case 'z':
+          vertex.position = new Vec3(
+            twistCenter.x + newPerpX,
+            twistCenter.y + newPerpY,
+            pos.z
+          );
+          break;
+      }
+    }
+
+    // Recalculate normals after twisting
+    result.calculateNormals();
+
+    return result;
+  }
+
+  /**
+   * Taper mesh by scaling progressively along an axis.
+   *
+   * @param mesh The mesh to taper
+   * @param axis The axis along which tapering occurs ('x', 'y', or 'z')
+   * @param startScale Scale factor at the minimum axis position (e.g., 1.0 = no change)
+   * @param endScale Scale factor at the maximum axis position (e.g., 0.5 = half size)
+   * @param center Optional center point for the taper (defaults to mesh center)
+   * @returns New mesh with tapered vertices
+   *
+   * Example: taper along Y with startScale=1 and endScale=0.5 makes a cone-like shape
+   * where the bottom is full size and the top is half size.
+   */
+  static taper(mesh: Mesh, axis: 'x' | 'y' | 'z', startScale: number, endScale: number, center?: Vec3): Mesh {
+    const result = mesh.clone();
+
+    // Get mesh bounds to determine the taper range
+    const bounds = result.getAABB();
+    const taperCenter = center ?? bounds.center;
+
+    // Get the extent along the taper axis
+    let axisMin: number, axisMax: number;
+    switch (axis) {
+      case 'x': axisMin = bounds.min.x; axisMax = bounds.max.x; break;
+      case 'y': axisMin = bounds.min.y; axisMax = bounds.max.y; break;
+      case 'z': axisMin = bounds.min.z; axisMax = bounds.max.z; break;
+    }
+    const axisLength = axisMax - axisMin;
+
+    if (axisLength < 1e-6) {
+      return result; // No tapering possible (flat mesh)
+    }
+
+    // For each vertex, scale perpendicular coordinates based on position along axis
+    for (const vertex of result.vertices) {
+      const pos = vertex.position;
+
+      // Get coordinate along taper axis
+      let axisCoord: number;
+      switch (axis) {
+        case 'x': axisCoord = pos.x; break;
+        case 'y': axisCoord = pos.y; break;
+        case 'z': axisCoord = pos.z; break;
+      }
+
+      // Calculate interpolation factor (0 at min, 1 at max)
+      const t = (axisCoord - axisMin) / axisLength;
+
+      // Interpolate scale factor
+      const scale = startScale + (endScale - startScale) * t;
+
+      // Scale perpendicular coordinates relative to center
+      switch (axis) {
+        case 'x':
+          vertex.position = new Vec3(
+            pos.x,
+            taperCenter.y + (pos.y - taperCenter.y) * scale,
+            taperCenter.z + (pos.z - taperCenter.z) * scale
+          );
+          break;
+        case 'y':
+          vertex.position = new Vec3(
+            taperCenter.x + (pos.x - taperCenter.x) * scale,
+            pos.y,
+            taperCenter.z + (pos.z - taperCenter.z) * scale
+          );
+          break;
+        case 'z':
+          vertex.position = new Vec3(
+            taperCenter.x + (pos.x - taperCenter.x) * scale,
+            taperCenter.y + (pos.y - taperCenter.y) * scale,
+            pos.z
+          );
+          break;
+      }
+    }
+
+    // Recalculate normals after tapering
+    result.calculateNormals();
+
+    return result;
+  }
+
+  /**
+   * Mirror mesh across a plane.
+   *
+   * @param mesh The mesh to mirror
+   * @param plane The mirror plane, defined by axis ('x', 'y', 'z') or { point, normal }
+   * @param weld If true, merge the mirrored mesh with the original (weld boundary vertices)
+   * @returns New mesh with mirrored geometry (and original if weld=true)
+   *
+   * Example: mirror(mesh, 'x') mirrors across YZ plane (x=0)
+   * Example: mirror(mesh, { point: {x:0,y:0,z:0}, normal: {x:1,y:0,z:0} }, true) mirrors and welds
+   */
+  static mirror(
+    mesh: Mesh,
+    plane: 'x' | 'y' | 'z' | { point: Vec3; normal: Vec3 },
+    weld: boolean = false
+  ): Mesh {
+    // Normalize plane definition
+    let planePoint: Vec3;
+    let planeNormal: Vec3;
+
+    if (typeof plane === 'string') {
+      planePoint = new Vec3(0, 0, 0);
+      switch (plane) {
+        case 'x': planeNormal = new Vec3(1, 0, 0); break;
+        case 'y': planeNormal = new Vec3(0, 1, 0); break;
+        case 'z': planeNormal = new Vec3(0, 0, 1); break;
+      }
+    } else {
+      planePoint = plane.point;
+      planeNormal = plane.normal.normalize();
+    }
+
+    // Create mirrored mesh
+    const mirrored = new Mesh();
+
+    // Mirror each vertex across the plane
+    for (const vertex of mesh.vertices) {
+      const pos = vertex.position;
+
+      // Calculate distance from point to plane
+      const d = pos.sub(planePoint).dot(planeNormal);
+
+      // Mirror position: p' = p - 2*d*n
+      const mirroredPos = pos.sub(planeNormal.mul(2 * d));
+
+      // Clone vertex with mirrored position
+      const newVertex = vertex.clone();
+      newVertex.position = mirroredPos;
+
+      // Mirror normal if present
+      if (newVertex.attributes.normal) {
+        const n = newVertex.attributes.normal;
+        // Reflect normal: n' = n - 2*(n·planeNormal)*planeNormal
+        const nd = n.dot(planeNormal);
+        newVertex.attributes.normal = n.sub(planeNormal.mul(2 * nd));
+      }
+
+      mirrored.addVertex(newVertex);
+    }
+
+    // Copy faces with reversed winding order (to maintain outward normals)
+    for (const face of mesh.faces) {
+      // Reverse the indices to flip the face normal
+      const reversedIndices = [...face.indices].reverse();
+      const newFace = new Face(reversedIndices, face.color);
+      newFace.materialSlotIndex = face.materialSlotIndex;
+      mirrored.addFace(newFace);
+    }
+
+    // Copy material slots
+    for (const slot of mesh.materialSlots) {
+      mirrored.addMaterialSlot(slot);
+    }
+
+    if (!weld) {
+      // Just return the mirrored mesh
+      mirrored.calculateNormals();
+      return mirrored;
+    }
+
+    // Weld: combine original mesh with mirrored mesh
+    const result = mesh.clone();
+    const vertexOffset = result.vertices.length;
+
+    // Add mirrored vertices
+    for (const vertex of mirrored.vertices) {
+      result.addVertex(vertex);
+    }
+
+    // Add mirrored faces with offset indices
+    for (const face of mirrored.faces) {
+      const offsetIndices = face.indices.map(i => i + vertexOffset);
+      const newFace = new Face(offsetIndices, face.color);
+      newFace.materialSlotIndex = face.materialSlotIndex;
+      result.addFace(newFace);
+    }
+
+    // Weld boundary vertices that are on the mirror plane
+    // Find vertices that are on (or very close to) the mirror plane
+    const WELD_TOLERANCE = 1e-5;
+    const vertexMap = new Map<number, number>(); // mirrored index -> original index
+
+    for (let i = 0; i < mesh.vertices.length; i++) {
+      const pos = mesh.vertices[i].position;
+      const d = Math.abs(pos.sub(planePoint).dot(planeNormal));
+
+      if (d < WELD_TOLERANCE) {
+        // This vertex is on the mirror plane
+        // Map the mirrored vertex back to the original
+        vertexMap.set(i + vertexOffset, i);
+      }
+    }
+
+    // Remap face indices for welded vertices
+    if (vertexMap.size > 0) {
+      for (const face of result.faces) {
+        for (let i = 0; i < face.indices.length; i++) {
+          const mappedIndex = vertexMap.get(face.indices[i]);
+          if (mappedIndex !== undefined) {
+            face.indices[i] = mappedIndex;
+          }
+        }
+      }
+
+      // Remove duplicate vertices (the mirrored ones that got remapped)
+      // This is complex, so for now we just leave the unused vertices
+      // They don't affect rendering, just slightly increase memory
+    }
+
+    result.calculateNormals();
+    return result;
+  }
+
+  /**
+   * Create a radial array of a mesh around an axis.
+   *
+   * @param mesh The mesh to duplicate radially
+   * @param axis The axis to rotate around, defined by point + direction, or simple 'x'/'y'/'z'
+   * @param count Number of copies to create (including original)
+   * @param angle Total angle in radians to spread copies over (default: 2*PI for full circle)
+   * @param includeOriginal If true (default), includes the original mesh; if false, only rotated copies
+   * @returns New mesh with all copies combined
+   *
+   * Example: radialArray(tooth, 'y', 24) creates 24 copies around Y axis (15° apart)
+   * Example: radialArray(mesh, 'z', 4, Math.PI) creates 4 copies over 180°
+   */
+  static radialArray(
+    mesh: Mesh,
+    axis: 'x' | 'y' | 'z' | { point: Vec3; direction: Vec3 },
+    count: number,
+    angle: number = Math.PI * 2,
+    includeOriginal: boolean = true
+  ): Mesh {
+    if (count < 1) {
+      return mesh.clone();
+    }
+
+    // Normalize axis definition
+    let axisPoint: Vec3;
+    let axisDir: Vec3;
+
+    if (typeof axis === 'string') {
+      axisPoint = new Vec3(0, 0, 0);
+      switch (axis) {
+        case 'x': axisDir = new Vec3(1, 0, 0); break;
+        case 'y': axisDir = new Vec3(0, 1, 0); break;
+        case 'z': axisDir = new Vec3(0, 0, 1); break;
+      }
+    } else {
+      axisPoint = axis.point;
+      axisDir = axis.direction.normalize();
+    }
+
+    const result = new Mesh();
+
+    // Copy material slots from original
+    for (const slot of mesh.materialSlots) {
+      result.addMaterialSlot(slot);
+    }
+
+    // Calculate angle step
+    const angleStep = count > 1 ? angle / count : 0;
+    const startIndex = includeOriginal ? 0 : 1;
+
+    // Create each copy
+    for (let i = startIndex; i < count; i++) {
+      const rotAngle = i * angleStep;
+      const vertexOffset = result.vertices.length;
+
+      // Add rotated vertices
+      for (const vertex of mesh.vertices) {
+        const pos = vertex.position;
+
+        // Rotate position around axis
+        const rotatedPos = this.rotatePointAroundAxis(pos, axisPoint, axisDir, rotAngle);
+
+        const newVertex = vertex.clone();
+        newVertex.position = rotatedPos;
+
+        // Rotate normal if present
+        if (newVertex.attributes.normal) {
+          newVertex.attributes.normal = this.rotateVectorAroundAxis(
+            newVertex.attributes.normal, axisDir, rotAngle
+          );
+        }
+
+        result.addVertex(newVertex);
+      }
+
+      // Add faces with offset indices
+      for (const face of mesh.faces) {
+        const offsetIndices = face.indices.map(idx => idx + vertexOffset);
+        const newFace = new Face(offsetIndices, face.color);
+        newFace.materialSlotIndex = face.materialSlotIndex;
+        result.addFace(newFace);
+      }
+    }
+
+    result.calculateNormals();
+    return result;
+  }
+
+  /**
+   * Rotate a point around an axis using Rodrigues' rotation formula.
+   */
+  private static rotatePointAroundAxis(point: Vec3, axisPoint: Vec3, axisDir: Vec3, angle: number): Vec3 {
+    // Translate point relative to axis point
+    const p = point.sub(axisPoint);
+
+    // Rodrigues' rotation formula
+    const rotated = this.rotateVectorAroundAxis(p, axisDir, angle);
+
+    // Translate back
+    return rotated.add(axisPoint);
+  }
+
+  /**
+   * Rotate a vector around an axis using Rodrigues' rotation formula.
+   */
+  private static rotateVectorAroundAxis(v: Vec3, axis: Vec3, angle: number): Vec3 {
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+
+    // v_rot = v*cos(θ) + (axis × v)*sin(θ) + axis*(axis·v)*(1-cos(θ))
+    const cross = axis.cross(v);
+    const dot = axis.dot(v);
+
+    return v.mul(cos)
+      .add(cross.mul(sin))
+      .add(axis.mul(dot * (1 - cos)));
+  }
+
+  // ===========================================================================
+  // B5-003: Loop Resampling for Blend Zones
+  // ===========================================================================
+
+  /**
+   * Resample a loop to have a target number of vertices.
+   * Uses linear interpolation along the loop perimeter.
+   *
+   * @param loop The input edge loop
+   * @param targetCount The desired number of vertices
+   * @returns A new EdgeLoop with targetCount vertices
+   */
+  static resampleLoop(loop: EdgeLoop, targetCount: number): EdgeLoop {
+    if (targetCount < 3) {
+      throw new Error('Target vertex count must be at least 3');
+    }
+
+    const vertices = loop.vertices;
+    const n = vertices.length;
+
+    if (n === targetCount) {
+      // Already the right size
+      return new EdgeLoop(vertices.map(v => v.clone()));
+    }
+
+    // Calculate cumulative edge lengths
+    const edgeLengths: number[] = [];
+    let totalLength = 0;
+
+    for (let i = 0; i < n; i++) {
+      const nextI = (i + 1) % n;
+      const length = vertices[i].position.sub(vertices[nextI].position).length();
+      edgeLengths.push(length);
+      totalLength += length;
+    }
+
+    // Create cumulative distance array
+    const cumulative: number[] = [0];
+    for (let i = 0; i < n; i++) {
+      cumulative.push(cumulative[i] + edgeLengths[i]);
+    }
+
+    // Sample new vertices at equal arc-length intervals
+    const newVertices: Vertex[] = [];
+    const stepLength = totalLength / targetCount;
+
+    for (let i = 0; i < targetCount; i++) {
+      const targetDist = i * stepLength;
+
+      // Find which edge this distance falls on
+      let edgeIndex = 0;
+      while (edgeIndex < n - 1 && cumulative[edgeIndex + 1] <= targetDist) {
+        edgeIndex++;
+      }
+
+      // Handle wrap-around
+      if (edgeIndex >= n) {
+        edgeIndex = n - 1;
+      }
+
+      // Interpolate along this edge
+      const edgeStart = cumulative[edgeIndex];
+      const edgeLen = edgeLengths[edgeIndex];
+      const t = edgeLen > 0 ? (targetDist - edgeStart) / edgeLen : 0;
+
+      const v1 = vertices[edgeIndex];
+      const v2 = vertices[(edgeIndex + 1) % n];
+
+      // Interpolate position using Vec3
+      const interpolatedPos = new Vec3(
+        v1.position.x + t * (v2.position.x - v1.position.x),
+        v1.position.y + t * (v2.position.y - v1.position.y),
+        v1.position.z + t * (v2.position.z - v1.position.z)
+      );
+
+      newVertices.push(new Vertex(interpolatedPos));
+    }
+
+    return new EdgeLoop(newVertices);
+  }
+
+  /**
+   * Loft between two loops that may have different vertex counts.
+   * Automatically resamples to the larger count.
+   *
+   * @param loop1 First edge loop
+   * @param loop2 Second edge loop
+   * @param segments Number of intermediate segments (default 1 = direct connection)
+   * @returns A mesh connecting the two loops
+   */
+  static loftWithResampling(loop1: EdgeLoop, loop2: EdgeLoop, segments: number = 1): Mesh {
+    const count1 = loop1.length;
+    const count2 = loop2.length;
+
+    // Resample to the larger count
+    const targetCount = Math.max(count1, count2);
+
+    const resampled1 = count1 === targetCount ? loop1 : this.resampleLoop(loop1, targetCount);
+    const resampled2 = count2 === targetCount ? loop2 : this.resampleLoop(loop2, targetCount);
+
+    if (segments === 1) {
+      // Direct loft
+      return this.loft([resampled1, resampled2]);
+    }
+
+    // Create intermediate loops by interpolation
+    const loops: EdgeLoop[] = [resampled1];
+
+    for (let s = 1; s < segments; s++) {
+      const t = s / segments;
+      const intermediateVerts: Vertex[] = [];
+
+      for (let i = 0; i < targetCount; i++) {
+        const v1 = resampled1.vertices[i];
+        const v2 = resampled2.vertices[i];
+        const interpolatedPos = new Vec3(
+          v1.position.x + t * (v2.position.x - v1.position.x),
+          v1.position.y + t * (v2.position.y - v1.position.y),
+          v1.position.z + t * (v2.position.z - v1.position.z)
+        );
+        intermediateVerts.push(new Vertex(interpolatedPos));
+      }
+
+      loops.push(new EdgeLoop(intermediateVerts));
+    }
+
+    loops.push(resampled2);
+
+    return this.loft(loops);
+  }
+
+  /**
+   * Create a blend mesh between two loops from different builders.
+   * This is the high-level API for B5-003 blend zones.
+   *
+   * @param myLoop Loop from the current builder (already in world space)
+   * @param theirLoop Loop from another builder (already in world space)
+   * @param options Blend options
+   * @returns A mesh connecting the two loops
+   */
+  static createBlendZone(
+    myLoop: EdgeLoop,
+    theirLoop: EdgeLoop,
+    options: {
+      segments?: number;
+      alignLoops?: boolean;  // Try to align starting vertices for better topology
+    } = {}
+  ): Mesh {
+    const segments = options.segments ?? 1;
+
+    let loop1 = myLoop;
+    let loop2 = theirLoop;
+
+    // Optionally align loops to minimize twist
+    if (options.alignLoops !== false) {
+      loop2 = this.alignLoopToMatch(loop1, loop2);
+    }
+
+    return this.loftWithResampling(loop1, loop2, segments);
+  }
+
+  /**
+   * Rotate a loop's starting vertex to best align with another loop.
+   * Minimizes the sum of squared distances between corresponding vertices.
+   */
+  private static alignLoopToMatch(reference: EdgeLoop, toAlign: EdgeLoop): EdgeLoop {
+    const refVerts = reference.vertices;
+    const alignVerts = toAlign.vertices;
+
+    // Resample if needed for comparison
+    const targetCount = refVerts.length;
+    const resampled = alignVerts.length === targetCount
+      ? alignVerts
+      : this.resampleLoop(toAlign, targetCount).vertices;
+
+    // Find the rotation that minimizes distance
+    let bestRotation = 0;
+    let bestScore = Infinity;
+
+    for (let rot = 0; rot < targetCount; rot++) {
+      let score = 0;
+      for (let i = 0; i < targetCount; i++) {
+        const refV = refVerts[i].position;
+        const alignV = resampled[(i + rot) % targetCount].position;
+        const dx = refV.x - alignV.x;
+        const dy = refV.y - alignV.y;
+        const dz = refV.z - alignV.z;
+        score += dx * dx + dy * dy + dz * dz;
+      }
+      if (score < bestScore) {
+        bestScore = score;
+        bestRotation = rot;
+      }
+    }
+
+    // Apply rotation
+    if (bestRotation === 0) {
+      return new EdgeLoop(resampled.map(v => v.clone()));
+    }
+
+    const rotated: Vertex[] = [];
+    for (let i = 0; i < targetCount; i++) {
+      rotated.push(resampled[(i + bestRotation) % targetCount].clone());
+    }
+
+    return new EdgeLoop(rotated);
+  }
 }
-
-
-

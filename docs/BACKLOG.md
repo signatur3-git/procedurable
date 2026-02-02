@@ -1,10 +1,10 @@
 # Procedurable Backlog
 
-> **Version:** 2.2 (2026-02-02 revision — directory reorganization, C0 complete, D1 complete)
+> **Version:** 3.0 (2026-02-03 — Phase 3 planning)
 > **Purpose:** Tactical work items for AI coding agents and human developers.
 > **Strategy:** See `MASTER_PLAN.md` for vision and track definitions.
 > **Quality:** See `QUALITY_TIERS.md` for tier definitions and gate criteria.
-> **Supersedes:** Previous backlog (archived in git history).
+> **Phase 2 Archive:** See `BACKLOG_PHASE2_ARCHIVE.md` for completed Phase 2 work (49/51 stories).
 
 ---
 
@@ -21,7 +21,7 @@
 
 ```
 ### [ID]: Story Title
-**Track:** A/B/C/D  |  **Status:** ⬜/🟡/✅  |  **Size:** XS/S/M/L/XL
+**Track:** E/F/G/H  |  **Status:** ⬜/🟡/✅  |  **Size:** XS/S/M/L/XL
 **Dependencies:** [story IDs or "None"]
 
 #### Context
@@ -40,134 +40,14 @@ Implementation hints.
 
 ---
 
-## Builder Inventory (2026-02-01)
+## Phase 2 Carryover
 
-> **Purpose:** Track which builders to keep, fix, or delete.
+These two Phase 2 demo stories were not completed. They remain valid but are lower priority than Phase 3 infrastructure. An agent may pick them up opportunistically.
 
-### Directory Organization (Updated 2026-02-02)
-
-Builders are organized by purpose:
-
-```
-builders/
-├── catalog/              Production builders
-│   ├── DiningChair.yaml  Promoted from DiningChairTier2 (Tier 2)
-│   ├── Table.yaml        Dining table with composed legs
-│   ├── Vase.yaml         Lathed vase
-│   ├── TextSign.yaml     3D text signage
-│   └── components/       Sub-builders composed into others
-│       ├── Leg.yaml
-│       ├── Cushion.yaml
-│       └── Tree.yaml
-├── scenes/               Multi-object assemblies
-│   ├── DiningScene.yaml
-│   ├── ThemedRoom.yaml
-│   └── TreeScatter.yaml
-├── reference/            Quality tier documentation-as-code
-│   ├── ChairTier0.yaml
-│   ├── ChairTier1.yaml
-│   ├── ChairTier2.yaml
-│   ├── SimpleChairWithQuality.yaml
-│   └── plans/
-└── test-fixtures/        Test & capability demos
-    ├── Gear.yaml, PlateWithHoles.yaml, SimpleRing.yaml
-    ├── RadialPattern.yaml, Rock.yaml
-    ├── BoxTest.yaml, BeveledBox.yaml
-    ├── LetterA.yaml, LetterH.yaml, IconHeart.yaml
-```
-
-### Catalog (production builders)
-
-| Builder | Location | Tier | Status | Notes |
-|---------|----------|------|--------|-------|
-| DiningChair | catalog/ | 2 | ✅ Works | Promoted from DiningChairTier2. 4 back styles, 3 leg styles |
-| Table | catalog/ | 1 | ⚠️ Fix needed | "height" NaN in Leg composition |
-| Vase | catalog/ | 0 | ✅ Works | Loft showcase |
-| TextSign | catalog/ | 1 | ✅ Works | Text-to-3D showcase |
-
-### Components (composed into other builders)
-
-| Builder | Location | Status | Notes |
-|---------|----------|--------|-------|
-| Leg | catalog/components/ | ✅ Works | Used by Table |
-| Tree | catalog/components/ | ✅ Works | Used by TreeScatter |
-| Cushion | catalog/components/ | ✅ Works | Demonstrates soft goods |
-
-### Scenes (FIX - needed for D4)
-
-| Builder | Location | Issue | Action |
-|---------|----------|-------|--------|
-| DiningScene | scenes/ | Depends on Table | Fix after Table works |
-| ThemedRoom | scenes/ | Depends on Table; ChairInBounds missing | Fix after Table works |
-| TreeScatter | scenes/ | ✅ Works | Scatter + instancing |
-
-### Test Fixtures (capability demos & test support)
-
-| Builder | Location | Feature | Notes |
-|---------|----------|---------|-------|
-| Gear | test-fixtures/ | 2D booleans + radial array | Needs involute teeth before catalog promotion |
-| PlateWithHoles | test-fixtures/ | Multi-hole 2D boolean | |
-| SimpleRing | test-fixtures/ | Boolean subtract | |
-| RadialPattern | test-fixtures/ | Radial array | |
-| Rock | test-fixtures/ | Procedural variation | Tier 0 box, no real shape yet |
-| BeveledBox | test-fixtures/ | Bevel topology | |
-| BoxTest | test-fixtures/ | Minimal fixture | |
-| LetterA/H | test-fixtures/ | Path/typography | |
-| IconHeart | test-fixtures/ | Bezier paths | |
-
-### Reference (quality tier documentation)
-
-| Builder | Location | Purpose |
-|---------|----------|---------|
-| ChairTier0 | reference/ | What Tier 0 looks like |
-| ChairTier1 | reference/ | What Tier 1 looks like |
-| ChairTier2 | reference/ | What Tier 2 looks like |
-| SimpleChairWithQuality | reference/ | quality: section reference |
-
-### Deleted (cleaned up 2026-02-01 and 2026-02-02)
-
-| Builder | Reason |
-|---------|--------|
-| DiningChair (old Tier 1) | Superseded by promoted DiningChairTier2 → catalog/DiningChair |
-| DecorativeSign | Empty file |
-| ChairInBounds | Constraint demo - feature not production ready |
-| ConditionalTest | Tech test, conditionals demonstrated in DiningChair |
-| ErrorTest | Intentionally broken test file |
-| ForestSlice | Superseded by TreeScatter |
-| Mug | Low quality, Vase covers loft better |
-| RoomWithChair | Shared context feature not working |
-| Sign, SimpleSign, SimpleLetterSign | Superseded by TextSign |
-| TaggedChair | Tags feature demo - not a priority |
-| TestTextHoles | Missing font, limited value |
-| WoodChair | Material demo - materials not fully implemented |
-| WorldSlice | Terrain not a priority, low quality |
-
-### Summary
-
-- **Catalog:** 4 builders + 3 components
-- **Scenes:** 3 builders (1 working, 2 need fixes)
-- **Test fixtures:** 9 builders
-- **Reference:** 4 builders
-- **Fix needed:** Table (NaN in Leg composition), ThemedRoom (missing ChairInBounds)
-
-### Topology Validation (Added 2026-02-01)
-
-Added `checkMeshTopology()` to detect issues without manual inspection:
-- Non-manifold edges (edge shared by >2 faces)
-- Inconsistent face winding (adjacent faces with same edge direction)
-- Isolated vertices (not used by any face)
-- Boundary edges (informational - mesh not watertight)
-
-**Findings from initial validation scan (2026-02-01), resolved by C0 fixes:**
-
-| Builder | Winding Issues | Resolution |
-|---------|----------------|------------|
-| DiningChair (old) | 32 pairs ⚠️ | Deleted; replaced by DiningChairTier2 (0 issues) |
-| Gear | 376 pairs ⚠️ | Fixed by C0-003/C0-004/C0-005 loft/bevel/extrude winding fixes |
-| PlateWithHoles | 8 pairs ⚠️ | Fixed by C0-005 extrude winding fix |
-| Vase | ✅ OK | 11 degenerate triangles (cosmetic) |
-
-**Root cause was fixed:** Geometry commands (loft, bevel, extrude2D) were generating faces with inconsistent winding. All fixed in C0-003 through C0-005.
+| Story | Track | Status | Notes |
+|-------|-------|--------|-------|
+| D3-001: Gear at Tier 2 | D | 🟡 Partial | Passes gates; needs involute teeth |
+| D4-001: Furnished Room at Tier 2 | D | ⬜ | Integration proof; depends on Table fix |
 
 ---
 
@@ -175,1602 +55,1334 @@ Added `checkMeshTopology()` to detect issues without manual inspection:
 
 | Track | Milestone | Stories | Done | Status |
 |-------|-----------|---------|------|--------|
-| A: Quality | A1: Quality Declaration | 3 | 3 | ✅ Complete |
-| A: Quality | A2: Quality Gates | 3 | 3 | ✅ Complete |
-| A: Quality | A3: Decision Coverage | 2 | 2 | ✅ Complete |
-| A: Quality | A4: Sophistication Plans | 2 | 2 | ✅ Complete |
-| B: Platform | B1: Foundation Cleanup | 5 | 5 | ✅ Complete |
-| B: Platform | B2: Scene Description | 3 | 3 | ✅ Complete |
-| B: Platform | B3: World Metadata | 3 | 0 | ⬜ |
-| B: Platform | B4: Builder Authoring via DSL | 3 | 0 | ⬜ |
-| B: Platform | B5: Builder Negotiation | 3 | 0 | ⬜ |
-| C: Geometry | **C0: Mesh Topology Fixes** | 5 | 5 | ✅ Complete (old DiningChair deleted, tests cover n-gons + flipped faces) |
-| C: Geometry | C1: 2D Booleans | 3 | 3 | ✅ Complete |
-| C: Geometry | C2: Bevel & Chamfer | 3 | 3 | ✅ Complete |
-| C: Geometry | C3: Material Slots | 2 | 0 | ⬜ |
-| C: Geometry | C4: Basic UV Generation | 2 | 0 | ⬜ |
-| C: Geometry | C5: Deformers | 3 | 1 | 🟡 In Progress |
-| C: Geometry | C6: glTF Export | 2 | 0 | ⬜ |
-| C: Geometry | C7: Symmetry Operations | 2 | 0 | ⬜ |
-| D: Demos | D1: DiningChair Tier 2 | 1 | 1 | ✅ Complete (promoted to catalog/DiningChair) |
-| D: Demos | D2: Vase Tier 2 | 1 | 0 | ⬜ |
-| D: Demos | D3: Gear Tier 2 | 1 | 0 | 🟡 Partial (passes gates, needs involute teeth) |
-| D: Demos | D4: Furnished Room Tier 2 | 1 | 0 | ⬜ |
+| E: Rigging | E1: Skeleton Declaration | 2 | 0 | ⬜ |
+| E: Rigging | E2: Vertex Weights | 2 | 0 | ⬜ |
+| E: Rigging | E3: Morph Targets | 2 | 0 | ⬜ |
+| E: Rigging | E4: glTF Skeleton Export | 2 | 0 | ⬜ |
+| F: Knowledge | F1: Executable Constraints | 3 | 0 | ⬜ |
+| F: Knowledge | F2: Style Definitions | 3 | 0 | ⬜ |
+| F: Knowledge | F3: Role-Based Composition | 2 | 0 | ⬜ |
+| F: Knowledge | F4: Cross-Builder Constraints | 2 | 0 | ⬜ |
+| G: World | G1: Height Field Mesh | 2 | 0 | ⬜ |
+| G: World | G2: LOD System | 2 | 0 | ⬜ |
+| G: World | G3: UV Pipeline | 3 | 0 | ⬜ |
+| G: World | G4: Procedural Textures | 3 | 0 | ⬜ |
+| G: World | G5: Decals & Text | 2 | 0 | ⬜ |
+| G: World | G6: Texture Baking | 3 | 0 | ⬜ |
+| G: World | G7: Billboard Primitives | 1 | 0 | ⬜ |
+| H: Demos | H1: Rigged Creature | 1 | 0 | ⬜ |
+| H: Demos | H2: Styled Room | 1 | 0 | ⬜ |
+| H: Demos | H3: Chess Board | 1 | 0 | ⬜ |
+| H: Demos | H4: Village on Terrain | 1 | 0 | ⬜ |
+| H: Demos | H5: Textured Furniture | 1 | 0 | ⬜ |
+
+**Total: 39 stories, 0 complete**
 
 ---
 
-# TRACK A: QUALITY & STANDARDS
+# TRACK E: RIGGING & ANIMATION DATA
 
-## A1: Quality Declaration
+## E1: Skeleton Declaration
 
-> **Goal:** Add `quality:` section to YAML builder format. Retrofit all existing builders with honest tier assessments. No code changes needed -- this is purely format + content.
+> **Goal:** Builders declare joint hierarchies as structured data in YAML. Skeleton data flows through TracedOutput and PSD to export.
 
-### A1-001: Define Quality YAML Schema
+### E1-001: Skeleton Schema and Builder Support
 
-**Track:** A | **Status:** ✅ **COMPLETE** | **Size:** S
-**Dependencies:** None
-**Completed:** 2026-01-31
-
-#### Context
-The `quality:` section must be parseable by YamlBuilderParser but doesn't need to affect execution yet. It's metadata that agents and humans read to understand gaps.
-
-#### Completed Work
-- ✅ Defined `quality:` YAML schema with target_tier, current_tier, tier_gaps, parts, decision_coverage
-- ✅ Documented schema in `YAML_BUILDER_FORMAT.md` with detailed examples
-- ✅ YamlBuilderParser accepts `quality:` section without errors (passthrough interface added)
-- ✅ Created `SimpleChairWithQuality.yaml` as complete reference example
-
-#### Files Modified
-- `docs/YAML_BUILDER_FORMAT.md` (added Quality section documentation)
-- `src/generation/builder/YamlBuilderParser.ts` (added quality field to interface)
-- `builders/SimpleChairWithQuality.yaml` (reference example)
-
----
-
-### A1-002: Retrofit Existing Builders
-
-**Track:** A | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** A1-001
-**Completed:** 2026-01-31
+**Track:** E | **Status:** ⬜ | **Size:** L
+**Dependencies:** None (PSD already stubs `skeleton: null`)
 
 #### Context
-Every committed builder needs an honest `quality:` assessment. This forces a review of what each builder actually produces vs what it claims to produce.
+The PSD format already stubs `skeleton: null` and `jointWeights: []` on mesh prims (B2-001). This story fills those stubs with real data. A skeleton is a hierarchy of joints, each with a name, parent, rest-pose transform, and optional constraints. Builders declare this in YAML; the executor processes it into TracedOutput; PSD serialization preserves it.
 
-#### Completed Work
-- ✅ All 20 production builders have `quality:` section (4 test fixtures excluded)
-- ✅ Each builder has `target_tier`, `current_tier`, `tier_gaps`
-- ✅ Each builder has per-part tier assessment
-- ✅ Decision coverage documented with geometry_affecting, decorative_only, coverage_percentage
-- ✅ All builders identify specific upgrade paths
-
-#### Key Findings
-- 1 builder at Tier 2 (Cushion), 10 at Tier 1, 9 at Tier 0
-- Major unused decisions: vase_style, mug_style, cushion_shape, has_armrests, furniture_count
-- Average decision coverage: ~55%
-
-#### Files Modified
-- All files in `builders/*.yaml`
-
----
-
-### A1-003: Quality Tier Reference Builders
-
-**Track:** A | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** A1-001
-**Completed:** 2026-02-01
-
-#### Context
-Create reference builders that exemplify each tier so agents and humans have concrete targets to compare against.
-
-#### Completed Work
-- ✅ Created `ChairTier0.yaml` -- bounding volumes only (boxes for seat, legs, back)
-- ✅ Created `ChairTier1.yaml` -- silhouette correct (lofted legs, proper seat, flat back panel)
-- ✅ Created `ChairTier2.yaml` -- form-resolved (back_style produces different geometry, multi-material, closed meshes)
-- *(Note: moved from `builders/examples/` to `builders/reference/` in 2026-02-02 reorganization)*
-- ✅ Each reference builder has comprehensive `quality:` section documenting tier characteristics
-- ✅ Reference builders linked from `QUALITY_TIERS.md` in new section 2.1
-
-#### Technical Details
-- ChairTier0: 48 vertices, 36 faces - box primitives only
-- ChairTier1: ~80 vertices - lofted legs, conditional stretchers
-- ChairTier2: back_style decision produces different geometry (solid panel vs slats vs ladder rungs)
-- ChairTier2 documents blocked improvements (C2 bevel, C5 deformers)
-
-#### Files Modified
-- `builders/examples/ChairTier0.yaml` (already existed, verified)
-- `builders/examples/ChairTier1.yaml` (new)
-- `builders/examples/ChairTier2.yaml` (new)
-- `docs/QUALITY_TIERS.md` (added section 2.1 with links)
-
----
-
-## A2: Quality Gates
-
-> **Goal:** Automated quality checks in ValidationAPI that verify builders meet their declared tier.
-
-### A2-001: Tier 1 Gate Implementation
-
-**Track:** A | **Status:** ✅ Done | **Size:** M
-**Dependencies:** A1-001
-
-#### Context
-Tier 1 gates are basic checks that every builder should pass: parts exist, proportions are reasonable, output varies with seed.
+This is the foundation for rigging — without it, exported models are static geometry only.
 
 #### Acceptance Criteria
-- [x] `evaluateQualityTier()` function in ValidationAPI
-- [x] Tier 1 checks: min face count, min triangle count, geometry groups ≥2, degenerate ratio <10%, bounds reasonable, non-zero volume
-- [x] Tier 2 checks also implemented: higher triangle count, ≥3 groups, ≥2 materials, degenerate <2%, max triangle cap
-- [x] Returns structured `QualityGateResult` (target_tier, achieved_tier, gates, suggestions, summary)
-- [x] Suggestions are machine-readable: `{ action, target, reason, metric, current_value, required_value, tier }` so agents can act on them programmatically
-- [x] DSL command `builder.quality [tier=N]` returns gate results
-- [ ] At least 3 existing builders pass Tier 1 gates (not yet verified end-to-end)
-- [x] Unit tests for quality gate system (11 tests passing)
-
-#### Files Modified
-- `src/generation/validation/ValidationAPI.ts` — new interfaces + `evaluateQualityTier()`
-- `src/generation/builder/TracedBuilder.ts` — `qualityGateResult` field on TracedOutput
-- `src/servers/authoring/commands/builder.ts` — `builder.quality` command
-- `src/tests/__tests__/QualityGates.test.ts` — 11 unit tests
-
----
-
-### A2-002: Tier 2 Gate Implementation
-
-**Track:** A | **Status:** ✅ **COMPLETE** | **Size:** L
-**Dependencies:** A2-001
-**Completed:** 2026-02-01
-
-#### Context
-Tier 2 gates enforce form quality: no single-face parts, multiple materials, closed meshes, decision coverage.
-
-#### Completed Work
-- ✅ Tier 2 check: min 6 faces per named part (`min_faces_per_part` gate)
-- ✅ Tier 2 check: ≥80% closed (watertight) mesh edges (`closed_mesh` gate)
-- ✅ Existing Tier 2 check: ≥2 distinct materials (already existed in A2-001)
-- ✅ Gate checks run incrementally (Tier 1 must pass before Tier 2 affects achieved_tier)
-- ✅ Suggestions are specific and actionable (e.g., "Part 'back' has only 1 face(s), needs ≥6 for Tier 2")
-- ✅ Unit tests for new gates (4 tests: min_faces_per_part pass/fail, closed_mesh pass/fail)
-
-#### Technical Details
-- Added `countFacesPerGroup()` helper that counts faces from trace entries (face: and loft:)
-- Added `findUnderFacedGroups()` to identify parts failing the 6-face minimum
-- Added `checkClosedMesh()` that counts edge sharing (closed = shared by exactly 2 faces)
-- Loft traces include `faceCount` in details for accurate counting
-
-#### Note on Decision Coverage
-The "≥90% decisions affect output" check is deferred to A3-001/A3-002 (Decision Coverage track) as it requires running the builder multiple times with different decision values to verify coverage.
-
-#### Files Modified
-- `src/generation/validation/ValidationAPI.ts` (new helper functions + gates T2-6, T2-7)
-- `src/tests/__tests__/QualityGates.test.ts` (4 new tests, fixed test helper)
-
----
-
-### A2-003: Quality Gate in Builder Execution
-
-**Track:** A | **Status:** ✅ **COMPLETE** | **Size:** S
-**Dependencies:** A2-001
-**Completed:** 2026-02-01
-
-#### Context
-Quality gates should run automatically when a builder executes and appear in trace output, so agents encounter them without explicitly requesting them.
-
-#### Completed Work
-- ✅ Quality gate results included in TracedOutput when `quality:` section is present
-- ✅ Dashboard shows quality tier badge (T0/T1/T2) next to builder name (in overlay and grid title)
-- ✅ Gate failures appear in validation.issues as warnings (don't block execution)
-- ✅ Builder.run DSL command includes quality summary in response (target_tier, achieved_tier, gates_passed/failed)
-- ✅ Unit tests for automatic quality gate execution (AutoQualityGates.test.ts - 4 tests)
-
-#### Technical Details
-- `parseAndExecuteBuilder()` now runs `evaluateQualityTier()` when YAML has `quality:` section
-- Uses async dynamic import to avoid circular dependency
-- Suggestions are added to `validation.issues` with severity 'warning'
-- Dashboard shows green badge (✓) when achieved_tier >= target_tier, orange (⚠) otherwise
-
-#### Files Modified
-- `src/generation/builder/YamlBuilderParser.ts` (auto-run quality gates)
-- `src/servers/authoring/commands/builder.ts` (include quality in run response)
-- `src/servers/dashboard/main.ts` (quality badge display)
-- `dashboard.html` (quality badge CSS)
-- `src/tests/__tests__/AutoQualityGates.test.ts` (new - 4 integration tests)
-
----
-
-## A3: Decision Coverage
-
-> **Goal:** Verify that every declared decision actually produces different output.
-
-### A3-001: Decision Coverage Testing
-
-**Track:** A | **Status:** ✅ **COMPLETE** | **Size:** L
-**Dependencies:** A2-001
-**Completed:** 2026-02-01
-
-#### Context
-The biggest quality problem: decisions that don't do anything. Run builder with each option forced, diff the outputs.
-
-#### Completed Work
-- ✅ `testDecisionCoverage(yamlDefinition, executeBuilder, seed)` function in ValidationAPI
-- ✅ Compares mesh vertex/face counts between options (different count = covered)
-- ✅ Returns per-decision coverage report with status: 'covered', 'uncovered', 'partial', or 'error'
-- ✅ DSL command `builder.coverage [<name>] [seed=N]` returns coverage report
-- ✅ Integration tests (12 tests in DecisionCoverage.test.ts)
-
-#### Technical Details
-- Function runs builder once for baseline, then once per decision option with override
-- Tracks unique vertex:face count combinations to determine coverage
-- For choice decisions: tests all options, partial if some produce different geometry
-- For boolean decisions: tests true and false values
-- For number decisions: tests min, mid, and max values
-- For count decisions: tests min, mid, and max values
-- Returns comprehensive report with per-decision optionResults showing vertex/face counts
-- DSL command supports both active builder and explicit builder name
-
-#### Files Modified
-- `src/generation/validation/ValidationAPI.ts` (new interfaces + testDecisionCoverage function)
-- `src/servers/authoring/commands/builder.ts` (new builder.coverage command)
-- `src/tests/__tests__/DecisionCoverage.test.ts` (new - 12 tests)
-
----
-
-### A3-002: Coverage Enforcement
-
-**Track:** A | **Status:** ✅ **COMPLETE** | **Size:** S
-**Dependencies:** A3-001
-**Completed:** 2026-02-01
-
-#### Context
-Wire coverage results into quality gates so uncovered decisions are flagged.
-
-#### Completed Work
-- ✅ Tier 2 gate includes decision coverage check (>= 90% covered)
-- ✅ Uncovered decisions listed in quality gate suggestions with action 'implement_decision'
-- ✅ Partial coverage decisions get 'complete_decision' suggestion
-- ✅ Gate is only evaluated when decisionCoverageReport is provided in ValidationContext
-- ✅ 4 unit tests for decision coverage gate (QualityGates.test.ts)
-
-#### Technical Details
-- Added `decisionCoverageReport?: DecisionCoverageReport` to ValidationContext interface
-- Added T2-8 gate 'decision_coverage' in evaluateQualityTier()
-- Gate skipped when no coverage report provided (requires running builder multiple times)
-- Suggestions include decision name, type, and notes about what's wrong
-
-#### Files Modified
-- `src/generation/validation/ValidationAPI.ts` (new gate + context field)
-- `src/tests/__tests__/QualityGates.test.ts` (4 new tests)
-
----
-
-## A4: Sophistication Plans
-
-> **Goal:** First-class format for planning what a builder should achieve at each tier.
-
-### A4-001: Sophistication Plan Schema
-
-**Track:** A | **Status:** ✅ | **Size:** S
-**Dependencies:** A1-001
-
-#### Context
-Before writing geometry, agents should produce a plan describing each tier's parts, tools, and decisions. This format makes the plan structured and verifiable.
-
-#### Acceptance Criteria
-- [x] Define YAML schema for sophistication plans (per-tier: parts, tools_needed, decisions, upgrades)
-- [x] Document in `QUALITY_TIERS.md`
-- [x] Create example plan for DiningChair
-- [x] Create example plan for Vase
+- [ ] `skeleton:` section in YAML builder format: array of joints
+- [ ] Each joint: `name`, `parent` (name or null for root), `position` (relative to parent), `orientation` (euler angles, default 0,0,0)
+- [ ] Optional joint constraints: `type` (hinge, ball_and_socket, fixed), `limits` (min/max angles per axis)
+- [ ] Joint positions support expressions (`$measurement_name`, arithmetic)
+- [ ] `TracedSkeleton` interface in TracedBuilder with joint hierarchy
+- [ ] Skeleton data included in TracedOutput
+- [ ] PSD `skeleton` field on mesh prims populated from TracedSkeleton
+- [ ] `PSDJoint` interface: name, parent, restTransform, constraints
+- [ ] DSL command `builder.skeleton` returns joint hierarchy for active builder
+- [ ] Unit tests for skeleton parsing, expression evaluation, hierarchy validation
+- [ ] Validation: no duplicate joint names, parent references valid, no cycles
 
 #### Files to Modify
-- `docs/QUALITY_TIERS.md`
-
----
-
-### A4-002: Plan-to-Gate Comparison
-
-**Track:** A | **Status:** ✅ | **Size:** M
-**Dependencies:** A4-001, A2-002
-
-#### Context
-Compare builder output against its sophistication plan to verify the plan was followed.
-
-#### Acceptance Criteria
-- [x] Function that loads sophistication plan and compares against builder output
-- [x] Checks: planned parts exist, planned decisions are covered, planned tools are used
-- [x] DSL command `builder.check_plan <name>` returns comparison
-- [x] Integration test
-
-#### Files to Modify
-- `src/generation/validation/ValidationAPI.ts`
-- `src/servers/authoring/commands/builder.ts`
-
----
-
-# TRACK B: PLATFORM COMPONENTS
-
-## B1: Foundation Cleanup
-
-> **Goal:** Resolve known gaps and inconsistencies before building new platform features.
-
-### B1-001: Architecture & Flow Consolidation
-
-**Track:** B | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** None
-**Completed:** 2026-01-31
-
-#### Context
-The old P2-M3b was never started. Service ownership is unclear: which module owns profiles? Which owns expressions? This needs resolution before adding more services.
-
-#### Completed Work
-- ✅ Restructured codebase into 6 domain-organized folders (platform/, generation/, servers/, storage/, demos/, tests/)
-- ✅ Clear service ownership: platform owns infrastructure, generation owns builder engine, servers owns interfaces
-- ✅ Documented in `CODE_STRUCTURE_EVALUATION.md`
-- ✅ All TypeScript compilation passes, 217/223 tests pass
-
-#### Files Modified
-- `src/` folder structure completely reorganized
-- `CODE_STRUCTURE_EVALUATION.md` updated with final structure
-
----
-
-### B1-002: Fix Text Glyph Holes
-
-**Track:** B | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** None
-**Completed:** 2026-01-31
-
-#### Context
-Text-to-shape only uses outer contours. Letters A, O, P, R, etc. don't have their holes subtracted. This blocks the signage domain.
-
-#### Completed Work
-- ✅ Fixed winding order detection after Y-flip transformation
-- ✅ Updated isHole assignment in 4 locations (extractContours and extractPathContours)
-- ✅ Added comprehensive comments explaining coordinate system conventions
-- ✅ Existing tests pass, winding detection tests updated
-- ✅ Created TestTextHoles.yaml builder to demonstrate the fix
-
-#### Technical Details
-The bug was caused by coordinate system transformation. TrueType fonts use Y-up coordinates where outer contours are CCW and holes are CW. When we flip Y→Z (to match our XZ ground plane), the winding order reverses. The fix changed `isHole = isClockwise()` to `isHole = !isClockwise()` to account for this.
-
-#### Files Modified
-- `src/generation/text/FontParser.ts` (fixed hole detection logic)
-- `src/tests/__tests__/FontParser.test.ts` (updated test expectations)
-- `builders/TestTextHoles.yaml` (test builder created)
-
----
-
-### B1-003: Complete Goal-Seeking Primitives (M2d-007)
-
-**Track:** B | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** None
-**Completed:** 2026-01-31
-
-#### Context
-Last unfinished story from the agent authoring layer. Goal-seeking commands like "place N chairs around table" that agents can use instead of manual coordinate math.
-
-#### Completed Work
-- ✅ `scene.place_around` command: circular and rectangular arrangements with collision avoidance
-- ✅ `scene.place_along` command: linear placement with even or fixed spacing, configurable facing
-- ✅ `scene.fill_area` command: Poisson disk scatter for natural distribution
-- ✅ All commands return placement data (positions, rotations) for further composition
-- ✅ Integration tests created (goal-seeking-placement.test.ts)
-- ✅ Documentation added to DSL_COMMANDS.md
-
-#### Technical Details
-Reused existing platform infrastructure rather than building new systems:
-- `placeAroundRectangle/Circle` from platform/scene/Placement
-- `poissonDiskSample` from platform/spatial/Scatter
-- AABB collision detection
-All placements are deterministic (seeded random) for reproducibility.
-
-#### Files Modified
-- `src/servers/authoring/commands/scene.ts` (added 3 command handlers)
-- `src/tests/goal-seeking-placement.test.ts` (new integration tests)
-- `docs/DSL_COMMANDS.md` (added Scene Commands section)
-
----
-
-### B1-004: Gear Builder Demo Completion
-
-**Track:** B | **Status:** ✅ **COMPLETE** | **Size:** S
-**Dependencies:** None
-**Completed:** 2026-02-01
-
-#### Context
-The Gear builder demo from the old M3 was started but never finished. Complete it with current tools or document what's blocked.
-
-#### Completed Work
-- ✅ `builders/Gear.yaml` produces recognizable gear shapes (656+ vertices, 1200+ faces)
-- ✅ Decisions: `tooth_count` (8-32), `gear_style` (beveled/rounded)
-- ✅ Quality section declares tier 2 target and achieves tier 2
-- ✅ Removed "simple" style which produced degenerate triangles
-- ✅ Gear passes all 13 quality gates (Tier 1 + Tier 2)
-- ✅ Integration tests (8 tests in GearBuilder.test.ts)
-
-#### Technical Details
-- Uses 2D→3D pipeline: Shape2D primitives (circle, rect) → extrude2d → radialArray
-- 3 distinct geometry groups: gear_body, hub_hole, tooth
-- 2 materials: gear_metal, gear_brass
-- 100% closed mesh edges (watertight)
-- Updated `countGeometryGroups()` and `countFacesPerGroup()` in ValidationAPI to count `mesh:` trace entries (from extrude2d)
-
-#### Remaining Improvements (Future Work - Needs C1: 2D Booleans)
-- Involute tooth profile (currently rectangular)
-- Proper hub hole (currently overlapping cylinder, not boolean subtract)
-- Web/spoke structure for Tier 3
-
-#### Files Modified
-- `builders/Gear.yaml` (updated quality section, removed simple style)
-- `src/generation/validation/ValidationAPI.ts` (added mesh: to geometry group counting)
-- `src/tests/__tests__/GearBuilder.test.ts` (new - 8 tests)
-
----
-
-### B1-005: YamlBuilderParser Refactoring
-
-**Track:** B | **Status:** ✅ **COMPLETE** | **Size:** L
-**Dependencies:** None
-**Completed:** 2026-02-01
-
-#### Context
-YamlBuilderParser.ts was 2,005 lines with a misleading name (did parsing AND execution). The `processGeometry()` function alone was 1,012 lines. This blocked maintainability and testability improvements.
-
-#### Acceptance Criteria
-- [x] Extract type definitions to dedicated file
-- [x] Extract material resolution to dedicated file
-- [x] Separate execution from parsing
-- [x] All existing tests pass
-- [x] No functionality changes
-
-#### Completed Work
-
-**Phase 1 & 2 (Type Extraction)**
-- ✅ Created `YamlBuilderTypes.ts` (358 lines) - all YAML schema interfaces
-- ✅ Created `MaterialResolver.ts` (144 lines) - color/material resolution logic
-
-**Phase 3 (Command Registry)**
-- ✅ Created `GeometryCommandHandler.ts` (103 lines) - base interface and registry pattern
-- ✅ Created `ProfileResolver.ts` (85 lines) - profile/spline resolution
-- ✅ Created `commands/` directory with 14 command handlers:
-  - BoxCommand, VertexCommand, CircleCommand, LoopCommand, FaceCommand
-  - LoftCommand, CapCommand, LatheCommand, SweepCommand
-  - SubdivideCommand, BevelCommand, RadialArrayCommand, Extrude2DCommand
-  - ControlFlowCommands (when, if, repeat)
-
-**Phase 4 (Complete Separation)**
-- ✅ Created `YamlBuilderExecutor.ts` (669 lines) - new clean execution engine
-- ✅ Reduced `YamlBuilderParser.ts` from 2,005 to **118 lines** (-94% reduction!)
-- ✅ Parser now only delegates to executor, plus YAML parsing utilities
-- ✅ All tests pass (only pre-existing GearBuilder.test.ts import.meta issue)
-
-#### Architecture After Refactoring
-
-```
-YamlBuilderParser.ts (118 lines)
-    └── parseAndExecuteBuilder() → delegates to YamlBuilderExecutor.ts
-
-YamlBuilderExecutor.ts (669 lines)
-    ├── Phase 1: Decisions
-    ├── Phase 2: Measurements
-    ├── Phase 2.5: Materials
-    ├── Phase 2.6: Profiles/Splines/Shapes
-    ├── Phase 3: Derived
-    ├── Phase 4: Geometry → Command Registry (14 handlers)
-    ├── Phase 5: Compositions
-    ├── Phase 6: Placements
-    └── Phase 7: Quality Gates
-
-commands/
-    ├── index.ts (registry factory)
-    ├── BoxCommand.ts, VertexCommand.ts, CircleCommand.ts
-    ├── LoopCommand.ts, FaceCommand.ts, LoftCommand.ts
-    ├── CapCommand.ts, LatheCommand.ts, SweepCommand.ts
-    ├── SubdivideCommand.ts, BevelCommand.ts
-    ├── RadialArrayCommand.ts, Extrude2DCommand.ts
-    └── ControlFlowCommands.ts (when, if, repeat)
-```
-
-#### Files Modified
-- `src/generation/builder/YamlBuilderParser.ts` (reduced to 118 lines)
-- `src/generation/builder/YamlBuilderExecutor.ts` (new - 669 lines)
-- `src/generation/builder/YamlBuilderTypes.ts` (new - 358 lines)
-- `src/generation/builder/MaterialResolver.ts` (new - 144 lines)
-- `src/generation/builder/GeometryCommandHandler.ts` (new - 103 lines)
-- `src/generation/builder/ProfileResolver.ts` (new - 85 lines)
-- `src/generation/builder/commands/*.ts` (new - 14 command handlers)
-- `src/tests/__tests__/YamlBuilderExecutor.test.ts` (new - executor tests)
-- `docs/YAMLBUILDER_REFACTORING.md` (new - architecture documentation)
-- ✅ 8 unit tests for command handlers
-
-#### Phase 4 (Completed)
-- ✅ Extracted 15 command handlers to `commands/` directory:
-  - Primitives: box, vertex, circle, loop, face, loft, cap
-  - Advanced: lathe, sweep, subdivide, bevel, radialArray
-  - Control flow: when, if, repeat
-- ✅ **Registry integrated into processGeometry()** - commands now dispatched via registry
-- ⬜ `extrude2d` (~500 lines) - still inline (very complex, deferred)
-
-#### Future Work (Deferred)
-- Extract `extrude2d` command (may need shape resolvers)
-- Remove redundant inline command handlers from YamlBuilderParser.ts
-- Create `YamlBuilderExecutor.ts` to fully separate parsing from execution (Phase 5)
-
-#### Files Created
-- `src/generation/builder/YamlBuilderTypes.ts`
-- `src/generation/builder/MaterialResolver.ts`
-- `src/generation/builder/ProfileResolver.ts`
-- `src/generation/builder/GeometryCommandHandler.ts`
-- `src/generation/builder/commands/` (14 files, 15 handlers)
-- `src/tests/__tests__/GeometryCommandHandler.test.ts`
-
-#### Files Modified
-- `src/generation/builder/YamlBuilderParser.ts` - integrated registry dispatch
-
----
-
-## B2: Scene Description Format (PSD)
-
-> **Goal:** Define a serializable scene graph format that builders output and tools consume.
-
-### B2-001: PSD v0.1 Schema Definition
-
-**Track:** B | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** B1-001 ✅
-**Completed:** 2026-02-01
-
-#### Context
-The Procedurable Scene Description format is the intermediate representation between builders and consumers (renderers, exporters, agents). Inspired by USD but scoped to what we need now.
-
-#### Completed Work
-- ✅ PSD v0.1 schema with flat prim map (USD-inspired paths like `/Root/child`)
-- ✅ Three prim types: Mesh (geometry), Instance (prototype reference), Xform (grouping)
-- ✅ PSDScene, PSDMeshPrim, PSDInstancePrim, PSDXformPrim, PSDGeometry, PSDTransform, PSDBox, PSDMaterial interfaces
-- ✅ Skeleton/weight fields stubbed on mesh prims (skeleton: null, jointWeights: [])
-- ✅ Material slots: per-face material index into scene-wide materials array (PBR-ready: color, roughness, metalness)
-- ✅ Schema documented in `docs/PSD_FORMAT.md` with full examples
-- ✅ Example PSD file: `builders/examples/DiningScene.psd.yaml` (table + 4 chair instances + prototype)
-- ✅ Validation helpers: `validatePSDScene()`, `isValidPSDPath()`, `getParentPath()`, `getPrimName()`
-- ✅ 17 unit tests (PSD.test.ts)
-
-#### Technical Details
-- Flat map design (not nested tree) — prims stored by path, parent references link hierarchy
-- Path conventions follow USD: must start with `/`, no trailing `/`
-- Prototypes stored under `/__prototypes__/` subtree
-- `validatePSDScene()` checks: path format, parent-child consistency, material bounds, instance prototypes
-
-#### Files Modified
-- `src/generation/builder/PSD.ts` (new — interfaces + validation helpers)
-- `docs/PSD_FORMAT.md` (new — format documentation)
-- `builders/examples/DiningScene.psd.yaml` (new — example PSD)
-- `src/tests/__tests__/PSD.test.ts` (new — 17 tests)
-
----
-
-### B2-002: Builder Output to PSD Serialization
-
-**Track:** B | **Status:** ✅ **COMPLETE** | **Size:** L
-**Dependencies:** B2-001 ✅
-**Completed:** 2026-02-01
-
-#### Context
-Builder TracedOutput should be serializable to PSD format. This is the bridge between authoring and consumption.
-
-#### Completed Work
-- ✅ `serializeToPSD(output: TracedOutput): PSDScene` — converts TracedOutput to PSD format
-- ✅ Mesh geometry serialized as flat arrays (vertices, normals, indices) with per-face flat shading normals
-- ✅ Instances serialized as prototype Mesh prims under `/__prototypes__/` + Instance prims with transforms
-- ✅ Bounds preserved from TracedOutput validation data
-- ✅ Material extraction: unique face colors deduplicated into PSDMaterial list with per-face materialSlots
-- ✅ `deserializePSD(scene: PSDScene): DeserializedPSD` — reconstructs renderable data from PSD
-- ✅ Round-trip tests: serialize → deserialize → compare vertex/triangle counts, materials, colors
-- ✅ DSL command `builder.export_psd` — returns PSD scene + validation + summary
-- ✅ 23 unit tests (17 schema + 6 serialization)
-
-#### Technical Details
-- Scene structure: root Xform → merged Mesh + optional __prototypes__ Xform + Instance prims
-- `extractMaterials()` deduplicates face colors by rounding to 3 decimal places
-- Geometry is unrolled per-face for flat shading (matching existing `builder.mesh` command)
-- `deserializePSD()` reconstructs colors from materialSlots for rendering
-- Validation via `validatePSDScene()` ensures parent-child consistency after serialization
-
-#### Files Modified
-- `src/generation/builder/PSD.ts` (added serializeToPSD, deserializePSD, extractMaterials + helpers)
-- `src/servers/authoring/commands/builder.ts` (added builder.export_psd command)
-- `src/tests/__tests__/PSD.test.ts` (6 new serialization + round-trip tests)
-
----
-
-### B2-003: PSD Scene Queries
-
-**Track:** B | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** B2-002 ✅
-**Completed:** 2026-02-01
-
-#### Context
-Agents need to query PSD scenes to reason about builder output: find parts by tag, get bounds, check spatial relationships.
-
-#### Completed Work
-- ✅ `psd.query_by_tag <tag>` — returns matching prims from last PSD output (recursive — searches children)
-- ✅ `psd.get_bounds <prim_path>` — returns AABB for a prim with size and center
-- ✅ `psd.list_prims` — returns hierarchy with depth information
-- ✅ `psd.get_materials` — returns material assignments with usage statistics
-- ✅ `psd.overview` — returns top-level prims with aggregated metadata: child count, combined bounds, collected tags from descendants
-- ✅ `psd.inspect <prim_path>` — returns one level of children for drill-down navigation
-- ✅ `psd.distance <prim_a> <prim_b>` — returns center-to-center and surface-to-surface distance
-- ✅ `psd.prims_within <prim> radius=<r>` — returns prims whose bounds intersect the search sphere
-- ✅ Tag aggregation: `collectAggregatedTags()` collects tags from all descendants
-- ✅ 22 unit tests in PSDQueries.test.ts
-- ✅ Documentation added to DSL_COMMANDS.md
-
-#### Technical Details
-- Created new `psd` command namespace for PSD-specific queries
-- PSD scene is lazily cached in CommandContext.lastPSDScene
-- Query functions added to PSD.ts: `queryByTag`, `getPrimBounds`, `listPrimsHierarchy`, `getOverview`, `inspectPrim`, `getMaterialAssignments`, `calculateDistance`, `findPrimsWithin`
-- Surface-to-surface distance is approximate (uses bounding box radii)
-
-#### Files Modified
-- `src/generation/builder/PSD.ts` (new query functions)
-- `src/servers/authoring/commands/psd.ts` (new command namespace)
-- `src/servers/authoring/command-registry.ts` (added lastPSDScene to context)
-- `src/servers/authoring/server.ts` (registered psd namespace)
-- `src/tests/__tests__/PSDQueries.test.ts` (new - 22 tests)
-- `docs/DSL_COMMANDS.md` (added PSD Scene Query Commands section)
-
----
-
-## B3: World Metadata Collector
-
-> **Goal:** Persistent knowledge store where agents accumulate domain knowledge across sessions.
-
-### B3-001: Metadata Store Implementation
-
-**Track:** B | **Status:** ⬜ | **Size:** M
-**Dependencies:** None
-
-#### Context
-Agents need to record and retrieve knowledge: style palettes, builder relationships, spatial rules, domain standards. This is a structured key-value store with domain schemas, backed by the existing storage system.
-
-#### Acceptance Criteria
-- [ ] `MetadataStore` class with get/set/list/delete operations
-- [ ] Namespaced keys (e.g., `styles/modern`, `rules/furniture/clearance`)
-- [ ] Values are typed YAML documents (not arbitrary blobs)
-- [ ] Persistent to filesystem via StorageProvider
-- [ ] Unit tests for CRUD operations
-
-#### Files to Modify
-- `src/storage/MetadataStore.ts` (new)
-- `src/storage/index.ts`
-
----
-
-### B3-002: Metadata DSL Commands
-
-**Track:** B | **Status:** ⬜ | **Size:** S
-**Dependencies:** B3-001
-
-#### Context
-Expose metadata store through DSL so agents can use it during authoring sessions.
-
-#### Acceptance Criteria
-- [ ] `metadata.set <key> <value>` stores a metadata entry
-- [ ] `metadata.get <key>` retrieves a metadata entry
-- [ ] `metadata.list [prefix]` lists keys, optionally filtered by prefix
-- [ ] `metadata.delete <key>` removes an entry
-- [ ] Integration tests
-
-#### Files to Modify
-- `src/servers/authoring/commands/metadata.ts` (new)
-- `src/servers/authoring/command-registry.ts`
-
----
-
-### B3-003: Pre-Built Domain Knowledge
-
-**Track:** B | **Status:** ⬜ | **Size:** M
-**Dependencies:** B3-002
-
-#### Context
-Seed the metadata store with useful domain knowledge that agents can reference when building.
-
-#### Acceptance Criteria
-- [ ] Furniture domain: standard dimensions (chair heights, table widths, clearances)
-- [ ] Style palettes: modern, rustic, industrial (colors, materials, proportions)
-- [ ] Builder relationships: which builders compose into which scenes
-- [ ] Material associations: wood types → colors, metal types → finishes
-- [ ] All metadata queryable via DSL
-
-#### Files to Modify
-- `metadata/` directory (new, with YAML knowledge files)
-
----
-
-## B4: Builder Authoring via DSL
-
-> **Goal:** Agents can create new YAML builders through DSL commands, not just file edits.
-
-### B4-001: Builder Template Generation
-
-**Track:** B | **Status:** ⬜ | **Size:** M
-**Dependencies:** A1-001
-
-#### Context
-An agent should be able to say "create a new builder for a bookshelf" and get a properly structured YAML file with quality section, decision placeholders, and measurement scaffolding.
-
-#### Acceptance Criteria
-- [ ] `builder.create <name> --domain <domain>` generates template YAML
-- [ ] Template includes: decisions (from domain knowledge), measurements (standard for domain), quality section (target_tier: 2), geometry placeholder
-- [ ] Template is valid YAML that parses without errors
-- [ ] Domain-specific templates for: furniture, vessel, signage, mechanical
-- [ ] Integration test
-
-#### Files to Modify
-- `src/servers/authoring/commands/builder.ts`
-
----
-
-### B4-002: Builder Section Editing
-
-**Track:** B | **Status:** ⬜ | **Size:** L
-**Dependencies:** B4-001
-
-#### Context
-Agents should be able to add decisions, measurements, and geometry to a builder through DSL commands rather than raw file editing.
-
-#### Acceptance Criteria
-- [ ] `builder.add_decision <builder> <name> <type> [options...]` adds a decision
-- [ ] `builder.add_measurement <builder> <name> <value>` adds a measurement
-- [ ] `builder.add_geometry <builder> <type> <params...>` adds a geometry command
-- [ ] Each command modifies the YAML file and triggers hot-reload
-- [ ] Validation: refuse to add duplicate names, invalid types
-- [ ] Integration tests
-
-#### Files to Modify
-- `src/servers/authoring/commands/builder.ts`
-
----
-
-### B4-003: Sophistication-Guided Creation
-
-**Track:** B | **Status:** ⬜ | **Size:** M
-**Dependencies:** B4-001, A4-001
-
-#### Context
-When creating a builder, an agent should be guided by a sophistication plan. The creation workflow should reference the plan at each step.
-
-#### Acceptance Criteria
-- [ ] `builder.create` accepts `--plan <plan_file>` to load sophistication plan
-- [ ] Plan tiers shown in creation output ("Tier 1 requires: seat, legs, back")
-- [ ] Generated template includes planned parts as geometry placeholders
-- [ ] Quality section pre-filled from plan
-- [ ] Integration test
-
-#### Files to Modify
-- `src/servers/authoring/commands/builder.ts`
-
----
-
-## B5: Builder Negotiation
-
-> **Goal:** Enable builders to communicate bidirectionally — declaring attachment points, publishing spatial requirements, receiving offers from environment builders, and blending geometry at shared boundaries. See `VISION_EXAMPLES.md` Scene #13 for full motivation.
-
-### B5-001: Attachment Point Declarations
-
-**Track:** B | **Status:** ⬜ | **Size:** S
-**Dependencies:** B2-001
-
-#### Context
-Builders should declare named ports (attachment points) as part of their output. A port has a position, orientation, and optionally references a named edge loop. When composing, the parent can snap a child's port to its own port, auto-computing offset and rotation. This is the simplest level of inter-builder communication — one-directional conformance.
-
-#### Acceptance Criteria
-- [ ] `ports:` section in YAML builder format: each port has `name`, `position`, `normal`, optional `loop` (reference to named edge loop)
-- [ ] Port data included in TracedOutput and PSD format
-- [ ] Composition syntax: `attach_to: <parent_builder>.<port_name>` snaps child port to parent port
-- [ ] Auto-computed offset and rotation from port alignment
-- [ ] Port data queryable via `scene.get_ports <prim_path>`
-- [ ] Integration test: lamp attaches to table surface port
-
-#### Files to Modify
-- `src/generation/builder/YamlBuilderParser.ts` (parse ports section)
-- `src/generation/builder/TracedBuilder.ts` (store port data in output)
-- `src/generation/builder/PSD.ts` (port type in PSD schema)
-- `src/servers/authoring/commands/scene.ts` (query ports)
-- `docs/YAML_BUILDER_FORMAT.md` (document ports syntax)
-
----
-
-### B5-002: Request/Offer Negotiation Protocol
-
-**Track:** B | **Status:** ⬜ | **Size:** L
-**Dependencies:** B5-001, B2-002
-
-#### Context
-Some builders need to adapt to each other. A house needs a flat area; terrain needs to know where houses go before generating. This requires a structured negotiation protocol: builders publish **requirements**, environment builders process them and publish **offers**, then all builders generate geometry using the offers.
-
-The simplest implementation uses composition ordering within the current single-pass model: compose requirement-publishers first (they write to SharedContext), then compose the environment builder (it reads requirements, generates adapted geometry, writes offers), then re-compose the original builders (they read offers and adapt). A true multi-pass execution model is a future enhancement.
-
-#### Acceptance Criteria
-- [ ] `requirements:` section in YAML: typed spatial requirements (e.g., `type: terrain_clearance, shape: rectangle, width: N, depth: N, position: {x, z}, max_slope: N`)
-- [ ] Requirements published to SharedContext as structured data (not flat strings)
-- [ ] Environment builders can read all published requirements via `context.get_requirements(type)`
-- [ ] `offers:` section: environment builders publish typed offers (e.g., `elevation, slope, slope_direction, boundary_loop`)
-- [ ] Requesting builders can read offers via `context.get_offer(requirement_name)`
-- [ ] Offer data usable in measurement expressions: `$offer.flat_pad.elevation`
-- [ ] Demo: terrain builder flattens pad for house; house reads elevation and slope from terrain's offer
-- [ ] All requirements and offers are traced (inspectable: "why is this house at elevation 42.3m?")
-- [ ] Integration test with terrain + house negotiation
-
-#### Files to Modify
-- `src/generation/builder/YamlBuilderParser.ts` (parse requirements/offers)
-- `src/generation/builder/TracedBuilder.ts` (requirement/offer storage and tracing)
-- `src/platform/scene/SharedContext.ts` (typed requirement/offer channels)
-- `docs/YAML_BUILDER_FORMAT.md` (document negotiation syntax)
+- `src/generation/builder/YamlBuilderTypes.ts` (YamlJoint, YamlSkeleton interfaces)
+- `src/generation/builder/YamlBuilderExecutor.ts` (new phase for skeleton processing)
+- `src/generation/builder/TracedBuilder.ts` (TracedSkeleton, joint registration)
+- `src/generation/builder/PSD.ts` (PSDJoint, fill skeleton field on PSDMeshPrim)
+- `src/servers/authoring/commands/builder.ts` (builder.skeleton command)
 
 #### Notes
-The initial implementation should use **composition ordering** (compose children that publish requirements → compose environment → re-compose children with offers) rather than a true multi-pass engine. This keeps the architecture simple while proving the protocol. Multi-pass execution can be added later if the ordering approach becomes too limiting.
+Joint positions should be derived from measurements where possible: "shoulder joint is at (shoulder_width/2, shoulder_height, 0)". This makes the skeleton parametric — change the measurements, skeleton adapts.
+
+Example YAML:
+```yaml
+skeleton:
+  - name: root
+    position: { x: 0, y: 0, z: 0 }
+  - name: spine
+    parent: root
+    position: { x: 0, y: '$hip_height', z: 0 }
+  - name: neck
+    parent: spine
+    position: { x: 0, y: '$torso_height', z: 0 }
+  - name: shoulder_L
+    parent: spine
+    position: { x: '$shoulder_width / 2', y: '$torso_height * 0.9', z: 0 }
+    constraints:
+      type: ball_and_socket
+      limits: { pitch: [-90, 180], yaw: [-90, 90], roll: [-45, 45] }
+  - name: elbow_L
+    parent: shoulder_L
+    position: { x: '$upper_arm_length', y: 0, z: 0 }
+    constraints:
+      type: hinge
+      axis: z
+      limits: { min: 0, max: 145 }
+```
 
 ---
 
-### B5-003: Transition Zone Blending
+### E1-002: Skeleton Composition
 
-**Track:** B | **Status:** ⬜ | **Size:** L
-**Dependencies:** B5-002
+**Track:** E | **Status:** ⬜ | **Size:** M
+**Dependencies:** E1-001
 
 #### Context
-When two builders share a boundary (terrain meets house foundation, road cuts through hill), neither builder alone can generate the transition geometry. Both must contribute boundary loops, and a blend operation connects them. This reuses the existing loft primitive — the new work is the protocol for exchanging boundary data and the composition syntax for declaring blend zones.
+When builders compose (horse body + eagle wings + scorpion tail), each sub-builder has its own skeleton. The composed skeleton must merge — child joint hierarchies attach at specified parent joints, transforms adjusted by composition offset.
 
 #### Acceptance Criteria
-- [ ] `blend_zone:` composition option: declares two boundary loops (one from each builder) and a blending method
-- [ ] Syntax: `blend_zone: { my_loop: <name>, their_loop: <other_builder>.<loop_name>, method: loft, segments: N }`
-- [ ] System retrieves both loops, applies builder transforms to bring them into shared coordinate space
-- [ ] Loft/bridge mesh generated between the two loops
-- [ ] Loop resampling when vertex counts don't match (linear interpolation to target count)
-- [ ] Blend mesh inherits material from the nearest source builder (or configurable)
-- [ ] Demo: terrain-to-house-foundation blend produces watertight connecting mesh
-- [ ] Integration test
+- [ ] When composing a builder that has a skeleton, child skeleton merges into parent skeleton
+- [ ] Composition syntax: `skeleton_attach: <parent_joint_name>` specifies which parent joint the child's root connects to
+- [ ] Child joint positions adjusted by composition transform (offset, rotation)
+- [ ] Joint name conflicts resolved by prefixing with builder name (`wing_L.shoulder` instead of `shoulder`)
+- [ ] Composed PSD scene has merged skeleton across composed prims
+- [ ] Unit test: compose two builders with skeletons, verify merged hierarchy
 
 #### Files to Modify
-- `src/generation/builder/YamlBuilderParser.ts` (parse blend_zone)
-- `src/generation/builder/TracedBuilder.ts` (blend zone execution)
-- `src/platform/geometry/MeshOperations.ts` (loop resampling utility)
+- `src/generation/builder/YamlBuilderTypes.ts` (skeleton_attach in YamlComposition)
+- `src/generation/builder/YamlBuilderExecutor.ts` (skeleton merge in composition phase)
+- `src/generation/builder/TracedBuilder.ts` (mergeSkeleton method)
+- `src/generation/builder/PSD.ts` (merged skeleton in serialization)
 
 ---
 
-# TRACK C: FOUNDATIONAL GEOMETRY TOOLS
+## E2: Vertex Weights
 
-## C0: Mesh Topology Fixes (NEW - 2026-02-01)
+> **Goal:** Rule-based vertex weight assignment — no manual weight painting.
 
-> **Goal:** Fix face winding consistency across all geometry operations. This is a prerequisite for correct rendering and future geometry operations.
-> **Discovery:** Topology validation added 2026-02-01 revealed widespread winding issues.
+### E2-001: Weight Rules and Assignment
 
-### C0-001: Topology Validation System
+**Track:** E | **Status:** ⬜ | **Size:** L
+**Dependencies:** E1-001
 
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** S
+#### Context
+Each vertex needs influence weights for one or more bones. Instead of manual painting, builders declare rules: "vertices within Ncm of joint X are influenced by bone Y with distance falloff." The system evaluates these rules against the mesh and skeleton to produce weights.
+
+#### Acceptance Criteria
+- [ ] `weights:` section in YAML builder format: array of weight rules
+- [ ] Rule types: `proximity` (distance from joint, with falloff), `region` (bounding box/sphere), `gradient` (linear blend between two joints)
+- [ ] `proximity` rule: `joint: <name>, radius: <N>, falloff: linear|smooth|sharp`
+- [ ] `region` rule: `joint: <name>, min: {x,y,z}, max: {x,y,z}, weight: <0-1>`
+- [ ] `gradient` rule: `joint_a: <name>, joint_b: <name>, axis: <x|y|z>` — linear blend along axis
+- [ ] Weight normalization: per-vertex weights sum to 1.0
+- [ ] Max 4 influences per vertex (standard for real-time; drop lowest)
+- [ ] `VertexWeights` data structure: sparse array of `{jointIndex, weight}` per vertex
+- [ ] Weights stored on PSD mesh prims in `jointWeights` field
+- [ ] DSL command `builder.weights` shows weight statistics (coverage, max influences, unweighted vertices)
+- [ ] Unit tests for each rule type, normalization, max-influence clamping
+
+#### Files to Modify
+- `src/generation/builder/YamlBuilderTypes.ts` (YamlWeightRule interfaces)
+- `src/generation/builder/YamlBuilderExecutor.ts` (weight computation phase, after skeleton)
+- `src/generation/builder/TracedBuilder.ts` (VertexWeights storage)
+- `src/generation/builder/PSD.ts` (jointWeights serialization)
+- `src/servers/authoring/commands/builder.ts` (builder.weights command)
+
+#### Notes
+Weight computation is O(vertices * joints * rules) but tractable for procedural meshes (typically <10K vertices). Proximity is the most common rule — start there, add region and gradient later if needed.
+
+---
+
+### E2-002: Weight Visualization
+
+**Track:** E | **Status:** ⬜ | **Size:** S
+**Dependencies:** E2-001
+
+#### Context
+Agents and humans need to see weight assignments to debug skinning issues. Dashboard shows a heat-map overlay when a joint is selected.
+
+#### Acceptance Criteria
+- [ ] Dashboard keyboard shortcut 'W' toggles weight visualization mode
+- [ ] In weight mode, vertex colors replaced by weight heat map (blue=0, red=1)
+- [ ] Click/select a joint name to see weights for that specific joint
+- [ ] DSL command `builder.show_weights <joint_name>` returns per-vertex weight data
+- [ ] Unweighted vertices highlighted in magenta (error color)
+
+#### Files to Modify
+- `src/servers/dashboard/main.ts` (weight visualization mode)
+- `src/servers/authoring/commands/builder.ts` (show_weights command)
+
+---
+
+## E3: Morph Targets
+
+> **Goal:** Named vertex offset sets that blend between mesh variants. Foundation for character variation and LOD blending.
+
+### E3-001: Morph Target System
+
+**Track:** E | **Status:** ⬜ | **Size:** L
+**Dependencies:** None (operates on Mesh, independent of skeleton)
+
+#### Context
+A morph target (blend shape) is a set of per-vertex position offsets from a base mesh. Blending is linear interpolation of offsets. This enables: character body variation (lean to stocky), facial expressions, LOD transitions, and procedural variation from archetypes.
+
+glTF supports morph targets natively, making this directly exportable.
+
+#### Acceptance Criteria
+- [ ] `MorphTarget` class: name, vertex offsets (sparse — only store non-zero deltas)
+- [ ] `MorphTargetSet`: base mesh + named targets + validation (vertex count match)
+- [ ] `MeshOperations.applyMorphTargets(base, targets[], weights[])` returns blended mesh
+- [ ] Blending is additive: `result[i] = base[i] + sum(targets[j][i] * weights[j])`
+- [ ] `MeshOperations.createMorphTarget(base, variant, name)` computes delta from two topology-matching meshes
+- [ ] Topology validation: base and variant must have identical vertex count and face connectivity
+- [ ] YAML `morph_targets:` section: declare named targets as references to other builder outputs or inline offsets
+- [ ] DSL command `geometry.blend <target_name> weight=<0-1>` applies morph in geometry pipeline
+- [ ] Unit tests: create target, apply single target, apply multiple targets, topology mismatch error
+
+#### Files to Modify
+- `src/platform/geometry/MorphTarget.ts` (new — MorphTarget, MorphTargetSet classes)
+- `src/platform/geometry/MeshOperations.ts` (applyMorphTargets, createMorphTarget)
+- `src/platform/geometry/index.ts` (export)
+- `src/generation/builder/YamlBuilderTypes.ts` (morph_targets section)
+- `src/generation/builder/YamlBuilderExecutor.ts` (morph target processing)
+
+#### Notes
+The simplest morph target is computed by diffing two meshes with identical topology. The YAML format should support both:
+1. **Inline:** explicit vertex offsets (for small adjustments)
+2. **Reference:** "use the mesh from builder X with decisions Y as variant" — system runs both builders, diffs the meshes
+
+Start with inline offsets; reference-based targets can be added in a follow-up.
+
+---
+
+### E3-002: Morph Target in PSD and Dashboard
+
+**Track:** E | **Status:** ⬜ | **Size:** M
+**Dependencies:** E3-001
+
+#### Context
+Morph targets should be visible in PSD format and controllable in the dashboard for preview.
+
+#### Acceptance Criteria
+- [ ] PSD mesh prims include `morphTargets` field: array of `{name, offsets}`
+- [ ] Dashboard slider UI for morph target weights (when targets present)
+- [ ] Slider changes trigger re-render with blended mesh
+- [ ] DSL command `builder.morph_targets` lists available targets with vertex count
+
+#### Files to Modify
+- `src/generation/builder/PSD.ts` (morphTargets on PSDMeshPrim)
+- `src/servers/dashboard/main.ts` (morph target slider UI)
+- `src/servers/authoring/commands/builder.ts` (morph_targets command)
+
+---
+
+## E4: glTF Skeleton Export
+
+> **Goal:** Extend C6 glTF exporter to include skins, joints, weights, and morph targets.
+
+### E4-001: Skeleton and Skin Export
+
+**Track:** E | **Status:** ⬜ | **Size:** L
+**Dependencies:** E1-001, E2-001, C6-001 ✅
+
+#### Context
+The current glTF exporter (C6) outputs geometry, materials, and UVs. This story adds the skin, joints, and inverse bind matrices needed for rigged models. A rigged glTF model can be imported into Blender, Unity, Unreal, or any glTF viewer and posed/animated.
+
+#### Acceptance Criteria
+- [ ] glTF export includes `skins` array with joint references and inverse bind matrices
+- [ ] Joint nodes added to glTF scene hierarchy with rest-pose transforms
+- [ ] Joint constraints exported as glTF extras (not standard glTF, but preserved)
+- [ ] Vertex weights exported as `JOINTS_0` and `WEIGHTS_0` accessors (4 influences max)
+- [ ] Validates in glTF validator (khronos reference validator)
+- [ ] DSL command `builder.export_rigged_gltf [filename]` exports rigged model
+- [ ] Unit test: export rigged model, verify skin/joint/weight structure in GLB
+
+#### Files to Modify
+- `src/export/GLTFExporter.ts` (extend with skin, joint, weight export)
+- `src/servers/authoring/commands/builder.ts` (export_rigged_gltf command)
+
+#### Notes
+Inverse bind matrices are computed from the rest-pose joint transforms. Each joint's IBM is the inverse of its world-space transform. This converts vertex positions from model space to joint-local space for skinning.
+
+---
+
+### E4-002: Morph Target Export
+
+**Track:** E | **Status:** ⬜ | **Size:** M
+**Dependencies:** E3-001, C6-001 ✅
+
+#### Context
+glTF 2.0 natively supports morph targets via the `targets` array on mesh primitives. Each target is an accessor for position offsets (and optionally normal/tangent offsets).
+
+#### Acceptance Criteria
+- [ ] glTF mesh primitives include `targets` array when morph targets are present
+- [ ] Each target is a set of `POSITION` delta accessors
+- [ ] `mesh.weights` array provides default blend weights
+- [ ] Target names stored in `mesh.extras.targetNames` (glTF convention)
+- [ ] Validates in glTF validator
+- [ ] Unit test: export model with morph targets, verify target structure
+
+#### Files to Modify
+- `src/export/GLTFExporter.ts` (morph target export)
+
+---
+
+# TRACK F: KNOWLEDGE & STYLE SYSTEM
+
+## F1: Executable Constraints
+
+> **Goal:** Extend the metadata store from key-value lookup to support executable constraint schemas that enforce domain rules.
+
+### F1-001: Constraint Schema Definition
+
+**Track:** F | **Status:** ⬜ | **Size:** L
+**Dependencies:** B3-001 ✅ (MetadataStore exists)
+
+#### Context
+B3's MetadataStore holds key-value metadata (dimensions, styles, materials). For domain models like chess positions, music notation, or gear meshing, agents need *rules*: "no two pieces on same square," "gear pitch must match between meshing gears," "notes must fill the bar to the time signature."
+
+These rules should be **data, not code**. An agent defines a constraint schema in the metadata store; the platform evaluates it. This is the key to "agents define new knowledge without code changes."
+
+#### Acceptance Criteria
+- [ ] `ConstraintSchema` interface: name, description, variables (typed), rules (expressions that must evaluate to true)
+- [ ] Variable types: `number`, `string`, `boolean`, `position` ({x,y,z}), `set` (collection), `grid` (2D array)
+- [ ] Rule types:
+  - `expression`: arbitrary boolean expression using ExpressionService (e.g., `$a + $b <= 10`)
+  - `unique`: no duplicate values in a set/grid column (e.g., chess square occupancy)
+  - `range`: value within min/max (e.g., `$pitch_angle >= 14 && $pitch_angle <= 25`)
+  - `reference`: value must exist in a lookup table (e.g., `$piece_type in ['king','queen','rook','bishop','knight','pawn']`)
+- [ ] `ConstraintEvaluator` class: takes schema + variable bindings, evaluates all rules, returns pass/fail per rule with explanation
+- [ ] Schemas stored in MetadataStore under `constraints/` namespace (e.g., `constraints/chess/position`)
+- [ ] DSL commands:
+  - `constraint.define <key>` — stores a constraint schema (YAML input)
+  - `constraint.evaluate <key>` — evaluates schema against provided variable bindings
+  - `constraint.list` — lists defined constraint schemas
+- [ ] Unit tests for each rule type, schema validation, evaluation with pass/fail cases
+
+#### Files to Modify
+- `src/generation/validation/ConstraintEvaluator.ts` (new)
+- `src/generation/validation/index.ts` (export)
+- `src/servers/authoring/commands/constraint.ts` (new command namespace)
+- `src/servers/authoring/server.ts` (register namespace)
+
+#### Notes
+The key insight is that ExpressionService already evaluates arithmetic/boolean expressions. Constraints extend this with domain-specific predicates (uniqueness, set membership, grid rules). The evaluator is a thin layer over ExpressionService + a few built-in predicate functions.
+
+Example chess constraint schema:
+```yaml
+name: chess_position
+description: Valid chess board position
+variables:
+  board:
+    type: grid
+    dimensions: [8, 8]
+    cell_type: string
+rules:
+  - type: unique
+    description: No two pieces on same square
+    target: board
+    key: position
+  - type: expression
+    description: Each side has exactly one king
+    expression: "count(board, 'K') == 1 && count(board, 'k') == 1"
+  - type: range
+    description: Pawns only on ranks 2-7
+    target: board
+    condition: "cell in ['P','p'] implies row >= 1 && row <= 6"
+```
+
+---
+
+### F1-002: Constraint Integration with Builders
+
+**Track:** F | **Status:** ⬜ | **Size:** M
+**Dependencies:** F1-001
+
+#### Context
+Builders should be able to reference constraint schemas to validate their decisions and placements. A chess board builder references the chess position constraint; a gear assembly builder references the gear meshing constraint.
+
+#### Acceptance Criteria
+- [ ] `constraints:` section in YAML builder format: references constraint schemas by key
+- [ ] Builder executor evaluates constraints after decisions and measurements are resolved
+- [ ] Constraint failures appear in validation.issues with severity 'error'
+- [ ] Constraint results included in TracedOutput for traceability
+- [ ] Quality gate: "all referenced constraints pass" as a Tier 2 requirement
+- [ ] Unit test: builder with constraint reference, pass and fail cases
+
+#### Files to Modify
+- `src/generation/builder/YamlBuilderTypes.ts` (constraints reference)
+- `src/generation/builder/YamlBuilderExecutor.ts` (constraint evaluation phase)
+- `src/generation/validation/ValidationAPI.ts` (constraint gate)
+
+---
+
+### F1-003: Built-in Domain Constraint Libraries
+
+**Track:** F | **Status:** ⬜ | **Size:** M
+**Dependencies:** F1-001
+
+#### Context
+Seed the constraint system with useful domain constraints that demonstrate the pattern and are immediately usable.
+
+#### Acceptance Criteria
+- [ ] `constraints/mechanical/gear_mesh` — pitch match, center distance, rotation direction
+- [ ] `constraints/spatial/no_overlap` — AABB non-intersection for placed objects
+- [ ] `constraints/spatial/clearance` — minimum distance between objects
+- [ ] `constraints/music/time_signature` — beats per bar, note duration sum
+- [ ] `constraints/chess/valid_position` — legal chess position rules
+- [ ] All constraints stored as metadata YAML files, loadable via `constraint.evaluate`
+- [ ] Documentation: each constraint has description and usage example
+
+#### Files to Create
+- `metadata/constraints/mechanical/gear_mesh.yaml`
+- `metadata/constraints/spatial/no_overlap.yaml`
+- `metadata/constraints/spatial/clearance.yaml`
+- `metadata/constraints/music/time_signature.yaml`
+- `metadata/constraints/chess/valid_position.yaml`
+
+---
+
+## F2: Style Definitions
+
+> **Goal:** Style as a first-class composable data object — not hardcoded conditionals, but a structured definition that any builder can consume.
+
+### F2-001: Style Schema and Resolution
+
+**Track:** F | **Status:** ⬜ | **Size:** L
+**Dependencies:** B3-001 ✅ (MetadataStore), F1-001 (constraint evaluation patterns)
+
+#### Context
+B3-003 seeded style palettes (modern, rustic, industrial) as flat metadata. This story promotes style to a first-class concept with structured effects on decisions, materials, proportions, and patterns.
+
+A style definition specifies:
+- **Decision defaults:** "if style is industrial, default `leg_style` to `square`"
+- **Material palette:** colors, roughness, metalness overrides
+- **Proportion rules:** ratios and relationships between measurements
+- **Pattern preferences:** symmetry type, repetition, ornamentation level
+
+When a builder is composed under a style, unset decisions inherit style defaults, materials resolve from the style palette, and proportion rules constrain measurements.
+
+#### Acceptance Criteria
+- [ ] `StyleDefinition` interface: name, decision_defaults, material_palette, proportion_rules, pattern_preferences
+- [ ] `decision_defaults`: map of `{decision_name: preferred_value}` — applied as fallback when decision is unset
+- [ ] `material_palette`: map of `{role: material_definition}` — e.g., `{primary_wood: {color: '#8B4513', roughness: 0.7}}`
+- [ ] `proportion_rules`: array of expressions that must hold (e.g., `table_height / chair_seat_height >= 1.15`)
+- [ ] `pattern_preferences`: `{symmetry: 'bilateral'|'radial'|'none', repetition: 'low'|'medium'|'high'}`
+- [ ] Styles stored in MetadataStore under `styles/` (upgrading existing B3-003 style metadata)
+- [ ] `resolveStyle(styleName)` loads and validates a style definition
+- [ ] YAML builder format: `style: <name>` at top level or in composition section
+- [ ] When `style:` is set, ExpressionService provides `$style.<property>` access
+- [ ] Decision resolution order: explicit override > style default > builder default > random
+- [ ] Material resolution: `$style.primary_wood` resolves to the style's palette entry
+- [ ] DSL commands:
+  - `style.define <name>` — creates/updates a style definition
+  - `style.list` — lists available styles
+  - `style.preview <name>` — shows style's decision defaults and palette
+- [ ] Unit tests for style loading, decision defaulting, material resolution, proportion validation
+
+#### Files to Modify
+- `src/generation/builder/StyleResolver.ts` (new)
+- `src/generation/builder/YamlBuilderTypes.ts` (style field)
+- `src/generation/builder/YamlBuilderExecutor.ts` (style integration in decision + material phases)
+- `src/generation/builder/ExpressionService.ts` ($style prefix support)
+- `src/servers/authoring/commands/style.ts` (new command namespace)
+- `metadata/styles/modern.yaml` (upgrade to StyleDefinition format)
+- `metadata/styles/rustic.yaml` (upgrade)
+- `metadata/styles/industrial.yaml` (upgrade)
+
+#### Notes
+The decision defaulting mechanism is the most impactful feature. Currently, a builder's decision is either explicitly overridden or randomly chosen. With style defaults, an entire scene can be given a coherent look by setting `style: mid_century_modern` at the top level — every sub-builder picks up appropriate defaults without explicit per-decision overrides.
+
+---
+
+### F2-002: Style Cascading in Composition
+
+**Track:** F | **Status:** ⬜ | **Size:** M
+**Dependencies:** F2-001
+
+#### Context
+When a parent builder sets `style: industrial`, all composed children should inherit that style (unless they override it). Style cascades through SharedContext.
+
+#### Acceptance Criteria
+- [ ] Parent `style:` value propagated to SharedContext
+- [ ] Child builders read style from SharedContext when not explicitly set
+- [ ] Child can override style: `compose: { builder: Lamp, style: art_deco }` overrides parent
+- [ ] Style defaults merge with explicit composition overrides (explicit wins)
+- [ ] Unit test: parent sets style, child inherits and uses style decision defaults
+- [ ] Unit test: child overrides parent style
+
+#### Files to Modify
+- `src/generation/builder/SharedContext.ts` (style propagation)
+- `src/generation/builder/YamlBuilderExecutor.ts` (style cascading in composition)
+
+---
+
+### F2-003: Style-Driven Material Theming
+
+**Track:** F | **Status:** ⬜ | **Size:** M
+**Dependencies:** F2-001, C3-001 ✅ (Material Slots)
+
+#### Context
+A style defines a material palette. Builders reference roles (`primary_wood`, `accent_metal`, `fabric`) rather than specific colors. The style resolves roles to concrete materials.
+
+#### Acceptance Criteria
+- [ ] YAML materials section supports `role: <name>` instead of explicit color
+- [ ] Role resolved from active style's material_palette
+- [ ] Fallback: if no style or role not in palette, use builder's explicit color
+- [ ] Style palette includes PBR properties (roughness, metalness) not just color
+- [ ] Changing style at scene level changes all material colors/properties across children
+- [ ] Unit test: same builder, two styles, produces different material colors
+
+#### Files to Modify
+- `src/generation/builder/MaterialResolver.ts` (role-based resolution)
+- `src/generation/builder/StyleResolver.ts` (palette lookup)
+- `src/generation/builder/YamlBuilderExecutor.ts` (wire into material phase)
+
+---
+
+## F3: Role-Based Composition
+
+> **Goal:** Compose builders by role + style, not by hardcoded builder name.
+
+### F3-001: Builder Role Registry
+
+**Track:** F | **Status:** ⬜ | **Size:** M
+**Dependencies:** F2-001, B3-001 ✅
+
+#### Context
+Currently, composition references specific builders by name: `compose: { builder: DiningChair }`. For style cascading to work at scale, the system should resolve builders by role: `compose: { role: seating }` picks the best builder for the current style.
+
+#### Acceptance Criteria
+- [ ] `BuilderRoleRegistry`: maps `(role, style?) -> builder_name` with priority/preference
+- [ ] Registry populated from metadata store: `builders/roles/<role>.yaml` lists candidates
+- [ ] Resolution: exact match (role + style) > role-only match > error
+- [ ] YAML composition: `role: <name>` as alternative to `builder: <name>`
+- [ ] When both `role:` and `style:` are present, lookup uses both
+- [ ] `builder.register_role <builder_name> role=<role> [style=<style>]` DSL command
+- [ ] `builder.list_roles` shows role -> builder mappings
+- [ ] Fallback: if no match, error with available options listed
+- [ ] Unit tests for registration, resolution, style-specific resolution, fallback
+
+#### Files to Modify
+- `src/generation/builder/BuilderRoleRegistry.ts` (new)
+- `src/generation/builder/YamlBuilderTypes.ts` (role field in YamlComposition)
+- `src/generation/builder/YamlBuilderExecutor.ts` (role resolution in composition)
+- `src/servers/authoring/commands/builder.ts` (register_role, list_roles commands)
+- `metadata/builders/roles/` (role definitions)
+
+---
+
+### F3-002: Role-Based Scene Templates
+
+**Track:** F | **Status:** ⬜ | **Size:** M
+**Dependencies:** F3-001
+
+#### Context
+With role-based composition, scene templates become style-independent. A "dining room" template composes `role: table`, `role: seating` (x4), `role: lighting`, `role: decoration`. Changing the style completely changes the output without modifying the template.
+
+#### Acceptance Criteria
+- [ ] Scene template YAML that uses only roles (no hardcoded builder names)
+- [ ] Scene template + `style: modern` produces modern furniture
+- [ ] Same template + `style: industrial` produces industrial furniture
+- [ ] Decision coverage: style decision at scene level cascades to all roles
+- [ ] At least one working template: DiningRoom with 4+ roles
+- [ ] Unit test: same template, different styles, different builder resolution
+
+#### Files to Create
+- `builders/scenes/templates/DiningRoom.yaml` (role-based template)
+
+---
+
+## F4: Cross-Builder Constraints
+
+> **Goal:** Measurement constraints that span sibling builders — proportion harmonics.
+
+### F4-001: Cross-Builder Proportion Rules
+
+**Track:** F | **Status:** ⬜ | **Size:** M
+**Dependencies:** F1-001, F2-001
+
+#### Context
+A style defines proportion rules: "table height / chair seat height = 1.15-1.25." These span multiple builders that are siblings in a composition. The constraint evaluator checks these after all children have generated their measurements.
+
+#### Acceptance Criteria
+- [ ] Style `proportion_rules` evaluated after composition completes
+- [ ] Rules reference measurements from sibling builders via path: `table.height / seating.seat_height`
+- [ ] Measurement values collected from SharedContext after all children run
+- [ ] Proportion violations reported as validation warnings (not blocking — proportions are guidelines)
+- [ ] `psd.check_proportions` DSL command evaluates proportion rules for the current scene
+- [ ] Unit test: compose table + chair, check proportion rule passes and fails
+
+#### Files to Modify
+- `src/generation/validation/ConstraintEvaluator.ts` (proportion rule evaluation)
+- `src/generation/builder/YamlBuilderExecutor.ts` (post-composition proportion check)
+- `src/servers/authoring/commands/psd.ts` (check_proportions command)
+
+---
+
+### F4-002: Assembly Metadata
+
+**Track:** F | **Status:** ⬜ | **Size:** S
+**Dependencies:** F4-001
+
+#### Context
+Mechanical assemblies (gears, joints) need non-spatial relationship metadata: "gear A meshes with gear B at ratio 3.5." This extends PSD with a `connections:` section.
+
+#### Acceptance Criteria
+- [ ] `PSDConnection` interface: `type`, `from` (prim path), `to` (prim path), `data` (key-value)
+- [ ] `connections:` section in YAML builder format
+- [ ] Connections serialized to PSD scene
+- [ ] `psd.connections` DSL command lists connections
+- [ ] Unit test: gear assembly with meshing connection, queryable
+
+#### Files to Modify
+- `src/generation/builder/PSD.ts` (PSDConnection, connections on PSDScene)
+- `src/generation/builder/YamlBuilderTypes.ts` (connections section)
+- `src/generation/builder/YamlBuilderExecutor.ts` (connection processing)
+- `src/servers/authoring/commands/psd.ts` (connections command)
+
+---
+
+# TRACK G: WORLD & SCENE CAPABILITIES
+
+## G1: Height Field Mesh
+
+> **Goal:** Generate terrain meshes from scalar fields — the foundation for landscapes, ground planes, and environment builders.
+
+### G1-001: Terrain Mesh Generation
+
+**Track:** G | **Status:** ⬜ | **Size:** L
+**Dependencies:** None (scalar fields and Mesh infrastructure exist)
+
+#### Context
+Scalar fields (Perlin noise, etc.) exist in platform/spatial. Mesh infrastructure exists in platform/geometry. The missing piece is converting a height field sample grid into a mesh with proper UVs and normals. This enables terrain builders that use the negotiation protocol (B5) to flatten pads for buildings.
+
+#### Acceptance Criteria
+- [ ] `MeshOperations.createHeightFieldMesh(options)` generates a grid mesh from a height function
+- [ ] Options: `width`, `depth`, `segmentsX`, `segmentsZ`, `heightFunction: (x, z) => y`
+- [ ] Generated mesh: proper triangulation (2 triangles per grid cell), computed normals, UV coordinates
+- [ ] UVs: (x/width, z/depth) — simple planar projection
+- [ ] Normals: per-vertex computed from adjacent face normals (smooth terrain)
+- [ ] Accepts optional `modifications` array: `{ type: 'flatten', center, radius, elevation }` for building pads
+- [ ] Deterministic: same height function + seed = same mesh
+- [ ] YAML `terrain:` geometry command with `noise_scale`, `noise_amplitude`, `segments`
+- [ ] Integration with B5 negotiation: terrain builder reads `terrain_clearance` requirements, flattens pads
+- [ ] Unit tests: flat plane, noisy terrain, terrain with flattened pad, UV/normal correctness
+
+#### Files to Modify
+- `src/platform/geometry/MeshOperations.ts` (createHeightFieldMesh)
+- `src/generation/builder/commands/TerrainCommand.ts` (new)
+- `src/generation/builder/commands/index.ts` (register)
+- `src/generation/builder/YamlBuilderTypes.ts` (terrain command type)
+
+---
+
+### G1-002: Chunk-Aligned Terrain
+
+**Track:** G | **Status:** ⬜ | **Size:** M
+**Dependencies:** G1-001
+
+#### Context
+For large worlds, terrain is generated in chunks. Adjacent chunks must share boundary vertices for seamless tiling. The height function must be evaluated deterministically at boundary points by both chunks.
+
+#### Acceptance Criteria
+- [ ] `TerrainChunk` interface: `chunkX`, `chunkZ`, `size`, mesh reference
+- [ ] Boundary vertex sharing: chunks at (0,0) and (1,0) share their x=size edge vertices
+- [ ] Height function receives world-space coordinates (not chunk-local) for deterministic boundaries
+- [ ] `world.generate_chunk <chunkX> <chunkZ>` DSL command generates a single terrain chunk
+- [ ] `world.generate_region <minX> <minZ> <maxX> <maxZ>` generates multiple chunks
+- [ ] Unit test: two adjacent chunks, verify boundary vertices match exactly
+
+#### Files to Modify
+- `src/platform/scene/TerrainChunk.ts` (new)
+- `src/servers/authoring/commands/world.ts` (new command namespace)
+
+---
+
+## G2: LOD System
+
+> **Goal:** Scene-level quality tier selection based on distance — generate less detail for distant objects.
+
+### G2-001: LOD-Conditional Composition
+
+**Track:** G | **Status:** ⬜ | **Size:** M
+**Dependencies:** A2-001 ✅ (quality tiers exist)
+
+#### Context
+Builders already have quality tiers (Tier 0-4). LOD maps directly: Tier 0 for distant objects (bounding box), Tier 1 for mid-distance, Tier 2+ for close-up. The missing piece is a scene-level system that decides which tier to request based on a distance/budget parameter.
+
+#### Acceptance Criteria
+- [ ] Composition syntax: `lod_min: <tier>` — only invoke sub-builder when scene LOD budget >= tier
+- [ ] `lod_tier: <tier>` — force sub-builder to generate at specific tier (overrides builder's target)
+- [ ] Scene-level `lod_budget: <tier>` parameter on scene builders
+- [ ] Below `lod_min`, sub-builder replaced with bounding box placeholder (Tier 0 behavior)
+- [ ] `scene.generate_at_lod <tier>` DSL command — re-generates current scene at specified LOD
+- [ ] Unit test: scene with lod_min=2 sub-builder, generate at LOD 1 (placeholder) and LOD 2 (full)
+
+#### Files to Modify
+- `src/generation/builder/YamlBuilderTypes.ts` (lod_min, lod_tier in YamlComposition)
+- `src/generation/builder/YamlBuilderExecutor.ts` (LOD check in composition phase)
+- `src/servers/authoring/commands/scene.ts` (generate_at_lod command)
+
+---
+
+### G2-002: View-Dependent Generation
+
+**Track:** G | **Status:** ⬜ | **Size:** L
+**Dependencies:** G2-001, G1-001
+
+#### Context
+Given a camera position and direction, determine which chunks/objects to generate and at what LOD. Distant objects get lower LOD, off-screen objects are skipped entirely.
+
+#### Acceptance Criteria
+- [ ] `world.generate_view position=<x,y,z> direction=<x,y,z> range=<N>` command
+- [ ] Computes visible chunks/objects based on frustum and distance
+- [ ] LOD tier assigned per-object based on distance from camera
+- [ ] Returns scene with mixed LOD levels
+- [ ] Progressive: calling with closer position generates more detail for nearby objects
+- [ ] Unit test: generate view, verify near objects are higher LOD than far objects
+
+#### Files to Modify
+- `src/platform/scene/ViewDependentGenerator.ts` (new)
+- `src/servers/authoring/commands/world.ts` (generate_view command)
+
+---
+
+## G3: UV Pipeline
+
+> **Goal:** Fix UV generation, add smart unwrapping, texture atlasing, and UV quality gates. This is the foundation for all procedural texturing.
+> **Design:** See `PBR_TEXTURE_EVALUATION.md` for detailed exploration.
+
+### G3-001: Per-Operation UV Fixes
+
+**Track:** G | **Status:** ⬜ | **Size:** M
+**Dependencies:** C4-001 ✅ (basic UVs exist)
+
+#### Context
+Current UV generation is inconsistent — each geometry operation generates its own UVs (if any) without coordination. This causes checker pattern distortion, inconsistent texel density, and missing UVs on caps/cut faces. Before any procedural texturing, we need correct per-operation UVs with world-scale consistency.
+
+#### Acceptance Criteria
+- [ ] Box: 6 planar projections with world-scale (1 UV unit = 1 meter by default)
+- [ ] Lathe: cylindrical mapping for body, planar projection for caps
+- [ ] Extrude: cylindrical for sides, planar for caps, scaled to world dimensions
+- [ ] Loft: interpolated UVs from edge loops with consistent parameterization
+- [ ] Boolean: re-project cut faces with planar projection based on face normal
+- [ ] `uv_mode` parameter on geometry commands: `world_scale` (default), `normalized` (0-1), `none`
+- [ ] All geometry commands output vertices with valid UV attributes
+- [ ] Unit tests: verify UV coverage, no NaN/undefined UVs, consistent texel density
+
+#### Files to Modify
+- `src/generation/builder/commands/BoxCommand.ts` (add UV generation)
+- `src/generation/builder/commands/LatheCommand.ts` (fix cap UVs)
+- `src/generation/builder/commands/ExtrudeCommand.ts` (world-scale UVs)
+- `src/generation/builder/commands/LoftCommand.ts` (interpolated UVs)
+- `src/platform/geometry/Boolean2D.ts` (cut face UV projection)
+- `src/generation/builder/YamlBuilderTypes.ts` (uv_mode parameter)
+
+---
+
+### G3-002: Smart UV Unwrapping
+
+**Track:** G | **Status:** ⬜ | **Size:** L
+**Dependencies:** G3-001
+
+#### Context
+Per-operation UVs are independent — each part uses [0,1] separately. For coherent texturing, we need global UV unwrapping: segment mesh by normals, unfold with minimal distortion, pack islands efficiently.
+
+#### Acceptance Criteria
+- [ ] `UVUnwrapper` class: takes mesh, outputs unwrapped UVs
+- [ ] Angle-based segmentation: faces with similar normals form UV islands (configurable angle threshold)
+- [ ] ABF (Angle-Based Flattening) or LSCM unwrapping per island
+- [ ] Island packing: MaxRects bin-packing into [0,1] texture space with configurable margin
+- [ ] Seam hints: `prefer_seam` and `avoid_seam` edge tags respected during segmentation
+- [ ] YAML `post_process.unwrap:` section with method, margin, pack options
+- [ ] DSL command `builder.unwrap [method=smart] [margin=0.01]`
+- [ ] Unwrap preserves part-to-island mapping for later texture assignment
+- [ ] Unit tests: unwrap chair, verify utilization > 60%, max stretch < 20%
+
+#### Files to Create
+- `src/platform/geometry/UVUnwrapper.ts`
+- `src/platform/geometry/IslandPacker.ts`
+
+#### Files to Modify
+- `src/generation/builder/YamlBuilderTypes.ts` (post_process.unwrap)
+- `src/generation/builder/YamlBuilderExecutor.ts` (unwrap phase)
+- `src/servers/authoring/commands/builder.ts` (unwrap command)
+
+---
+
+### G3-003: UV Quality Gates
+
+**Track:** G | **Status:** ⬜ | **Size:** S
+**Dependencies:** G3-001
+
+#### Context
+How do we know if UVs are good enough for texturing? We need quality metrics and machine-readable suggestions, similar to geometry quality gates.
+
+#### Acceptance Criteria
+- [ ] `UVQualityMetrics` interface: coverage, max_stretch, mean_stretch, utilization, density_variance, overlap_count
+- [ ] `evaluateUVQuality(mesh): UVQualityMetrics`
+- [ ] Coverage: percentage of faces with valid UVs (target: 100%)
+- [ ] Stretch: area/angle distortion per island (target: < 10% max)
+- [ ] Utilization: percentage of [0,1] texture space used (target: > 70%)
+- [ ] Density variance: ratio of max to min texel density (target: < 1.5x)
+- [ ] Overlap: count of overlapping UV islands (target: 0)
+- [ ] DSL command `builder.uv_quality` returns metrics + suggestions
+- [ ] Suggestions are machine-readable: `{ action, target, reason }`
+- [ ] Quality gates for Tier 3+ require passing UV quality thresholds
+- [ ] Unit tests for each metric
+
+#### Files to Create
+- `src/generation/validation/UVQualityGates.ts`
+
+#### Files to Modify
+- `src/generation/validation/QualityGates.ts` (integrate UV checks for Tier 3+)
+- `src/servers/authoring/commands/builder.ts` (uv_quality command)
+
+---
+
+## G4: Procedural Textures
+
+> **Goal:** Noise-based texture evaluation, mesh analysis (curvature, AO), material layering, and domain generators.
+
+### G4-001: Mesh Analysis Pipeline
+
+**Track:** G | **Status:** ⬜ | **Size:** M
+**Dependencies:** G3-001 (UVs exist)
+
+#### Context
+Procedural textures need mesh analysis data to intelligently place effects: wear on edges (curvature), dirt in crevices (AO), position-based patterns. This must be deterministic and baked to UV space.
+
+#### Acceptance Criteria
+- [ ] `MeshAnalysis` interface: curvature, ambientOcclusion, worldPosition, faceNormals per vertex/texel
+- [ ] `bakeMeshAnalysis(mesh, uvResolution): MeshAnalysis` — rasterizes mesh data to UV-space buffers
+- [ ] Per-vertex curvature: average angle between adjacent face normals (-1 concave to +1 convex)
+- [ ] Per-vertex AO: ray-based occlusion sampling (simplified, 16-32 rays per vertex)
+- [ ] World position stored per-vertex for triplanar/position-based effects
+- [ ] Deterministic: same mesh + UVs = same analysis
+- [ ] Unit tests: bake analysis for known mesh, verify curvature high on edges, AO high in crevices
+
+#### Files to Create
+- `src/platform/materials/MeshAnalysis.ts`
+
+#### Files to Modify
+- `src/demos/MeshMapBaker.ts` (extend existing baking or replace)
+
+---
+
+### G4-002: Procedural Texture Generators
+
+**Track:** G | **Status:** ⬜ | **Size:** L
+**Dependencies:** G4-001
+
+#### Context
+The noise infrastructure exists (ScalarField, perlin3d) but operates in 3D world space. Generators combine noise with domain knowledge to produce specific material effects.
+
+#### Acceptance Criteria
+- [ ] `TextureGenerator` interface: `evaluate(uv, params, meshAnalysis, seed) -> {albedo, normal, roughness, metallic, height}`
+- [ ] Noise functions extended: Perlin, Worley (Voronoi), FBM, domain warping — all seeded
+- [ ] Built-in generators:
+  - `wood_grain`: ring patterns, rays, species-specific color (oak, walnut, pine)
+  - `stone`: Voronoi cells with mortar lines
+  - `metal_brushed`: directional scratch noise
+  - `fabric_weave`: pattern-based (plain, twill, satin)
+  - `edge_wear`: curvature-driven wear (uses MeshAnalysis)
+  - `dirt_accumulation`: AO-driven grime (uses MeshAnalysis)
+  - `noise_color`: generic noise-to-color-ramp
+- [ ] Generator registry for extensibility
+- [ ] All generators produce coherent multi-channel output (albedo matches roughness matches normal)
+- [ ] YAML `generator:` section in material layers
+- [ ] Unit tests for each generator, verify determinism across runs
+
+#### Files to Create
+- `src/platform/materials/TextureGenerator.ts`
+- `src/platform/materials/generators/WoodGrainGenerator.ts`
+- `src/platform/materials/generators/StoneGenerator.ts`
+- `src/platform/materials/generators/MetalBrushedGenerator.ts`
+- `src/platform/materials/generators/WearGenerator.ts`
+- `src/platform/materials/generators/index.ts`
+
+---
+
+### G4-003: Material Layering
+
+**Track:** G | **Status:** ⬜ | **Size:** M
+**Dependencies:** G4-002
+
+#### Context
+Real materials have layers: base coat + grain + weathering + detail. The layer stack evaluates bottom-to-top with blend modes and masks.
+
+#### Acceptance Criteria
+- [ ] `MaterialLayer` interface: generator, blend_mode, opacity, mask
+- [ ] `MaterialStack`: ordered array of layers, evaluated bottom-to-top
+- [ ] Blend modes: normal, multiply, overlay, add, screen
+- [ ] Mask types: `uniform` (constant), `noise` (procedural), `curvature`, `ao`, `expression`
+- [ ] Expression masks: `curvature > 0.5 AND ao < 0.3` — parsed and evaluated
+- [ ] YAML `materials.X.layers:` section for layer stack definition
+- [ ] Material stack produces final per-texel values for all PBR channels
+- [ ] Unit test: base wood + edge wear overlay, verify wear concentrated on high curvature
+
+#### Files to Create
+- `src/platform/materials/MaterialStack.ts`
+- `src/platform/materials/MaskEvaluator.ts`
+
+#### Files to Modify
+- `src/generation/builder/YamlBuilderTypes.ts` (materials.X.layers)
+- `src/generation/builder/MaterialResolver.ts` (stack evaluation)
+
+---
+
+## G5: Decals & Text
+
+> **Goal:** Project decals and text onto textures for logos, branding, signage.
+
+### G5-001: Decal Projection System
+
+**Track:** G | **Status:** ⬜ | **Size:** M
+**Dependencies:** G4-003 (layer stack exists)
+
+#### Context
+Decals are projected texture overlays — a logo on a chair underside, a brand mark on a product. They're conceptually a layer, but with spatial projection instead of UV-space evaluation.
+
+#### Acceptance Criteria
+- [ ] `Decal` interface: source (image path or generator), projection, blend_mode, opacity
+- [ ] `DecalProjection` types: planar (origin, normal, size), cylindrical (axis, radius, height), spherical
+- [ ] `projectDecalToUV(decal, mesh, uvMapping)`: computes which texels are affected, with decal-space UVs
+- [ ] Decals composite into layer stack as a special layer type
+- [ ] YAML `decals:` section in materials: array of decal definitions
+- [ ] DSL command `builder.add_decal <material> source=X position=center size=0.05`
+- [ ] Image loading: PNG/JPEG from `assets/` folder or URL
+- [ ] Unit test: project logo onto flat surface, verify correct texel coverage
+
+#### Files to Create
+- `src/platform/materials/DecalProjector.ts`
+
+#### Files to Modify
+- `src/platform/materials/MaterialStack.ts` (decal layer type)
+- `src/generation/builder/YamlBuilderTypes.ts` (decals section)
+- `src/servers/authoring/commands/builder.ts` (add_decal command)
+
+---
+
+### G5-002: Text-to-Texture Rendering
+
+**Track:** G | **Status:** ⬜ | **Size:** M
+**Dependencies:** G5-001
+
+#### Context
+The platform already has TrueType font parsing for 3D text (FontParser, glyph outlines). Text-to-texture reuses this to rasterize glyphs into texture space for signage, labels, and branded variants.
+
+#### Acceptance Criteria
+- [ ] `TextLayer` interface: content (with $expression support), font, size, color, position, align
+- [ ] Glyph rasterizer: bezier curves → pixel buffer at target resolution
+- [ ] Text composited as a layer type in material stack
+- [ ] World-space size: `size: 0.1` means text is 0.1 meters tall in world space
+- [ ] Position in UV space or via decal-style projection onto specific parts
+- [ ] YAML `text_layers:` section in materials
+- [ ] DSL command `builder.add_text <material> content="ACME" font=Helvetica size=0.05`
+- [ ] Reuse existing `FontParser` and `Glyph` infrastructure
+- [ ] Unit test: render "HELLO" at 256px, verify pixel coverage matches glyph area
+
+#### Files to Create
+- `src/platform/materials/TextRasterizer.ts`
+
+#### Files to Modify
+- `src/platform/materials/MaterialStack.ts` (text layer type)
+- `src/generation/builder/YamlBuilderTypes.ts` (text_layers section)
+- `src/servers/authoring/commands/builder.ts` (add_text command)
+
+---
+
+## G6: Texture Baking
+
+> **Goal:** Bake procedural materials to PBR texture files. Integrate with glTF export and dashboard preview.
+
+### G6-001: Texture Baking Pipeline
+
+**Track:** G | **Status:** ⬜ | **Size:** L
+**Dependencies:** G4-003 (layer stack), G5-002 (text/decals)
+
+#### Context
+Procedural textures are evaluated per-texel and baked to image files. This is deterministic (seed-controlled) and produces portable assets. Runtime shader evaluation is explicitly NOT a goal — baked textures work everywhere.
+
+#### Acceptance Criteria
+- [ ] `TextureBaker` class: takes mesh, UVs, material stack, resolution → baked images
+- [ ] Outputs: albedo, normal, roughness, metallic, ao (5 images per material)
+- [ ] Resolution configurable: 512, 1024, 2048, 4096
+- [ ] Format: PNG (lossless) or JPEG (lossy, for albedo only)
+- [ ] Deterministic: same mesh + material + seed = identical output bytes
+- [ ] Baked textures written to `output/textures/<builder>_<material>_<channel>.png`
+- [ ] YAML `texture_output:` section: format, resolution, maps to bake
+- [ ] DSL command `builder.bake_textures [resolution=2048] [format=png]`
+- [ ] Returns paths to baked files and bake statistics (time, file sizes)
+- [ ] Unit test: bake wood material, verify file exists, correct dimensions, non-blank
+
+#### Files to Create
+- `src/platform/materials/TextureBaker.ts`
+- `src/platform/materials/ImageWriter.ts` (PNG/JPEG encoding — use pngjs or sharp)
+
+#### Files to Modify
+- `src/generation/builder/YamlBuilderTypes.ts` (texture_output section)
+- `src/servers/authoring/commands/builder.ts` (bake_textures command)
+
+---
+
+### G6-002: glTF Export with Baked Textures
+
+**Track:** G | **Status:** ⬜ | **Size:** M
+**Dependencies:** G6-001, C6-001 ✅
+
+#### Context
+glTF export currently includes materials as PBR values (color, roughness, metalness). With baked textures, we embed texture references into the glTF file.
+
+#### Acceptance Criteria
+- [ ] glTF materials reference baked texture files (relative paths or embedded base64)
+- [ ] Texture info: `baseColorTexture`, `metallicRoughnessTexture`, `normalTexture`, `occlusionTexture`
+- [ ] Combined roughness-metallic texture (glTF convention: green=roughness, blue=metallic)
+- [ ] Option: embed textures in GLB (single file) or reference external files
+- [ ] Exported GLB opens in Blender/Three.js with correct textures applied
+- [ ] DSL command `builder.export format=gltf include_textures=true`
+- [ ] Unit test: export textured chair, import in reference viewer, verify textures visible
+
+#### Files to Modify
+- `src/export/GLTFExporter.ts` (texture embedding/referencing)
+- `src/servers/authoring/commands/builder.ts` (export options)
+
+---
+
+### G6-003: Dashboard PBR Preview
+
+**Track:** G | **Status:** ⬜ | **Size:** M
+**Dependencies:** G6-001
+
+#### Context
+The dashboard uses Three.js for preview. When baked textures exist, the dashboard should display them using `MeshStandardMaterial`. When textures don't exist (fast iteration mode), fall back to plain colors.
+
+#### Acceptance Criteria
+- [ ] Dashboard detects when baked textures exist for current builder
+- [ ] If textures exist: create `MeshStandardMaterial` with texture maps
+- [ ] If no textures: use current behavior (vertex colors or flat materials)
+- [ ] Toggle in UI: "Show Textures" / "Show Colors" for fast switching
+- [ ] Texture loading: fetch from `/textures/<builder>_<material>_<channel>.png`
+- [ ] Hot-reload: when textures re-baked, dashboard updates preview
+- [ ] Normal map applied correctly (tangent space)
+- [ ] Performance: lazy-load textures only when toggled on
+- [ ] Unit test: mock texture files, verify material switches correctly
+
+#### Files to Modify
+- `src/servers/dashboard/main.ts` (or client-side dashboard code)
+- `dashboard.html` (texture toggle UI)
+
+---
+
+### G6-004: Texture Housekeeping
+
+**Track:** G | **Status:** ⬜ | **Size:** S
+**Dependencies:** G6-001
+
+#### Context
+Baked textures accumulate over time — different seeds, resolutions, experiments. We need housekeeping commands to manage the texture cache and prevent unbounded growth.
+
+#### Acceptance Criteria
+- [ ] `output/textures/` is the managed texture cache directory
+- [ ] DSL command `texture.list [builder]` — list all baked textures, sizes, dates
+- [ ] DSL command `texture.clean [builder] [older_than=7d]` — remove old/orphaned textures
+- [ ] DSL command `texture.size` — report total cache size
+- [ ] Orphan detection: textures for builders that no longer exist
+- [ ] Optional: texture manifest file tracks which textures belong to which builder/seed
+- [ ] Clean operation is non-destructive by default (dry-run), `--force` to actually delete
+- [ ] Unit test: create temp textures, run clean, verify removal
+
+#### Files to Create
+- `src/storage/TextureCache.ts`
+
+#### Files to Modify
+- `src/servers/authoring/commands/texture.ts` (new command namespace)
+- `src/servers/authoring/CommandRegistry.ts` (register texture commands)
+
+---
+
+## G7: Billboard Primitives
+
+> **Goal:** Camera-facing quad primitives for particles, effects, and vegetation cards.
+
+### G7-001: Billboard Geometry and Instancing
+
+**Track:** G | **Status:** ⬜ | **Size:** S
 **Dependencies:** None
-**Completed:** 2026-02-01
 
 #### Context
-We had no way to detect topology issues without manual inspection. Added automated detection of:
-- Non-manifold edges (shared by >2 faces)
-- Inconsistent face winding (adjacent faces with same edge direction)
-- Isolated vertices (not used by any face)
-- Boundary edges (informational - mesh not watertight)
-
-#### Completed Work
-- ✅ `checkMeshTopology()` function in MeshChecks.ts
-- ✅ `formatTopologyIssues()` for human-readable output
-- ✅ Integration into `validateBuilder()` and `builder.validate` command
-- ✅ New validation checks: mesh_topology, mesh_topology_winding, mesh_topology_manifold, mesh_topology_isolated
-
-#### Files Modified
-- `src/generation/validation/MeshChecks.ts` (topology validation)
-- `src/generation/validation/ValidationAPI.ts` (integration)
-
----
-
-### C0-002: Fix Face Winding in Cap Operations
-
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** C0-001 ✅
-**Completed:** 2026-02-02
-
-#### Context
-The `cap` command and cap generation in `extrude2D` may generate faces with inconsistent winding relative to the sides. Originally reported as ~32 winding issues in the old DiningChair.
-
-#### Resolution
-- ✅ `capLoop()` winding is correct — cylinder test (8-segment and 12-segment) passes with 0 winding issues
-- ✅ `extrude2D` cap faces consistent with side faces (verified by extruded rectangle/circle tests)
-- ✅ Old DiningChair (Tier 1) deleted — its 6 remaining issues were from manually defined faces, not cap operations
-- ✅ DiningChairTier2 promoted to catalog/DiningChair with 0 topology issues
-- ✅ Unit tests: cap winding with 8-gon and 12-gon (n-gon) faces, single-flipped-face detection
-
-#### Files Modified
-- `src/tests/__tests__/TopologyValidation.test.ts` (n-gon cap test, flipped face test)
-
----
-
-### C0-003: Fix Face Winding in Loft Operations
-
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** C0-001 ✅
-**Completed:** 2026-02-01
-
-#### Context
-Loft between circles was generating faces with inconsistent winding relative to caps, causing topology warnings.
-
-#### Completed Work
-- ✅ Fixed `loftLoops()` winding: `[loop1[next], loop2[next], loop2[i], loop1[i]]`
-- ✅ Now compatible with cap convention: loop1 (bottom) flip=true, loop2 (top) flip=false
-- ✅ Unit test: cylinder with loft+caps passes topology validation
-- ✅ DiningChair winding issues reduced from 32 to 6 (remaining issues are manual face definitions)
-
-#### Files Modified
-- `src/generation/builder/TracedBuilder.ts` (loftLoops winding fix)
-- `src/tests/__tests__/TopologyValidation.test.ts` (cylinder test)
-
----
-
-### C0-004: Fix Face Winding in Bevel Operations
-
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** C0-001 ✅
-**Completed:** 2026-02-01
-
-#### Context
-The bevel operation was generating completely wrong geometry with inverted/scrambled faces.
-
-#### Completed Work
-- ✅ Rewrote `MeshOperations.bevel()` with correct chamfer algorithm
-- ✅ Per-face vertex creation for beveled corners (pulled inward along face bisector)
-- ✅ Chamfer face winding now checks original edge direction for consistency
-- ✅ Beveled box passes topology validation with 0 winding issues
-- ✅ Unit test: beveled box topology validation
-
-#### Known Limitations
-- ~~Multi-segment smooth bevel not implemented~~ **RESOLVED** - multi-segment smooth bevel now works. Intermediate vertices are interpolated along a circular arc between the two face planes, producing a smooth curved profile. Tests pass for segments 1-4+.
-
-#### Files Modified
-- `src/platform/geometry/MeshOperations.ts` (complete bevel rewrite)
-- `src/tests/__tests__/TopologyValidation.test.ts` (added beveled box test)
-
----
-
-### C0-005: Fix Face Winding in Extrude2D Operations
-
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** C0-001 ✅
-**Completed:** 2026-02-01
-
-#### Context
-Extrude2D side faces had inverted winding, causing visual artifacts and topology warnings.
-
-#### Completed Work
-- ✅ Fixed side face winding in `extrude2D()`: now uses [i1, i3, i4] and [i1, i4, i2] instead of [i1, i2, i4] and [i1, i4, i3]
-- ✅ Fixed side face winding in `extrude2DWithBevel()` similarly
-- ✅ Unit tests: extruded rectangle and circle pass topology validation
-- ✅ All 23 extrude tests still pass
-
-#### Files Modified
-- `src/platform/geometry/Extrude.ts` (side face winding fix)
-- `src/tests/__tests__/TopologyValidation.test.ts` (added extrude tests)
-
----
-
-## C1: 2D Booleans
-
-> **Goal:** Union, subtract, intersect operations on 2D shapes/polygons.
-
-### C1-001: 2D Polygon Clipping Library
-
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** L
-**Dependencies:** None
-**Completed:** 2026-02-01
-
-#### Context
-2D booleans are needed for: glyph holes in text, gear tooth profiles, mechanical parts, architectural floor plans. This is the most-requested missing geometry tool.
-
-#### Completed Work
-- ✅ Implemented polygon clipping using Greiner-Hormann algorithm with Sutherland-Hodgman for intersection
-- ✅ Operations: union, subtract, intersect
-- ✅ Handles: convex and concave polygons, polygons with holes
-- ✅ Output: PolygonWithHoles (outer boundary + hole boundaries) and BooleanResult (multi-polygon)
-- ✅ Shape2D integration: unionShapes, subtractShapes, intersectShapes, subtractShapesWithHoles
-- ✅ Multiple shape operations: unionMultiple, subtractMultiple
-- ✅ Unit tests: 22 tests covering all operations and edge cases
-- ✅ Exported from platform/geometry module
-
-#### Technical Details
-- Uses Greiner-Hormann for complex union/subtract, Sutherland-Hodgman for intersection (faster for convex cases)
-- Handles special cases: containment, disjoint polygons, identical polygons, touching edges
-- Returns hole information for subtract operations (useful for extrusion with holes)
-- Tolerances use EPSILON = 1e-10 for floating point comparisons
-
-#### Files Modified
-- `src/platform/geometry/PolygonBoolean.ts` (new - 700+ lines)
-- `src/platform/geometry/index.ts` (added export)
-- `src/tests/__tests__/PolygonBoolean.test.ts` (new - 22 tests)
-
----
-
-### C1-002: 2D Boolean DSL Integration
-
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** C1-001 ✅
-**Completed:** 2026-02-01
-
-#### Context
-Expose 2D booleans in YAML builders so profiles can be combined.
-
-#### Completed Work
-- ✅ DSL command `geometry.boolean2d op=<union|subtract|intersect> subject=<shape> clip=<shape>`
-- ✅ Shape specification syntax: `rect:width,height,x,z` or `circle:radius,segments,x,z`
-- ✅ Returns result polygon count, total area, and per-polygon info
-- ✅ YAML `shapes:` section supports `type: boolean` with `operation`, `subject`, `clip` properties
-- ✅ Boolean shapes can reference other shapes (rect, circle, ellipse, polygon, or nested boolean)
-- ✅ Result usable as input to extrude2d command
-- ✅ Nested boolean operations supported (chained operations preserve holes)
-- ✅ `clips` array support: subtract multiple shapes in one operation (e.g., `clips: [hole1, hole2, hole3]`)
-- ✅ DSL command documentation in DSL_COMMANDS.md
-- ✅ Integration tests: 11 tests in BooleanShapes.test.ts (including multi-hole tests)
-
-#### Technical Details
-- Added `boolean` type to YamlShape interface with `clip` (single) and `clips` (array) options
-- Shape resolution is recursive via `resolveShapeToPolygon()` returning `PolygonWithHoles` — holes survive through nested boolean chains
-- `applyBooleanOp()` accumulates holes from subject and each clip subtraction
-- `clips` array and chained booleans produce equivalent results (verified by test)
-- Works with both literal numeric values and expression strings
-
-#### Files Modified
-- `src/servers/authoring/commands/geometry.ts` (added boolean2d command)
-- `src/generation/builder/YamlBuilderParser.ts` (boolean shape type + multi-hole support)
-- `docs/DSL_COMMANDS.md` (documented geometry.boolean2d)
-- `src/tests/__tests__/BooleanShapes.test.ts` (11 integration tests)
-
----
-
-### C1-003: Wire Text Glyph Holes Through 2D Booleans
-
-**Track:** C | **Status:** ✅ **COMPLETE (Alternative Approach)** | **Size:** S
-**Dependencies:** C1-001 ✅, B1-002
-**Completed:** 2026-02-01
-
-#### Context
-Original goal was to use 2D booleans for text glyph holes. However, the Simple Font procedural text system was not well-suited for this approach. Instead, we demonstrated 2D boolean operations with mechanical part examples that properly show holes in extruded geometry.
-
-#### Completed Work (Alternative Approach)
-- ✅ Upgraded `Gear.yaml` to use 2D boolean subtract for hub hole and hub ring
-- ✅ Created `PlateWithHoles.yaml` - rectangular plate with circular center hole
-- ✅ Created `examples/SimpleRing.yaml` - canonical ring/washer shape (circle minus circle)
-- ✅ Fixed `extrude2DWithHoles()` integration in YamlBuilderParser to properly extrude shapes with holes
-- ✅ Updated GearBuilder tests to verify 2D boolean functionality
-
-#### Demo Builders
-| Builder | Shape | Holes | Description |
-|---------|-------|-------|-------------|
-| `examples/SimpleRing` | Circle | 1 circle | Ring/washer - simplest boolean hole demo |
-| `PlateWithHoles` | Rectangle | 5 circles | Metal plate with center hole + 4 mounting holes (uses `clips` array) |
-| `Gear` | Circle | 1 circle | Gear body with hub hole, plus hub ring and teeth |
-
-#### Technical Details
-- When `subtract()` returns holes (clip fully inside subject), `extrude2DWithHoles()` is called
-- `extrude2DWithHoles()` uses earcut triangulation for proper ring-shaped caps
-- Gear hub_ring uses `offset: gear_thickness` to sit ON TOP of gear_body (avoids z-fighting)
-- Boolean shapes work with expressions (e.g., `center: { x: corner_x, z: corner_z }`)
-- Multiple holes supported via `clips` array or chained boolean subtractions (holes preserved through nesting)
-
-#### Known Limitations
-- **Bevel not supported with holes**: Shapes with holes are extruded without bevel (warning is printed)
-
-#### Files Modified
-- `builders/Gear.yaml` (upgraded to use 2D boolean for hub)
-- `builders/PlateWithHoles.yaml` (multi-hole demo with clips array — 5 holes)
-- `builders/examples/SimpleRing.yaml` (new - canonical hole demo)
-- `src/generation/builder/YamlBuilderParser.ts` (hole-aware shape resolution + clips array)
-- `src/tests/__tests__/GearBuilder.test.ts` (updated for new structure)
-
----
-
-## C2: Bevel & Chamfer
-
-> **Goal:** Edge treatment operations for hard-surface finish quality.
-
-### C2-001: Edge Selection
-
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** None
-**Completed:** 2026-02-01
-
-#### Context
-Before beveling, we need to identify which edges to bevel. Artists typically bevel by angle threshold ("bevel all edges sharper than 30 degrees") or by explicit selection.
+Smoke, sparkles, glow effects, and distant vegetation are commonly rendered as camera-facing quads (billboards). This is a new primitive type — simple geometry but needs special handling in export (glTF extras or sprite extension).
 
 #### Acceptance Criteria
-- [x] `Mesh.getSharpEdges(angleThreshold)` returns edge list
-- [x] `Mesh.getEdgesByTag(tag)` returns tagged edges (for explicit selection)
-- [x] Edge represented as `[vertexA, vertexB, faceLeft, faceRight]`
-- [x] Unit tests (15 tests passing)
-
-#### Completed Work
-- ✅ `MeshEdge` interface with `vertexA`, `vertexB`, `faceLeft`, `faceRight`, `tag`
-- ✅ `Mesh.getEdges()` returns all edges with adjacent face info
-- ✅ `Mesh.getSharpEdges(angleThreshold)` filters by angle between faces
-- ✅ `Mesh.getBoundaryEdges()` returns edges with only one face
-- ✅ `Mesh.tagEdges(selector, tag)` tags edges matching a selector function
-- ✅ `Mesh.getEdgesByTag(tag)` retrieves tagged edges
-- ✅ `Mesh.getEdgeMidpoint(edge)` returns edge center position
-- ✅ `Mesh.getEdgeDirection(edge)` returns normalized direction vector
-- ✅ `Mesh.getEdgeLength(edge)` returns edge length
-
-#### Files Modified
-- `src/platform/geometry/Mesh.ts`
-- `src/tests/__tests__/EdgeSelection.test.ts`
-
----
-
-### C2-002: Bevel Operation
-
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** L
-**Dependencies:** C2-001
-**Completed:** 2026-02-01
-
-#### Context
-Bevel adds geometry at edges to create smooth light-catching transitions. Essential for any hard-surface asset that doesn't look like a programmer's cube.
-
-#### Acceptance Criteria
-- [x] `MeshOperations.bevel(mesh, edges, width, segments)` returns beveled mesh
-- [x] 1 segment = chamfer (flat cut), 2+ segments = smooth bevel
-- [x] Works on box primitives (most common case)
-- [x] Works on sphere/other primitives
-- [x] Preserves existing vertex colors/materials
-- [x] Unit tests with vertex/face count validation (12 tests)
-
-#### Completed Work
-- ✅ `MeshOperations.bevel()` static method added
-- ✅ Edge-based vertex splitting and bevel geometry creation
-- ✅ Width clamping to prevent self-intersection
-- ✅ Multi-segment smooth bevels (interpolates face normals)
-- ✅ Vertex color and face color preservation
-- ✅ Comprehensive test coverage
-
-#### Files Modified
-- `src/platform/geometry/MeshOperations.ts`
-- `src/tests/__tests__/Bevel.test.ts`
-
----
-
-### C2-003: Bevel DSL Integration
-
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** S
-**Dependencies:** C2-002
-**Completed:** 2026-02-01
-
-#### Context
-Expose bevel in YAML builders.
-
-#### Acceptance Criteria
-- [x] YAML `bevel:` command with `width`, `segments`, `angle_threshold` parameters
-- [x] Applies to preceding geometry command's output
-- [x] DSL command documentation
-- [x] Integration test with a builder that uses bevel (4 tests)
-
-#### Completed Work
-- ✅ `bevel:` command type added to YamlGeometryCommand
-- ✅ Command handler in processGeometry using evaluatePositionComponent for expressions
-- ✅ Documentation in DSL_COMMANDS.md with examples
-- ✅ Example builder: `builders/BeveledBox.yaml` *(deleted 2026-02-01 - had topology issues, bevel demonstrated in DiningChairTier2 and Gear)*
-- ✅ Integration tests: `BevelDSL.test.ts` (4 tests)
-
-#### Files Modified
-- `src/generation/builder/YamlBuilderParser.ts`
-- `docs/DSL_COMMANDS.md`
-- `builders/BeveledBox.yaml` *(deleted)*
-- `src/tests/__tests__/BevelDSL.test.ts`
-
----
-
-## C3: Material Slots
-
-> **Goal:** Named material regions instead of just vertex colors.
-
-### C3-001: Material Slot System
-
-**Track:** C | **Status:** ⬜ | **Size:** M
-**Dependencies:** None
-
-#### Context
-Currently materials are vertex colors only. For proper asset output (glTF, PSD), we need named material slots that map face ranges to material definitions.
-
-#### Acceptance Criteria
-- [ ] `MaterialSlot` type: name, color, roughness, metalness (PBR-ready)
-- [ ] `Mesh.materialSlots: MaterialSlot[]` with per-face slot index
-- [ ] YAML `materials:` section defines named slots
-- [ ] Geometry commands reference slots by name
-- [ ] Backward compatible (vertex colors still work as fallback)
-- [ ] Unit tests
+- [ ] `billboard:` geometry command: creates a quad with `width`, `height`, `facing` (camera|axis)
+- [ ] Billboard prims flagged in PSD: `type: billboard` with facing mode
+- [ ] Instancing works: scatter 100 billboards efficiently
+- [ ] glTF export: billboards as quads with `extras.billboard: true` (renderers handle orientation)
+- [ ] Dashboard: billboards rendered as quads (no special camera-facing needed in authoring view)
+- [ ] Unit test: create billboard, verify quad geometry, PSD type
 
 #### Files to Modify
-- `src/platform/geometry/Mesh.ts`
-- `src/generation/builder/MaterialLibrary.ts`
-- `src/generation/builder/YamlBuilderParser.ts`
+- `src/generation/builder/commands/BillboardCommand.ts` (new)
+- `src/generation/builder/commands/index.ts` (register)
+- `src/generation/builder/YamlBuilderTypes.ts` (billboard command type)
+- `src/generation/builder/PSD.ts` (billboard prim type or flag)
 
 ---
 
-### C3-002: Dashboard Material Rendering
+# TRACK H: PHASE 3 DEMOS
 
-**Track:** C | **Status:** ⬜ | **Size:** S
-**Dependencies:** C3-001
+> Each demo proves a convergence of Phase 3 capabilities on a vision-inspired scene.
+
+### H1-001: Rigged Creature
+
+**Track:** H | **Status:** ⬜ | **Size:** XL
+**Dependencies:** E1-002 (skeleton composition), E2-001 (weights), E4-001 (skeleton export)
 
 #### Context
-Dashboard should render material slots, not just vertex colors.
+Vision Example #3: A hybrid creature with skeleton, joints, and weights. Each body part from a different sub-builder. Exported to glTF with a working rig.
 
 #### Acceptance Criteria
-- [ ] Dashboard reads material slots from mesh
-- [ ] Each slot rendered with its color (PBR properties can be visualized later)
-- [ ] Fallback to vertex colors when no slots defined
-- [ ] Works with existing builders (no visual regression)
+- [ ] Creature builder composes: body (horse-like), wings (eagle-like), tail (scorpion-like) — simplified/stylized geometry
+- [ ] Each part declares its own skeleton section
+- [ ] Composed skeleton merges correctly (wing_L.shoulder attaches to body.spine)
+- [ ] Vertex weights assigned by proximity rules
+- [ ] Joint constraints defined (hinge for knees, ball_and_socket for shoulders)
+- [ ] Exports to glTF with working skin (importable in Blender, poses correctly)
+- [ ] Builder passes Tier 2 quality gates
+- [ ] 5+ seeds produce visually distinct but anatomically correct creatures
 
-#### Files to Modify
-- `src/servers/dashboard/main.ts`
+#### Files to Create
+- `builders/catalog/components/HorseBody.yaml`
+- `builders/catalog/components/EagleWing.yaml`
+- `builders/catalog/components/ScorpionTail.yaml`
+- `builders/catalog/HybridCreature.yaml`
 
 ---
 
-## C4: Basic UV Generation
+### H2-001: Styled Room
 
-> **Goal:** Automatic UV coordinates for common geometry operations.
-
-### C4-001: Operation-Specific UV Generation
-
-**Track:** C | **Status:** ⬜ | **Size:** L
-**Dependencies:** None
+**Track:** H | **Status:** ⬜ | **Size:** L
+**Dependencies:** F2-002 (style cascading), F3-002 (role-based templates)
 
 #### Context
-Lathe, sweep, and extrude have natural UV mappings (parametric). Generate UVs automatically during these operations rather than needing a separate unwrap step.
+Vision Examples #9 and #10: Same room template, completely different output based on style. Proves style cascading, role-based composition, and material theming.
 
 #### Acceptance Criteria
-- [ ] Lathe: UV mapped as (angle/2pi, height_t) -- cylindrical projection
-- [ ] Sweep: UV mapped as (path_t, profile_t)
-- [ ] Extrude: UV mapped as (x, y) on caps, (perimeter_t, height_t) on sides
-- [ ] Box: UV mapped per-face (standard box unwrap)
-- [ ] UV stored as `Vec2` on vertices
-- [ ] Unit tests verifying UV range [0,1] and continuity
+- [ ] Role-based room template with: table, seating (x4), lighting, decoration
+- [ ] `style: mid_century_modern` produces: tapered round legs, organic curves, walnut tones
+- [ ] `style: industrial` produces: square steel legs, angular forms, black/grey/rust
+- [ ] All materials resolve from style palette (no hardcoded colors in sub-builders)
+- [ ] Style decision at scene level produces genuinely different geometry in every component
+- [ ] Exports to glTF (two files: modern and industrial)
+- [ ] Side-by-side comparison meaningful (not just color changes — geometry differs)
 
-#### Files to Modify
-- `src/platform/geometry/Vertex.ts` (add UV field)
-- `src/platform/geometry/MeshOperations.ts`
-- `src/platform/geometry/Sweep.ts`
-- `src/platform/geometry/Extrude.ts`
+#### Files to Create
+- `builders/scenes/templates/StyledRoom.yaml`
+- `metadata/styles/mid_century_modern.yaml` (full StyleDefinition)
+- Builder registrations for each role/style combination
 
 ---
 
-### C4-002: UV in Dashboard and Export
+### H3-001: Chess Board
 
-**Track:** C | **Status:** ⬜ | **Size:** S
-**Dependencies:** C4-001, C3-001
+**Track:** H | **Status:** ⬜ | **Size:** L
+**Dependencies:** F1-002 (constraint integration), B2-003 ✅ (PSD queries)
 
 #### Context
-UVs should be visible in dashboard (checkerboard preview) and included in export.
+Vision Example #1: A chess board with pieces in a legal mid-game position. The position is generated by the builder using domain constraints, not hardcoded. An agent can query the PSD scene to count pieces, determine their positions, and verify the position is legal.
 
 #### Acceptance Criteria
-- [ ] Dashboard can show checkerboard texture on UV-mapped meshes (toggle)
-- [ ] PSD format includes UV data
-- [ ] glTF export includes UV data (when C6 is built)
+- [ ] Chess board builder: 8x8 board with alternating colors
+- [ ] Chess piece builders (simplified): king, queen, rook, bishop, knight, pawn — lathe profiles
+- [ ] Position generator: produces a legal mid-game position using chess constraint schema
+- [ ] Pieces placed on correct squares using placement system
+- [ ] PSD tags on pieces: `piece: king`, `color: white`, `square: e1`
+- [ ] Agent can query: `psd.query_by_tag piece:king` returns king positions
+- [ ] `psd.overview` shows board + piece count summary
+- [ ] Constraint schema: `constraints/chess/valid_position` validates the generated position
+- [ ] Exports to glTF (complete board with pieces)
+- [ ] 5+ seeds produce different legal positions
 
-#### Files to Modify
-- `src/servers/dashboard/main.ts`
-- `src/generation/builder/PSD.ts`
-
----
-
-## C5: Deformers
-
-> **Goal:** Parametric deformations that break the CG-perfect look.
-
-### C5-001: Noise Displacement
-
-**Track:** C | **Status:** ✅ **COMPLETE** | **Size:** M
-**Dependencies:** None
-**Completed:** 2026-02-02
-
-#### Context
-The simplest deformer: displace vertices along their normals by a noise function. Makes surfaces look hand-shaped, weathered, or organic.
-
-#### Completed Work
-- ✅ `MeshOperations.displaceByNoise(mesh, amplitude, frequency, seed)` returns deformed mesh
-- ✅ Uses existing Perlin noise infrastructure (`perlin3d` from MathService)
-- ✅ Displacement along vertex normals
-- ✅ Normals recalculated after displacement
-- ✅ YAML `displace:` command with expression support for amplitude/frequency
-- ✅ Unit tests (8 tests) + integration tests (3 tests) in NoiseDisplacement.test.ts
-
-#### Files Modified
-- `src/platform/geometry/MeshOperations.ts` (added `displaceByNoise` method)
-- `src/generation/builder/commands/DisplaceCommand.ts` (new command handler)
-- `src/generation/builder/commands/index.ts` (registered DisplaceCommandHandler)
-- `src/generation/builder/YamlBuilderTypes.ts` (added `displace` to YamlGeometryCommand union)
-- `src/tests/__tests__/NoiseDisplacement.test.ts` (new - 11 tests)
-- `src/tests/__tests__/GeometryCommandHandler.test.ts` (updated registry size to 17)
+#### Files to Create
+- `builders/catalog/ChessBoard.yaml`
+- `builders/catalog/components/ChessPiece.yaml` (parameterized by piece type)
+- `metadata/constraints/chess/valid_position.yaml`
 
 ---
 
-### C5-002: Bend & Twist
+### H4-001: Village on Terrain
 
-**Track:** C | **Status:** ⬜ | **Size:** M
-**Dependencies:** None
+**Track:** H | **Status:** ⬜ | **Size:** XL
+**Dependencies:** G1-001 (terrain), G2-001 (LOD), B5-002 ✅ (negotiation)
 
 #### Context
-Parametric deformers that bend or twist geometry along an axis. Used for organic shapes, cables, stylized forms.
+Vision Example #13: Houses on hilly terrain, using negotiation protocol. Houses publish `terrain_clearance` requirements; terrain flattens pads and publishes elevation offers; houses adapt foundation height.
 
 #### Acceptance Criteria
-- [ ] `MeshOperations.bend(mesh, axis, angle, center)` bends mesh around axis
-- [ ] `MeshOperations.twist(mesh, axis, angle)` twists mesh along axis
-- [ ] Both preserve mesh topology
-- [ ] YAML `bend:` and `twist:` commands
-- [ ] Unit tests
+- [ ] Terrain builder: height field mesh from noise, processes clearance requirements
+- [ ] House builder (simplified): box house with pitched roof, publishes terrain_clearance requirement
+- [ ] 3-5 houses placed on terrain, each adapted to local elevation
+- [ ] Terrain visibly flattened where houses sit
+- [ ] Road or path connecting houses (optional stretch goal)
+- [ ] LOD: houses at distance rendered as simple boxes
+- [ ] Tree scatter on terrain (using existing TreeScatter pattern)
+- [ ] PSD scene queryable: `psd.overview` shows terrain + houses + trees
+- [ ] Exports to glTF
+- [ ] 3+ seeds produce different village layouts on different terrain
 
-#### Files to Modify
-- `src/platform/geometry/MeshOperations.ts`
-- `src/generation/builder/YamlBuilderParser.ts`
+#### Files to Create
+- `builders/catalog/TerrainPatch.yaml`
+- `builders/catalog/components/SimpleHouse.yaml`
+- `builders/scenes/Village.yaml`
 
 ---
 
-### C5-003: Taper
+### H5-001: Textured Furniture
 
-**Track:** C | **Status:** ⬜ | **Size:** S
-**Dependencies:** None
+**Track:** H | **Status:** ⬜ | **Size:** L
+**Dependencies:** G6-002 (glTF with textures), G5-002 (text/decals), G4-003 (material layers)
 
 #### Context
-Scale geometry progressively along an axis. Already partially available via loft with different-sized loops, but a post-hoc taper is useful for existing meshes.
+The ultimate proof of the PBR texture pipeline: DiningChair with full procedural textures, wear patterns, and a branded variant with decal and text.
 
 #### Acceptance Criteria
-- [ ] `MeshOperations.taper(mesh, axis, startScale, endScale)` applies progressive scale
-- [ ] Works on any mesh (not just lofted)
-- [ ] YAML `taper:` command
-- [ ] Unit test
+- [ ] DiningChair upgraded with procedural materials:
+  - Wood frame: oak wood_grain generator + edge_wear + oil_finish layers
+  - Fabric seat (if cushion): fabric_weave generator + wear_fade
+- [ ] UV pipeline: chair mesh unwrapped with < 10% stretch, > 70% utilization
+- [ ] Mesh analysis baked: curvature and AO used for wear placement
+- [ ] Baked textures: albedo, normal, roughness, metallic, AO at 2048px
+- [ ] Textures deterministic: same seed produces identical texture files
+- [ ] Branded variant: "ACME Furniture" logo decal on seat underside
+- [ ] Branded variant: "ACME" text on back top rail
+- [ ] Dashboard PBR preview: chair rendered with MeshStandardMaterial + textures
+- [ ] Dashboard toggle: switch between textured and plain color modes
+- [ ] glTF export with embedded textures opens correctly in Blender
+- [ ] 3+ seeds produce visually distinct wear patterns while maintaining quality
 
 #### Files to Modify
-- `src/platform/geometry/MeshOperations.ts`
-- `src/generation/builder/YamlBuilderParser.ts`
+- `builders/catalog/DiningChair.yaml` (add materials.layers, uv_layout, texture_output)
+
+#### Files to Create
+- `assets/logos/acme_furniture.png` (sample logo)
 
 ---
 
-## C6: glTF Export
+# DEFERRED WORK (Carried from Phase 2 + New)
 
-> **Goal:** Export builder output to standard 3D format.
+> These remain valid but are explicitly deferred until Phase 3 tracks are substantially complete.
 
-### C6-001: Basic glTF Exporter
+## Carried from Phase 2
 
-**Track:** C | **Status:** ⬜ | **Size:** L
-**Dependencies:** C3-001, C4-001
+| Area | Why Deferred | Prerequisite |
+|------|-------------|--------------|
+| 3D Boolean CSG | Complex, only needed for architecture | C1 (2D booleans) ✅ proves approach |
+| Botanical / L-Systems | Vegetation generation, not authoring platform | C5 ✅, G1 (terrain for placement) |
+| Cloth & Soft Bodies | Character domain only | E-track (rigging) + deformers |
+| Characters / PersonBuilder | Capstone | E-track + F-track + morph targets |
+| Renderer Package | Deployment concern | C6 ✅ (glTF export) |
+| Text & Advanced 2D | Nice-to-have typography | Signage domain demand |
 
-#### Context
-glTF is the standard interchange format. Exporting to it makes Procedurable output usable in any 3D tool, game engine, or web viewer.
+## New Phase 3+ Deferrals
 
-#### Acceptance Criteria
-- [ ] `exportGLTF(mesh | PSDScene)` produces valid .gltf + .bin files
-- [ ] Geometry: positions, normals, UVs (when available)
-- [ ] Materials: PBR material from material slots (color, roughness, metalness)
-- [ ] Instances exported as nodes referencing shared mesh data
-- [ ] Validates with glTF validator
-- [ ] DSL command `builder.export_gltf <name> <path>`
-- [ ] Integration test
-
-#### Files to Modify
-- `src/export/GLTFExporter.ts` (new)
-- `src/servers/authoring/commands/builder.ts`
-
----
-
-### C6-002: Scene Export
-
-**Track:** C | **Status:** ⬜ | **Size:** M
-**Dependencies:** C6-001, B2-002
-
-#### Context
-Export composed scenes (multiple builders) as a single glTF with proper hierarchy.
-
-#### Acceptance Criteria
-- [ ] Composed scene exports with parent-child transform hierarchy
-- [ ] Instances share mesh data (not duplicated)
-- [ ] Material slots preserved across composed parts
-- [ ] DiningScene exports as valid glTF with table + chairs
-
-#### Files to Modify
-- `src/export/GLTFExporter.ts`
+| Area | Why Deferred | Prerequisite |
+|------|-------------|--------------|
+| Voxelization / Grid Snapping | LEGO/Minecraft styles (Scene #9) | F2 (style modifiers) |
+| Event-Driven Placement | Narrative scenes (Scene #11) | F1 (constraints), placement system |
+| Agent Memory Across Sessions | Learning from iteration history | B3 ✅ (metadata store) |
+| Builder Snapshot / Rollback | Undo for agent iteration | B4 ✅ (DSL authoring) + git integration |
+| Smooth LOD Transitions | Cross-fade/morph between LOD levels | G2 (LOD) + E3 (morph targets) |
+| Multi-Pass Composition | True multi-phase builder execution | B5 ✅ proves single-pass ordering works first |
 
 ---
 
-## C7: Symmetry Operations
+## Recommended Execution Order
 
-> **Goal:** Mirror, radial array, and translational symmetry — fundamental geometry operations missing from the toolkit. Essential for Art Deco, mechanical parts, natural forms, and any style with intentional repetition.
+### Wave 1 (Parallel — foundational, no interdependencies)
+- **E1-001**: Skeleton Declaration (enables all rigging)
+- **F1-001**: Constraint Schema (enables domain knowledge)
+- **G1-001**: Height Field Mesh (enables terrain)
+- **G3-001**: Per-Operation UV Fixes (enables all texturing)
 
-### C7-001: Mirror Operation
+### Wave 2 (Parallel — builds on Wave 1)
+- **E1-002**: Skeleton Composition (needs E1-001)
+- **E2-001**: Vertex Weights (needs E1-001)
+- **F1-002**: Constraint Integration (needs F1-001)
+- **F2-001**: Style Schema (needs F1-001 patterns)
+- **G3-002**: Smart UV Unwrapping (needs G3-001)
+- **G3-003**: UV Quality Gates (needs G3-001)
 
-**Track:** C | **Status:** ⬜ | **Size:** M
-**Dependencies:** None
+### Wave 3 (Parallel — builds on Wave 2)
+- **E3-001**: Morph Targets (independent but best after E2)
+- **F1-003**: Built-in Constraint Libraries (needs F1-001)
+- **F2-002**: Style Cascading (needs F2-001)
+- **F2-003**: Style-Driven Materials (needs F2-001)
+- **G1-002**: Chunk-Aligned Terrain (needs G1-001)
+- **G2-001**: LOD-Conditional Composition (independent)
+- **G4-001**: Mesh Analysis Pipeline (needs G3-001)
 
-#### Context
-Mirror is the most common symmetry operation in 3D modeling. Build half a chair, mirror it. Build one gear tooth, radially array it. Currently builders must manually duplicate and transform geometry, which is error-prone and verbose.
+### Wave 4 (Parallel — needs Waves 1-3)
+- **E2-002**: Weight Visualization (needs E2-001)
+- **E3-002**: Morph Target in PSD/Dashboard (needs E3-001)
+- **E4-001**: Skeleton Export (needs E1, E2)
+- **E4-002**: Morph Target Export (needs E3)
+- **F3-001**: Builder Role Registry (needs F2-001)
+- **G4-002**: Procedural Texture Generators (needs G4-001)
+- **G7-001**: Billboard Primitives (independent)
 
-#### Acceptance Criteria
-- [ ] `MeshOperations.mirror(mesh, plane)` returns mirrored mesh (plane defined by point + normal)
-- [ ] Option to merge mirrored mesh with original (`weld: true` merges boundary vertices)
-- [ ] Handles vertex colors and material slots correctly (mirrored, not flipped)
-- [ ] Normals correctly flipped on mirrored faces
-- [ ] YAML `mirror:` command with `plane` and `weld` parameters
-- [ ] Unit tests including weld boundary case
+### Wave 5 (Integration — needs Waves 1-4)
+- **F3-002**: Role-Based Scene Templates (needs F3-001)
+- **F4-001**: Cross-Builder Proportions (needs F1, F2)
+- **F4-002**: Assembly Metadata (needs F4-001)
+- **G2-002**: View-Dependent Generation (needs G2-001, G1)
+- **G4-003**: Material Layering (needs G4-002)
+- **G5-001**: Decal Projection (needs G4-003)
+- **G5-002**: Text-to-Texture (needs G5-001)
 
-#### Files to Modify
-- `src/platform/geometry/MeshOperations.ts`
-- `src/generation/builder/YamlBuilderParser.ts`
-- `docs/DSL_COMMANDS.md`
+### Wave 6 (Texture Baking — needs Waves 1-5)
+- **G6-001**: Texture Baking Pipeline (needs G4-003, G5-002)
+- **G6-002**: glTF Export with Textures (needs G6-001)
+- **G6-003**: Dashboard PBR Preview (needs G6-001)
+- **G6-004**: Texture Housekeeping (needs G6-001)
 
----
-
-### C7-002: Radial Array
-
-**Track:** C | **Status:** ⬜ | **Size:** M
-**Dependencies:** None
-
-#### Context
-Duplicate geometry N times around an axis. Used for gear teeth, table legs, flower petals, wheel spokes — any radially symmetric form. More general than `repeat` composition since it operates on raw geometry, not sub-builders.
-
-#### Acceptance Criteria
-- [ ] `MeshOperations.radialArray(mesh, axis, count)` returns arrayed mesh
-- [ ] Axis defined by point + direction
-- [ ] Option to merge adjacent copies (`weld: true`)
-- [ ] Option for partial array (e.g., 180° instead of 360°): `angle` parameter
-- [ ] YAML `radial_array:` command
-- [ ] Unit tests
-
-#### Files to Modify
-- `src/platform/geometry/MeshOperations.ts`
-- `src/generation/builder/YamlBuilderParser.ts`
-- `docs/DSL_COMMANDS.md`
-
----
-
-# TRACK D: DOMAIN DEMOS (QUALITY PROOF)
-
-> Each demo is a single story that rebuilds an existing builder to Tier 2 quality, proving the platform and tools work together.
-
-### D1-001: DiningChair at Tier 2
-
-**Track:** D | **Status:** ✅ **COMPLETE** | **Size:** XL
-**Dependencies:** A2-001 ✅, C2-003 ✅
-**Completed:** 2026-02-02
-
-#### Context
-The DiningChair was the poster child for "stick figure quality." Rebuilt so every decision produces different geometry, every part has proper volume, and passes Tier 2 quality gates.
-
-#### Completed Work
-- ✅ Created `DiningChairTier2.yaml` with distinct geometry per decision (2026-02-01)
-- ✅ Promoted to `builders/catalog/DiningChair.yaml`, old Tier 1 version deleted (2026-02-02)
-- ✅ `back_style`: 4 different geometries (solid, slat, ladder, spindle)
-- ✅ `leg_style`: 3 different geometries (round, tapered, square)
-- ✅ All parts have thickness (boxes and lofted cylinders)
-- ✅ 2 materials defined (wood, wood_dark)
-- ✅ 0 topology issues (winding, non-manifold, isolated vertices)
-- ✅ 100% decision coverage (all 7 geometry-affecting decisions produce different output)
-
-#### Acceptance Criteria
-- [x] `back_style` decision produces 4 genuinely different back geometries (solid panel, slats, ladder, spindles)
-- [x] `leg_style` decision produces different cross-sections (round, square, tapered)
-- [ ] `seat_shape` decision affects seat geometry (flat, contoured, rounded) - deferred to future work
-- [x] All parts have thickness (no single-face geometry)
-- [ ] Seat has edge radius or bevel - deferred (needs C2 integration in YAML)
-- [x] At least 2 materials (wood body, wood_dark accents)
-- [x] Quality section documents Tier 3 upgrade path
-
-#### Files Modified
-- `builders/catalog/DiningChair.yaml` (promoted from DiningChairTier2)
-- `builders/DiningChair.yaml` (old Tier 1 — deleted)
-- `src/generation/builder/commands/CircleCommand.ts` (default normal)
-- `src/generation/builder/YamlBuilderExecutor.ts` (include decisions in expression eval)
+### Wave 7 (Demos — prove everything)
+- **H1-001**: Rigged Creature (needs E1-E4)
+- **H2-001**: Styled Room (needs F2, F3)
+- **H3-001**: Chess Board (needs F1)
+- **H4-001**: Village on Terrain (needs G1, G2, B5 ✅)
+- **H5-001**: Textured Furniture (needs G3-G6)
 
 ---
 
-### D2-001: Vase at Tier 2
+## Success Criteria (Phase 3)
 
-**Track:** D | **Status:** ⬜ | **Size:** L
-**Dependencies:** A2-001, C5-001
+Phase 3 is complete when:
 
-#### Context
-The Vase builder has good bones (lathe) but minimal variety and no surface detail.
-
-#### Acceptance Criteria
-- [ ] `vase_style` decision produces genuinely different profiles (not just height variation)
-- [ ] Lip and foot detail: rim profile, foot ring, transition curves
-- [ ] Surface variation via noise displacement (subtle, not random)
-- [ ] At least 2 materials (body, glaze accent)
-- [ ] Passes Tier 2 quality gates
-- [ ] Quality section with honest Tier 3 gaps
-
-#### Files to Modify
-- `builders/catalog/Vase.yaml` (rewrite)
-
----
-
-### D3-001: Gear at Tier 2
-
-**Track:** D | **Status:** 🟡 **PARTIAL** | **Size:** L
-**Dependencies:** A2-001 ✅, C1-002 ✅
-
-#### Context
-The Gear builder was upgraded as part of C1-003 to demonstrate 2D boolean operations. It now passes all Tier 2 quality gates but uses simplified rectangular teeth rather than involute profiles.
-
-#### Current State (2026-02-01)
-- ✅ Passes all Tier 2 quality gates (13/13)
-- ✅ 2D boolean subtract for hub hole (gear_body = disc minus hole)
-- ✅ Hub ring with proper offset (no z-fighting)
-- ✅ Radial array of teeth
-- ✅ Decisions: tooth_count (8-32), gear_style (beveled/rounded)
-- ⬜ Teeth are rectangular (not involute profile)
-- ⬜ No web/spoke structure (solid disc)
-
-#### Remaining Acceptance Criteria
-- [ ] Involute tooth profile (or simplified trapezoidal) via 2D booleans
-- [ ] Additional decisions: module, pressure angle, bore diameter
-- [ ] Hub/web/rim structure (not just a flat disc with teeth)
-
-#### Files to Modify
-- `builders/test-fixtures/Gear.yaml` (enhance, then promote to catalog/ when teeth are improved)
-
----
-
-### D4-001: Furnished Room at Tier 2
-
-**Track:** D | **Status:** ⬜ | **Size:** XL
-**Dependencies:** D1-001, D2-001, B2-002
-
-#### Context
-A composed scene where every component passes Tier 2 quality. This is the integration proof.
-
-#### Acceptance Criteria
-- [ ] Room with table, chairs, and at least one decorative object (vase)
-- [ ] All composed builders pass Tier 2 individually
-- [ ] Composition itself is quality-gated (no overlapping objects, reasonable layout)
-- [ ] Exports to PSD format
-- [ ] Decision variety: style decisions cascade through components (modern room → modern chair)
-- [ ] Renders in dashboard across 5+ seeds with no visual glitches
-
-#### Files to Modify
-- `builders/scenes/ThemedRoom.yaml` or `builders/scenes/DiningScene.yaml` (rewrite)
-
----
-
-# DEFERRED WORK
-
-> These items are from the old backlog. They remain valid but are explicitly deferred. They are listed here for reference so nothing is lost. Each includes the reason for deferral and what would need to change for it to be picked up.
-
-## Deferred: 3D Boolean CSG (was P2-M5)
-**Reason:** Complex implementation, error-prone, only needed for architecture domain (doors/windows in walls). 2D booleans (C1) are more broadly useful and prove the approach.
-**Pick up when:** Architecture domain becomes a priority and C1 is complete.
-
-## Deferred: Botanical / L-Systems (was P2-M6)
-**Reason:** Only needed for vegetation. The existing scatter + instancing system handles tree placement. L-systems add tree *generation* which is a separate domain.
-**Pick up when:** Tree/plant quality matters and C5 (deformers) is complete.
-
-## Deferred: Advanced Materials (was P2-M7)
-**Reason:** Layer stacks, PBR textures, and procedural textures need material slots (C3) and UVs (C4) as prerequisites.
-**Pick up when:** C3 and C4 are complete and domain demos (Track D) expose material limitations.
-
-## Deferred: Cloth & Soft Bodies (was P2-M8)
-**Reason:** Only needed for characters. Static drape is the first useful step but requires deformers.
-**Pick up when:** Character domain becomes a priority and C5 (deformers) is complete.
-
-## Deferred: Characters / PersonBuilder (was P2-M9)
-**Reason:** Capstone that requires nearly everything else. Cannot be built well until materials, deformers, and ideally cloth are available.
-**Pick up when:** Tracks A-D are substantially complete.
-
-## Deferred: Renderer Package (was P2-M10)
-**Reason:** Deployment concern, not authoring. The dashboard serves current visualization needs.
-**Pick up when:** External consumers need to embed Procedurable output and C6 (glTF export) is complete.
-
-## Deferred: Text & Advanced 2D (remaining P2-M4 stories)
-**Reason:** Text-on-path, typography domain model, and calligraphy strokes are nice-to-have. The basic text-to-shape pipeline works. Glyph holes (B1-002/C1-003) are the critical fix.
-**Pick up when:** Signage domain builders expose specific typography limitations.
-
-## Deferred: Animation & Physics (Phase 3)
-**Reason:** Rigging, animation, physics are Phase 3. Vertex weight stubs should be added in C4 (UV work touches Vertex class).
-**Pick up when:** Phase 2 revised is complete.
-
-## Deferred: Asset Analyzer Framework (P3-Advanced)
-**Reason:** Research-grade work for importing external assets. Not needed for the authoring platform.
-**Pick up when:** Users request batch import of large asset libraries.
+1. A builder can declare a skeleton with joints, weights, and constraints in YAML, and export a rigged glTF that can be posed in Blender
+2. An agent can define a new domain constraint schema (e.g., chess rules) via DSL without any TypeScript changes
+3. Setting `style: X` at a scene level cascades meaningful visual changes (geometry + materials) to all composed children
+4. A terrain builder processes negotiation requirements from building builders and produces adapted terrain
+5. At least one demo scene from each Track H milestone passes Tier 2 quality gates
+6. All Phase 3 demos export to valid glTF files
+7. No Phase 3 feature required modifying platform geometry operations for domain-specific logic (domain logic lives in metadata/constraints/styles)
+8. A builder can declare procedural PBR materials and bake them to texture files (albedo, normal, roughness, metallic, AO)
+9. The dashboard can render baked PBR textures using Three.js MeshStandardMaterial
+10. Decals and text can be procedurally projected into baked textures
+11. Texture housekeeping commands exist to manage baked texture cache
+12. Textured furniture demo (H5) exports with embedded textures and opens correctly in Blender

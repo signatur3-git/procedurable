@@ -149,7 +149,8 @@ describe('Topology Validation', () => {
 
     it('should detect a single flipped face on an otherwise correct box', () => {
       // Gap test: detect winding error when only 1 of 6 faces is wrong
-      const box = MeshOperations.createBox(1, 1, 1);
+      // Use shared-vertex box for topology testing
+      const box = MeshOperations.createBoxWithSharedVertices(1, 1, 1);
 
       // Flip the first face by reversing its indices
       const flippedIndices = [...box.faces[0].indices].reverse();

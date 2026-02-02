@@ -2,63 +2,101 @@
 
 Surface appearance and non-destructive mesh post-processing.
 
-## Materials [minimal]
+## Materials [implemented — C3-001]
 
 ### Current State
 
-`MaterialLibrary` provides named color presets. Materials are applied as vertex colors — no UV-based texturing, no PBR properties.
+Procedurable supports two material systems that work together:
+
+1. **Named color presets** (legacy) — `MaterialLibrary` provides color lookups, applied as vertex colors
+2. **Material slots** (C3-001) — PBR-ready named slots with per-face assignment
 
 ```typescript
+// Legacy: color-only presets
 MaterialLibrary.get("oak")     → { r: 0.76, g: 0.60, b: 0.42 }
 MaterialLibrary.get("steel")   → { r: 0.78, g: 0.78, b: 0.80 }
+
+// New: full MaterialSlot with PBR properties
+interface MaterialSlot {
+  name: string;
+  color: RGBColor;
+  roughness: number;   // 0.0 (mirror) to 1.0 (rough), default 0.5
+  metalness: number;   // 0.0 (dielectric) to 1.0 (metal), default 0.0
+}
 ```
 
-### Target State: Named Material Slots [planned — C3]
+### Material Slots in YAML
 
-Instead of painting vertex colors, builders assign **named material slots** to mesh regions:
+Builders define named materials with PBR properties in the `materials:` section:
 
 ```yaml
 materials:
-  seat:
-    slot: primary_wood
-    default: oak
-  legs:
-    slot: primary_wood
-    default: $seat_material    # inherits from seat decision
-  cushion:
-    slot: fabric
-    default: linen_cream
+  wood:
+    color: wood_oak        # named color, hex (#8B4513), or conditional
+    roughness: 0.8
+    metalness: 0.0
+  metal:
+    color: metal_steel
+    roughness: 0.2
+    metalness: 0.9
+
+geometry:
+  - box:
+      name: table_top
+      center: { x: 0, y: 0.75, z: 0 }
+      size: { x: 1.2, y: 0.05, z: 0.8 }
+      color: $wood           # $-prefix references a named material slot
+  - box:
+      name: leg_bracket
+      center: { x: 0.5, y: 0.4, z: 0.3 }
+      size: { x: 0.05, y: 0.05, z: 0.05 }
+      color: $metal          # different material slot
+  - box:
+      name: accent
+      center: { x: 0, y: 0, z: 0 }
+      size: { x: 0.1, y: 0.1, z: 0.1 }
+      color: '#ff0000'       # inline color — no slot assigned (backward compat)
 ```
 
-Each slot has a name, a default value, and can be overridden. At export time, slots map to:
-- Vertex colors (current dashboard)
-- PBR material definitions (glTF export)
-- Material IDs (renderer integration)
+The `$material_name` syntax resolves both the color (for vertex color fallback) and the material slot index (for PBR export).
 
 ### Material Pipeline
 
 ```
 Builder YAML
-  │ declares material slots
+  │ materials: section defines named MaterialSlots
   ▼
-TracedBuilder
-  │ assigns slot to each face during geometry creation
+YamlBuilderExecutor (Phase 2.5)
+  │ resolveMaterialSlots() → registers slots on Mesh
   ▼
-Mesh faces tagged with slot name
-  │
-  ▼ (at export/render time)
-MaterialResolver
-  │ maps slot name → concrete material properties
-  │ (color, roughness, metallic, texture)
+Geometry Commands
+  │ resolveGeometryMaterial() → resolves color + slot index
+  │ Face created with both color AND materialSlotIndex
   ▼
-Output format (vertex colors / glTF materials / etc.)
+Mesh
+  │ materialSlots: MaterialSlot[] (deduplicated by name)
+  │ faces[i].materialSlotIndex → index into materialSlots
+  │ faces[i].color → vertex color fallback
+  ▼
+Output format:
+  ├── Dashboard: renders vertex colors (existing)
+  ├── PSD: material slots serialized (existing B2)
+  └── glTF: PBR materials from slots (planned C6)
 ```
+
+### Key Design Decisions
+
+- **Per-face, not per-vertex:** Material assignment is per-face via `Face.materialSlotIndex`, not per-vertex
+- **Deduplication:** `Mesh.addMaterialSlot()` deduplicates by name — same name returns existing index
+- **Merge-safe:** `Mesh.merge()` remaps slot indices so merged meshes maintain correct assignments
+- **Backward compatible:** Faces without a slot index fall back to vertex colors
+- **`$`-prefix convention:** `$wood` in geometry commands means "use the material slot named wood"; `wood_oak` without `$` means "use the named color directly"
 
 ### Why Slots Matter
 
-- **Consistency:** All "primary_wood" surfaces across a scene use the same material
-- **Override-friendly:** Agent says `material.set primary_wood walnut` and everything updates
+- **Consistency:** All `$wood` surfaces across a scene use the same material
 - **Export-ready:** glTF needs material definitions, not vertex colors
+- **PBR properties:** roughness and metalness travel with the slot, not just color
 - **Quality tier:** Tier 2 requires >= 2 distinct materials
 
 ## Modifiers [planned]

@@ -1,0 +1,56 @@
+# Style Palettes - Industrial
+# Raw, utilitarian, exposed materials
+
+key: styles/industrial
+createdAt: "2026-02-02T00:00:00.000Z"
+modifiedAt: "2026-02-02T00:00:00.000Z"
+description: Industrial design style - raw, utilitarian, exposed construction
+tags:
+  - style
+  - industrial
+  - urban
+
+value:
+  name: Industrial
+  description: Raw materials, exposed construction, utilitarian aesthetic
+
+  colors:
+    primary:
+      - { name: raw_steel, hex: "#71797E", rgb: [0.44, 0.47, 0.49] }
+      - { name: matte_black, hex: "#28282B", rgb: [0.16, 0.16, 0.17] }
+      - { name: concrete_grey, hex: "#808080", rgb: [0.5, 0.5, 0.5] }
+    accent:
+      - { name: rust, hex: "#8B4513", rgb: [0.55, 0.27, 0.07] }
+      - { name: copper_patina, hex: "#6D8B74", rgb: [0.43, 0.55, 0.45] }
+      - { name: edison_amber, hex: "#FFB347", rgb: [1.0, 0.70, 0.28] }
+    neutral:
+      - { name: aged_wood, hex: "#5C4033", rgb: [0.36, 0.25, 0.20] }
+      - { name: raw_concrete, hex: "#A9A9A9", rgb: [0.66, 0.66, 0.66] }
+
+  materials:
+    primary:
+      - { name: raw_steel, roughness: 0.4, metalness: 0.9 }
+      - { name: brushed_metal, roughness: 0.5, metalness: 0.85 }
+      - { name: cast_iron, roughness: 0.6, metalness: 0.75 }
+    secondary:
+      - { name: reclaimed_wood, roughness: 0.8, metalness: 0.0 }
+      - { name: exposed_brick, roughness: 0.9, metalness: 0.0 }
+      - { name: polished_concrete, roughness: 0.5, metalness: 0.0 }
+
+  proportions:
+    edge_radius: 0.0          # Sharp edges
+    leg_taper: 0.0            # No taper (structural)
+    bevel_width: 0.0          # No bevels
+    symmetry: functional      # Driven by function, not aesthetics
+
+  ornamentation:
+    level: none
+    allowed:
+      - exposed_hardware
+      - visible_welds
+      - patina
+      - rivet_details
+    forbidden:
+      - decorative_carving
+      - ornamental_curves
+      - painted_finishes

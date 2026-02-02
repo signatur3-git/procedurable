@@ -3,7 +3,7 @@ layout: home
 hero:
   name: Procedurable
   text: Decision-Driven Procedural Authoring
-  tagline: Target architecture reference for a platform where agents author 3D content through knowledge and builders
+  tagline: A platform where agents author 3D content through knowledge and builders — Phase 2 complete, Phase 3 in progress
   actions:
     - theme: brand
       text: Component Map
@@ -20,7 +20,7 @@ features:
   - title: YAML Builders
     details: Builders are declarative YAML files that compose decisions, measurements, geometry operations, and sub-builders. No imperative code required for authoring new content.
   - title: Quality Tiers
-    details: Four quality tiers (Placeholder → Art-Directed) with automated validation gates. Agents know what "done" means at each level.
+    details: Three quality tiers (Tier 0-2) with automated validation gates. Agents know what "done" means at each level. Decision coverage testing ensures all choices matter.
   - title: Agent-Native
     details: MCP protocol integration gives AI agents the same affordances as humans — discover, inspect, modify, validate, and accumulate knowledge.
 ---
@@ -62,7 +62,7 @@ The layers enforce a dependency rule: each layer may only depend on the layer di
 The **Builder Engine** uses a modular architecture:
 - `YamlBuilderParser` (118 lines) - entry point, delegates to executor
 - `YamlBuilderExecutor` (669 lines) - processes 7 phases
-- Command Registry - 14 geometry command handlers for extensibility
+- Command Registry - 22 geometry command handlers for extensibility
 
 ## What Makes This Different
 

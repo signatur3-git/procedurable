@@ -1,16 +1,18 @@
 # Quality Tiers
 
-Four levels of geometric quality, each with measurable criteria.
+Three levels of geometric quality currently supported, with automated validation gates.
+
+> **Updated:** 2026-02-03 (Phase 2 complete — all Tier 0-2 gates implemented)
 
 ## Overview
 
-| Tier | Name | Triangles | Materials | Use Case |
-|------|------|-----------|-----------|----------|
-| 0 | Placeholder | < 100 | 0-1 | Layout, spatial planning |
-| 1 | Sketch | 100-1,000 | 1 | Silhouette, rapid prototyping |
-| 2 | Form-Resolved | 1,000-10,000 | 2+ | Presentable, compositional |
-| 3 | Detail-Resolved | 10,000-100,000 | 3+ | Portfolio, near-final |
-| 4 | Art-Directed | 100,000+ | Full PBR | Production, export-ready |
+| Tier | Name | Triangles | Materials | Status |
+|------|------|-----------|-----------|--------|
+| 0 | Placeholder | < 100 | 0-1 | ✅ Automated gates |
+| 1 | Sketch | 100-1,000 | 1 | ✅ Automated gates |
+| 2 | Form-Resolved | 1,000-10,000 | 2+ | ✅ Automated gates |
+| 3 | Detail-Resolved | 10,000-100,000 | 3+ | ⬜ Phase 3+ |
+| 4 | Art-Directed | 100,000+ | Full PBR | ⬜ Future |
 
 ## Tier 0: Placeholder
 
@@ -32,11 +34,11 @@ Four levels of geometric quality, each with measurable criteria.
 - Minimum 100 triangles
 - Recognizable as intended object
 
-**Current state:** This is where most builders are today (DiningChair, Table).
+**Use case:** Rapid prototyping, testing composition and placement before investing in detail.
 
-**The problem:** Agents tend to stop here because there's no quality gate telling them to continue.
+**Note:** Agents now have quality gates that signal when Tier 1 is insufficient, with machine-readable suggestions for upgrading to Tier 2.
 
-## Tier 2: Form-Resolved
+## Tier 2: Form-Resolved ✅
 
 **What it looks like:** All parts have 3D volume. Legs are rounded (lathe, not extrude). Edges are beveled. At least 2 materials. Different decisions produce visibly different results.
 
@@ -48,15 +50,15 @@ Four levels of geometric quality, each with measurable criteria.
 - Every `choice` decision produces geometrically distinct output
 - No stick-figure parts (minimum cross-section per part)
 
-**Platform requirements:**
-- Bevel/chamfer [C2] — for edge treatment
-- Material slots [C3] — for multi-material
-- Quality gates [A2] — for automated checking
-- Decision coverage testing [A3] — for verifying decisions matter
+**Platform requirements (all complete):**
+- Bevel/chamfer [C2] ✅ — for edge treatment
+- Material slots [C3] ✅ — for multi-material
+- Quality gates [A2] ✅ — for automated checking
+- Decision coverage testing [A3] ✅ — for verifying decisions matter
 
-**This is the Phase 2 target.** Getting builders to Tier 2 means the platform is viable for serious procedural content.
+**This was the Phase 2 target — now achieved.** DiningChair and Vase are flagship Tier 2 examples with 100% decision coverage.
 
-## Tier 3: Detail-Resolved
+## Tier 3: Detail-Resolved (Phase 3+)
 
 **What it looks like:** Edge bevels visible. Joinery details (mortise & tenon hints). Cross-sections are accurate (not circular approximations). Surface variation from noise/deformers. UV coordinates for texturing.
 
@@ -69,16 +71,18 @@ Four levels of geometric quality, each with measurable criteria.
 - Part-level detail (screws, joints, trim)
 
 **Platform requirements:**
-- Everything in Tier 2, plus:
-- UV generation [C4]
-- Deformers [C5]
-- Part-level tagging
+- Everything in Tier 2 ✅, plus:
+- UV generation [C4] ✅
+- Deformers [C5] ✅
+- Part-level tagging (needs work)
 
-## Tier 4: Art-Directed
+**Status:** Infrastructure is ready from Phase 2. Tier 3 gates not yet automated.
+
+## Tier 4: Art-Directed (Future)
 
 **What it looks like:** Portfolio quality. Full PBR materials with textures. LOD variants for different viewing distances. Export-ready glTF with proper scene hierarchy. Animation-ready if applicable.
 
-**Not yet achievable.** Requires full material pipeline, texture authoring, and export tooling.
+**Status:** Requires procedural textures (G3), LOD system (G2), and rigging (E-track) from Phase 3.
 
 ## Quality Declaration in YAML
 

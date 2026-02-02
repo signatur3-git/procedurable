@@ -33,8 +33,8 @@ export class BevelCommandHandler extends BaseGeometryCommandHandler {
       ? evaluateExpression(bevelCmd.angle_threshold)
       : Math.PI / 6;
 
-    // Get the current mesh
-    const currentMesh = builder.getMesh();
+    // Weld coincident vertices for proper edge topology (needed for 24-vertex boxes etc.)
+    const currentMesh = builder.getMesh().weldVertices();
 
     // Get edges to bevel based on angle threshold
     const edgesToBevel = currentMesh.getSharpEdges(angleThreshold);

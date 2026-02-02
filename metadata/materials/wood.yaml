@@ -1,0 +1,67 @@
+# Material Associations
+# Maps material types to colors and physical properties
+
+key: materials/wood
+createdAt: "2026-02-02T00:00:00.000Z"
+modifiedAt: "2026-02-02T00:00:00.000Z"
+description: Wood material types with colors and properties
+tags:
+  - materials
+  - wood
+
+value:
+  oak:
+    color: { r: 0.76, g: 0.60, b: 0.42 }
+    hex: "#C19A6B"
+    roughness: 0.6
+    metalness: 0.0
+    density: 750  # kg/m³
+    grain: prominent
+
+  walnut:
+    color: { r: 0.36, g: 0.25, b: 0.20 }
+    hex: "#5C4033"
+    roughness: 0.5
+    metalness: 0.0
+    density: 650
+    grain: prominent
+
+  pine:
+    color: { r: 0.87, g: 0.72, b: 0.53 }
+    hex: "#DEB887"
+    roughness: 0.65
+    metalness: 0.0
+    density: 500
+    grain: subtle
+
+  maple:
+    color: { r: 0.93, g: 0.84, b: 0.69 }
+    hex: "#EDD6B0"
+    roughness: 0.4
+    metalness: 0.0
+    density: 700
+    grain: subtle
+
+  cherry:
+    color: { r: 0.60, g: 0.35, b: 0.25 }
+    hex: "#995940"
+    roughness: 0.45
+    metalness: 0.0
+    density: 580
+    grain: moderate
+
+  mahogany:
+    color: { r: 0.52, g: 0.22, b: 0.15 }
+    hex: "#853826"
+    roughness: 0.35
+    metalness: 0.0
+    density: 680
+    grain: moderate
+
+  ebony:
+    color: { r: 0.15, g: 0.12, b: 0.10 }
+    hex: "#261E1A"
+    roughness: 0.3
+    metalness: 0.0
+    density: 1100
+    grain: fine

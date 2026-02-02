@@ -1,0 +1,91 @@
+# Builder Relationships
+# Which builders can be composed into which scenes
+
+key: builders/relationships
+createdAt: "2026-02-02T00:00:00.000Z"
+modifiedAt: "2026-02-02T00:00:00.000Z"
+description: Defines which builders can be composed together
+tags:
+  - builders
+  - composition
+  - relationships
+
+value:
+  # Scene compositions
+  scenes:
+    DiningScene:
+      components:
+        - { builder: Table, count: 1, required: true }
+        - { builder: DiningChair, count: "4-8", required: true }
+        - { builder: Vase, count: "0-2", required: false }
+      style_inheritance: true
+      description: "A dining room scene with table and chairs"
+
+    LivingRoom:
+      components:
+        - { builder: Sofa, count: 1, required: true }
+        - { builder: CoffeeTable, count: 1, required: true }
+        - { builder: SideTable, count: "0-2", required: false }
+        - { builder: Lamp, count: "1-3", required: false }
+      style_inheritance: true
+      description: "A living room arrangement"
+
+    Office:
+      components:
+        - { builder: Desk, count: 1, required: true }
+        - { builder: OfficeChair, count: 1, required: true }
+        - { builder: Bookshelf, count: "0-2", required: false }
+        - { builder: Lamp, count: "0-1", required: false }
+      style_inheritance: true
+      description: "A home office setup"
+
+  # Component compatibility
+  compatibility:
+    DiningChair:
+      compatible_with:
+        - Table
+        - DiningTable
+      placement: around_table
+
+    Vase:
+      compatible_with:
+        - Table
+        - SideTable
+        - CoffeeTable
+        - Desk
+      placement: on_surface
+
+    Lamp:
+      compatible_with:
+        - Desk
+        - SideTable
+        - Table
+      placement: on_surface
+
+  # Builder domains
+  domains:
+    furniture:
+      builders:
+        - DiningChair
+        - Table
+        - Desk
+        - Bookshelf
+        - Sofa
+        - CoffeeTable
+        - SideTable
+
+    decoration:
+      builders:
+        - Vase
+        - Lamp
+        - Picture
+        - Plant
+
+    mechanical:
+      builders:
+        - Gear
+        - Mechanism
+
+    signage:
+      builders:
+        - TextSign

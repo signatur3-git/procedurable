@@ -1,0 +1,74 @@
+# Material Associations - Metals
+# Metal types with colors and physical properties
+
+key: materials/metal
+createdAt: "2026-02-02T00:00:00.000Z"
+modifiedAt: "2026-02-02T00:00:00.000Z"
+description: Metal material types with colors and properties
+tags:
+  - materials
+  - metal
+
+value:
+  steel:
+    color: { r: 0.44, g: 0.47, b: 0.49 }
+    hex: "#71797E"
+    roughness: 0.4
+    metalness: 0.9
+    density: 7850  # kg/m³
+
+  stainless_steel:
+    color: { r: 0.75, g: 0.75, b: 0.75 }
+    hex: "#C0C0C0"
+    roughness: 0.3
+    metalness: 0.95
+    density: 8000
+
+  chrome:
+    color: { r: 0.85, g: 0.85, b: 0.87 }
+    hex: "#D9D9DE"
+    roughness: 0.1
+    metalness: 1.0
+    density: 7150
+
+  brass:
+    color: { r: 0.80, g: 0.60, b: 0.20 }
+    hex: "#CC9933"
+    roughness: 0.3
+    metalness: 0.9
+    density: 8500
+
+  copper:
+    color: { r: 0.72, g: 0.45, b: 0.20 }
+    hex: "#B87333"
+    roughness: 0.35
+    metalness: 0.95
+    density: 8960
+
+  bronze:
+    color: { r: 0.55, g: 0.35, b: 0.15 }
+    hex: "#8C5926"
+    roughness: 0.4
+    metalness: 0.85
+    density: 8800
+
+  iron:
+    color: { r: 0.30, g: 0.28, b: 0.28 }
+    hex: "#4D4747"
+    roughness: 0.6
+    metalness: 0.8
+    density: 7870
+
+  gold:
+    color: { r: 0.85, g: 0.65, b: 0.13 }
+    hex: "#D9A621"
+    roughness: 0.15
+    metalness: 1.0
+    density: 19300
+
+  aluminum:
+    color: { r: 0.75, g: 0.76, b: 0.78 }
+    hex: "#C0C2C7"
+    roughness: 0.35
+    metalness: 0.9
+    density: 2700

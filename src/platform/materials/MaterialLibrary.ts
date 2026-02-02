@@ -17,6 +17,17 @@ export interface MaterialPreset {
   metalness?: number;
 }
 
+/**
+ * MaterialSlot - A named material slot with PBR-ready properties.
+ * Maps face ranges to material definitions for proper asset output (glTF, PSD).
+ */
+export interface MaterialSlot {
+  name: string;
+  color: RGBColor;
+  roughness: number;
+  metalness: number;
+}
+
 // =============================================================================
 // NAMED COLORS
 // =============================================================================

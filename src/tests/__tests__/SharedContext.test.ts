@@ -97,7 +97,13 @@ describe('SharedContext', () => {
       ctx.set('c', 3);
 
       const snapshot = ctx.snapshot();
-      expect(snapshot).toEqual({ a: 1, b: 2, c: 3 });
+      expect(snapshot).toEqual({
+        a: 1,
+        b: 2,
+        c: 3,
+        __requirements__: [],
+        __offers__: []
+      });
     });
 
     it('should reset to initial state', () => {
@@ -186,6 +192,182 @@ describe('SharedContext', () => {
       expect(count).toBe(5);
       expect(name).toBe('test');
       expect(config).toEqual({ enabled: true });
+    });
+  });
+
+  // B5-002: Requirements and Offers Tests
+  describe('Requirements/Offers (B5-002)', () => {
+    it('should publish and retrieve requirements', () => {
+      const ctx = new SharedContext();
+
+      ctx.publishRequirement({
+        id: 'house_pad',
+        publisher: 'HouseBuilder',
+        type: 'terrain_clearance',
+        shape: 'rectangle',
+        position: { x: 10, z: 20 },
+        width: 15,
+        depth: 12,
+        maxSlope: 0.05
+      });
+
+      const req = ctx.getRequirement('house_pad');
+      expect(req).toBeDefined();
+      expect(req?.type).toBe('terrain_clearance');
+      expect(req?.publisher).toBe('HouseBuilder');
+      expect(req?.position).toEqual({ x: 10, z: 20 });
+    });
+
+    it('should get requirements by type', () => {
+      const ctx = new SharedContext();
+
+      ctx.publishRequirement({
+        id: 'house1',
+        publisher: 'House1',
+        type: 'terrain_clearance',
+        shape: 'rectangle',
+        position: { x: 0, z: 0 }
+      });
+
+      ctx.publishRequirement({
+        id: 'road1',
+        publisher: 'Road1',
+        type: 'road_access',
+        shape: 'rectangle',
+        position: { x: 50, z: 0 }
+      });
+
+      ctx.publishRequirement({
+        id: 'house2',
+        publisher: 'House2',
+        type: 'terrain_clearance',
+        shape: 'rectangle',
+        position: { x: 100, z: 0 }
+      });
+
+      const terrainReqs = ctx.getRequirementsByType('terrain_clearance');
+      expect(terrainReqs.length).toBe(2);
+    });
+
+    it('should publish and retrieve offers', () => {
+      const ctx = new SharedContext();
+
+      ctx.publishOffer({
+        requirementId: 'house_pad',
+        publisher: 'TerrainBuilder',
+        fulfilled: true,
+        elevation: 42.5,
+        slope: 0.02,
+        boundaryLoop: 'house_pad_boundary'
+      });
+
+      const offer = ctx.getOffer('house_pad');
+      expect(offer).toBeDefined();
+      expect(offer?.fulfilled).toBe(true);
+      expect(offer?.elevation).toBe(42.5);
+      expect(offer?.boundaryLoop).toBe('house_pad_boundary');
+    });
+
+    it('should check if requirement is fulfilled', () => {
+      const ctx = new SharedContext();
+
+      ctx.publishOffer({
+        requirementId: 'fulfilled_req',
+        publisher: 'Terrain',
+        fulfilled: true
+      });
+
+      ctx.publishOffer({
+        requirementId: 'unfulfilled_req',
+        publisher: 'Terrain',
+        fulfilled: false
+      });
+
+      expect(ctx.isRequirementFulfilled('fulfilled_req')).toBe(true);
+      expect(ctx.isRequirementFulfilled('unfulfilled_req')).toBe(false);
+      expect(ctx.isRequirementFulfilled('nonexistent')).toBe(false);
+    });
+
+    it('should reset requirements and offers', () => {
+      const ctx = new SharedContext();
+
+      ctx.publishRequirement({
+        id: 'req1',
+        publisher: 'Builder1',
+        type: 'test',
+        shape: 'rectangle',
+        position: { x: 0, z: 0 }
+      });
+
+      ctx.publishOffer({
+        requirementId: 'req1',
+        publisher: 'Terrain',
+        fulfilled: true
+      });
+
+      expect(ctx.getAllRequirements().length).toBe(1);
+      expect(ctx.getAllOffers().length).toBe(1);
+
+      ctx.reset();
+
+      expect(ctx.getAllRequirements().length).toBe(0);
+      expect(ctx.getAllOffers().length).toBe(0);
+    });
+
+    it('should include requirements and offers in snapshot', () => {
+      const ctx = new SharedContext();
+
+      ctx.publishRequirement({
+        id: 'req1',
+        publisher: 'Builder',
+        type: 'test',
+        shape: 'circle',
+        position: { x: 0, z: 0 }
+      });
+
+      ctx.publishOffer({
+        requirementId: 'req1',
+        publisher: 'Terrain',
+        fulfilled: true,
+        elevation: 10
+      });
+
+      const snapshot = ctx.snapshot();
+      expect(snapshot.__requirements__.length).toBe(1);
+      expect(snapshot.__offers__.length).toBe(1);
+      expect(snapshot.__requirements__[0].id).toBe('req1');
+      expect(snapshot.__offers__[0].elevation).toBe(10);
+    });
+
+    it('should provide negotiation stats', () => {
+      const ctx = new SharedContext();
+
+      ctx.publishRequirement({
+        id: 'req1',
+        publisher: 'B1',
+        type: 'test',
+        shape: 'rectangle',
+        position: { x: 0, z: 0 }
+      });
+
+      ctx.publishRequirement({
+        id: 'req2',
+        publisher: 'B2',
+        type: 'test',
+        shape: 'rectangle',
+        position: { x: 0, z: 0 }
+      });
+
+      ctx.publishOffer({
+        requirementId: 'req1',
+        publisher: 'Terrain',
+        fulfilled: true
+      });
+
+      const stats = ctx.negotiationStats();
+      expect(stats.requirements).toBe(2);
+      expect(stats.offers).toBe(1);
+      expect(stats.fulfilled).toBe(1);
     });
   });
 });
