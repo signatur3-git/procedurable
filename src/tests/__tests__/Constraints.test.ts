@@ -89,14 +89,14 @@ describe('Constraint Passing System', () => {
   });
 
   describe('Constraint composition', () => {
-    it('should pass constraints through compose method', () => {
+    it('should pass constraints through compose method', async () => {
       const parent = new TracedBuilder('Parent', 42);
 
       // Define a simple measurement
       parent.defineMeasurement('parent_value', 0.9);
 
       // Compose a child with constraints
-      parent.compose('child', (seed, overrides) => {
+      await parent.compose('child', (seed, overrides) => {
         const child = new TracedBuilder('Child', seed, overrides);
 
         // Child should receive constraints
@@ -121,10 +121,10 @@ describe('Constraint Passing System', () => {
       expect(output.subBuilders.has('child')).toBe(true);
     });
 
-    it('should handle constraints in instanced compositions', () => {
+    it('should handle constraints in instanced compositions', async () => {
       const parent = new TracedBuilder('Parent', 42);
 
-      parent.compose('instance', (seed, overrides) => {
+      await parent.compose('instance', (seed, overrides) => {
         const child = new TracedBuilder('Child', seed, overrides);
 
         // Verify constraints received
@@ -207,12 +207,12 @@ describe('Constraint Passing System', () => {
   });
 
   describe('Constraint in expressions', () => {
-    it('should access constraints in derived expressions with @ prefix', () => {
+    it('should access constraints in derived expressions with @ prefix', async () => {
       const parent = new TracedBuilder('Parent', 42);
 
       parent.defineMeasurement('parent_width', 0.5);
 
-      parent.compose('child', (seed, overrides) => {
+      await parent.compose('child', (seed, overrides) => {
         const child = new TracedBuilder('Child', seed, overrides);
 
         // Define a measurement

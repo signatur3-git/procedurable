@@ -721,9 +721,9 @@ class ProceduralFontRegistry {
     // Register built-in simple glyphs
     this.registerBuiltinGlyphs();
 
-    // Try to load custom letters from builders/letters/ if available
+    // Try to load custom letters from builders/test-fixtures/ if available
     if (buildersDir) {
-      const lettersDir = path.join(buildersDir, 'letters');
+      const lettersDir = path.join(buildersDir, 'test-fixtures');
       try {
         await this.loadLettersFromDirectory(lettersDir, 'custom');
       } catch (e) {

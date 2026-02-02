@@ -13,3 +13,4 @@ export * from './MeshTransform';
 export * from './Extrude';
 export * from './Sweep';
 export * from './Subdivision';
+export * from './PolygonBoolean';

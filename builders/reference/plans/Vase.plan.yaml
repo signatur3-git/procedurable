@@ -1,0 +1,52 @@
+# Vase Sophistication Plan
+# Describes what the builder should achieve at each quality tier
+
+builder: Vase
+domain: vessels/decorative
+
+tier_0_placeholder:
+  description: "Simple cylinder volume for placement"
+  parts: [body_cylinder]
+  tools_needed: [cylinder]
+  decisions: [height_variation]
+
+tier_1_silhouette:
+  description: "Recognizable vase silhouette via lathed profile"
+  parts:
+    body: "Lathed profile with base, belly, neck, and lip flare"
+  tools_needed: [lathe]
+  decisions: [height_variation, vase_style]
+  upgrades_from_t0:
+    - "Body uses lathe with multi-point profile instead of plain cylinder"
+    - "Height variation scales overall form"
+
+tier_2_form_resolved:
+  description: "Distinct vase styles with proper proportions and detail"
+  parts:
+    body:
+      geometry: "Lathed profile with style-dependent control points"
+      detail: "Smooth curves, proper wall thickness"
+      variation: "vase_style changes profile shape"
+      variants:
+        classic: "Current profile - gentle belly curve, narrow neck, flared lip"
+        modern: "Straight walls, minimal belly, cylindrical neck"
+        bulbous: "Exaggerated belly, very narrow neck, wide lip"
+    foot:
+      geometry: "Separate foot ring at base"
+      detail: "Slightly wider than body base for stability"
+    lip:
+      geometry: "Thickened rim at top"
+      detail: "Lip thickness and flare as decisions"
+  tools_needed: [lathe, conditional_geometry, multi_material]
+  decisions_that_affect_geometry:
+    - "vase_style -> different profile control points"
+    - "height_variation -> scales overall height"
+  materials:
+    - "body_glaze: main ceramic color"
+    - "accent_band: decorative stripe at belly"
+
+tier_3_detail:
+  description: "Close-up ready vase with surface variation"
+  requires_tools_not_yet_built: [noise_displacement, UV_generation]
+  deferred: true
+  notes: "Organic surface displacement for handmade feel, UV mapping for glaze textures"

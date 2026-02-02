@@ -1,6 +1,6 @@
 # YAML Builder Format Specification
 
-> Version: 1.0.0
+> Version: 1.1.0
 > This document defines the YAML format for procedural builder definitions.
 
 ---
@@ -15,8 +15,28 @@ Builders are defined as YAML files that declaratively specify:
 5. **Derived** - Computed values from expressions
 6. **Geometry** - Vertices, loops, faces, lofts, compositions
 
-The YAML is parsed and executed by `YamlBuilderParser`, which generates
-calls to `TracedBuilder` methods.
+The YAML is parsed by `YamlBuilderParser` and executed by `YamlBuilderExecutor`,
+which uses a command registry to process geometry commands via `TracedBuilder`.
+
+### Architecture
+
+```
+YamlBuilderParser.parseAndExecuteBuilder(yaml)
+    └── YamlBuilderExecutor.executeBuilder(yaml)
+            ├── Phase 1: Decisions
+            ├── Phase 2: Measurements  
+            ├── Phase 3: Derived values
+            ├── Phase 4: Geometry → Command Registry
+            │       ├── BoxCommand, VertexCommand, CircleCommand
+            │       ├── LoopCommand, FaceCommand, LoftCommand
+            │       ├── CapCommand, LatheCommand, SweepCommand
+            │       ├── BevelCommand, SubdivideCommand
+            │       ├── RadialArrayCommand, Extrude2DCommand
+            │       └── ControlFlowCommands (when, if, repeat)
+            ├── Phase 5: Compositions
+            ├── Phase 6: Placements
+            └── Phase 7: Quality Gates
+```
 
 ---
 
@@ -497,6 +517,36 @@ geometry:
     color: $text_color
 ```
 
+
+#### Boolean Shape (2D Boolean Operations)
+```yaml
+shapes:
+  # Single clip (one hole)
+  ring:
+    type: boolean
+    operation: subtract    # union, subtract, or intersect
+    subject: outer_circle  # Reference to another shape
+    clip: inner_circle     # Single clip shape
+
+  # Multiple clips (multiple holes in one operation)
+  plate_with_holes:
+    type: boolean
+    operation: subtract
+    subject: plate_outline
+    clips:                 # Array of clip shapes
+      - center_hole
+      - mount_hole_1
+      - mount_hole_2
+      - mount_hole_3
+```
+
+- `operation`: `union` (merge shapes), `subtract` (cut clip from subject), `intersect` (overlap only)
+- `subject`: Reference to the base shape
+- `clip`: Single clip shape reference (use for one clip)
+- `clips`: Array of clip shape references (use for multiple clips)
+- Boolean shapes can reference other boolean shapes (nesting supported — holes are preserved through chains)
+- When `subtract` creates holes (clip fully inside subject), `extrude2DWithHoles()` handles proper triangulation
+- Bevel is not yet supported for shapes with holes
 
 **Conditional expressions** using `if()` function:
 ```yaml

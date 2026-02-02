@@ -1,0 +1,44 @@
+version: "1.0"
+name: SimpleRing
+description: Simple test of 2D boolean subtract producing a ring shape
+author: AI Agent
+tags: [test, boolean, C1-003]
+
+quality:
+  target_tier: 1
+
+measurements:
+  outer_radius:
+    value: 1.0
+  inner_radius:
+    value: 0.3
+  thickness:
+    value: 0.2
+
+materials:
+  metal:
+    color: { r: 0.6, g: 0.6, b: 0.7 }
+
+shapes:
+  outer_circle:
+    type: circle
+    radius: outer_radius
+    segments: 32
+
+  inner_circle:
+    type: circle
+    radius: inner_radius
+    segments: 24
+
+  ring:
+    type: boolean
+    operation: subtract
+    subject: outer_circle
+    clip: inner_circle
+
+geometry:
+  - extrude2d: ring_mesh
+    shape: ring
+    depth: thickness
+    caps: both
+    color: $metal

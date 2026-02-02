@@ -1,0 +1,93 @@
+version: "1.0"
+name: PlateWithHoles
+description: Demonstrates 2D boolean subtract with multiple holes - a metal plate with center hole and mounting holes
+author: AI Agent
+tags: [geometry, mechanical, demo, C1-003, boolean, multiple-holes]
+
+quality:
+  target_tier: 1
+  current_tier: 1
+  tier_gaps: []
+  parts:
+    plate:
+      tier: 1
+      notes: "Main plate with multiple holes via 2D boolean subtract using clips array"
+
+measurements:
+  plate_width:
+    value: 3.0
+  plate_height:
+    value: 2.0
+  plate_thickness:
+    value: 0.15
+  center_hole_radius:
+    value: 0.3
+  mounting_hole_radius:
+    value: 0.12
+  # Mounting hole positions (corners, inset from edges)
+  mount_inset_x:
+    value: 0.4
+  mount_inset_z:
+    value: 0.35
+
+materials:
+  steel:
+    color: { r: 0.5, g: 0.52, b: 0.55 }
+
+shapes:
+  # Main plate outline
+  plate_outline:
+    type: rect
+    width: plate_width
+    height: plate_height
+
+  # Center hole
+  center_hole:
+    type: circle
+    radius: center_hole_radius
+    segments: 32
+
+  # Four mounting holes at the corners
+  mount_tl:
+    type: circle
+    radius: mounting_hole_radius
+    segments: 16
+    center: { x: "-plate_width / 2 + mount_inset_x", z: "-plate_height / 2 + mount_inset_z" }
+
+  mount_tr:
+    type: circle
+    radius: mounting_hole_radius
+    segments: 16
+    center: { x: "plate_width / 2 - mount_inset_x", z: "-plate_height / 2 + mount_inset_z" }
+
+  mount_bl:
+    type: circle
+    radius: mounting_hole_radius
+    segments: 16
+    center: { x: "-plate_width / 2 + mount_inset_x", z: "plate_height / 2 - mount_inset_z" }
+
+  mount_br:
+    type: circle
+    radius: mounting_hole_radius
+    segments: 16
+    center: { x: "plate_width / 2 - mount_inset_x", z: "plate_height / 2 - mount_inset_z" }
+
+  # Plate with all five holes (center + 4 mounting) using clips array
+  plate_with_holes:
+    type: boolean
+    operation: subtract
+    subject: plate_outline
+    clips:
+      - center_hole
+      - mount_tl
+      - mount_tr
+      - mount_bl
+      - mount_br
+
+geometry:
+  # Main plate body with all holes
+  - extrude2d: plate
+    shape: plate_with_holes
+    depth: plate_thickness
+    caps: both
+    color: $steel

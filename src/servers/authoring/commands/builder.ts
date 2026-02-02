@@ -11,6 +11,10 @@
 import { CommandNamespace, CommandHandler, CommandContext, CommandResult } from '../command-registry';
 import { ParsedCommand, getArg, getNumberArg } from '../command-parser';
 import { storage } from './storage';
+import { validateBuilder, evaluateQualityTier, testDecisionCoverage, compareSophisticationPlan } from '../../../generation/validation/ValidationAPI';
+import { readFile } from 'fs/promises';
+import { join } from 'path';
+import { parseYamlWithLibrary, parseAndExecuteBuilder } from '../../../generation/builder/YamlBuilderParser';
 
 // TypeScript builders that can't be migrated to YAML yet
 // Person requires advanced geometry (subdivision, lathe) - Phase 2
@@ -164,7 +168,12 @@ const handlers: CommandHandler[] = [
           summary: {
             vertices: result.validation.vertexCount,
             faces: result.validation.faceCount,
-            issues: result.validation.issues.length
+            issues: result.validation.issues.length,
+            // A2-003: Include quality tier in broadcast
+            quality: result.qualityGateResult ? {
+              target_tier: result.qualityGateResult.target_tier,
+              achieved_tier: result.qualityGateResult.achieved_tier
+            } : undefined
           }
         });
 
@@ -173,6 +182,15 @@ const handlers: CommandHandler[] = [
         for (const [key, d] of result.decisions) {
           decisions[key] = { value: d.value, source: d.source };
         }
+
+        // A2-003: Build quality summary for response
+        const qualitySummary = result.qualityGateResult ? {
+          target_tier: result.qualityGateResult.target_tier,
+          achieved_tier: result.qualityGateResult.achieved_tier,
+          gates_passed: result.qualityGateResult.summary.passed,
+          gates_failed: result.qualityGateResult.summary.failed,
+          suggestion_count: result.qualityGateResult.suggestions?.length ?? 0
+        } : undefined;
 
         return {
           success: true,
@@ -188,7 +206,9 @@ const handlers: CommandHandler[] = [
             },
             decisions,
             issues: result.validation.issues.length,
-            traces: result.traces.size
+            traces: result.traces.size,
+            // A2-003: Include quality summary in response
+            quality: qualitySummary
           }
         };
       } catch (err: any) {
@@ -561,21 +581,19 @@ const handlers: CommandHandler[] = [
     description: 'Run validation checks on the last build',
     usage: 'builder.validate',
     execute: async (_cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
-      if (!ctx.lastRun || !ctx.lastRun.output) {
+      if (!ctx.lastRun || !ctx.lastRun.mesh) {
         return {
           success: false,
           error: 'No builder has been run yet. Use builder.run first.'
         };
       }
 
-      const { validateBuilder } = require('../../validation/ValidationAPI');
-
       const validationContext = {
         builderName: ctx.lastRun.builderName,
-        mesh: ctx.lastRun.output.mesh,
-        measurements: ctx.lastRun.output.measurements,
-        decisions: ctx.lastRun.output.decisions,
-        tags: ctx.lastRun.output.sceneGraph?.getAllTags?.() || []
+        mesh: ctx.lastRun.mesh,
+        measurements: ctx.lastRun.measurements,
+        decisions: ctx.lastRun.decisions,
+        tags: ctx.lastRun.sceneGraph?.getAllTags?.() || []
       };
 
       const results = validateBuilder(validationContext);
@@ -592,6 +610,244 @@ const handlers: CommandHandler[] = [
           passed: results.checks.filter((c: any) => c.status === 'pass'),
           warnings: results.checks.filter((c: any) => c.status === 'warning'),
           failed: results.checks.filter((c: any) => c.status === 'fail')
+        }
+      };
+    }
+  },
+
+  {
+    action: 'quality',
+    description: 'Evaluate quality tier gates on the last build. Returns machine-readable suggestions.',
+    usage: 'builder.quality [tier=N]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun || !ctx.lastRun.mesh) {
+        return {
+          success: false,
+          error: 'No builder has been run yet. Use builder.run first.'
+        };
+      }
+
+      // Parse optional tier argument from options (tier=N)
+      let requestedTier: number | undefined;
+      if (cmd.options.tier) {
+        requestedTier = parseInt(cmd.options.tier, 10);
+        if (isNaN(requestedTier) || requestedTier < 1 || requestedTier > 4) {
+          return { success: false, error: 'Invalid tier. Use tier=1, tier=2, tier=3, or tier=4.' };
+        }
+      }
+
+      // Build validation context with traces and quality metadata
+      const output = ctx.lastRun;
+      const validationContext = {
+        builderName: ctx.lastRun.builderName,
+        mesh: output.mesh,
+        measurements: output.measurements,
+        decisions: output.decisions,
+        tags: output.sceneGraph?.getAllTags?.() || [],
+        traces: output.traces
+      };
+
+      const result = evaluateQualityTier(validationContext, requestedTier);
+
+      // Store on output for downstream commands
+      output.qualityGateResult = result;
+
+      return {
+        success: true,
+        data: {
+          builder: ctx.lastRun.builderName,
+          seed: ctx.lastRun.seed,
+          target_tier: result.target_tier,
+          achieved_tier: result.achieved_tier,
+          summary: result.summary,
+          gates: result.gates,
+          suggestions: result.suggestions,
+          // Convenience groupings
+          passed_gates: result.gates.filter((g: any) => g.status === 'pass'),
+          failed_gates: result.gates.filter((g: any) => g.status === 'fail')
+        }
+      };
+    }
+  },
+
+  {
+    action: 'coverage',
+    description: 'Test decision coverage for a builder. Runs builder with each decision option to verify they affect output.',
+    usage: 'builder.coverage [<name>] [seed=N]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      // Get builder name from arg or use active builder
+      let builderName = getArg(cmd, 0, 'name');
+      if (!builderName) {
+        if (!ctx.activeBuilder) {
+          return {
+            success: false,
+            error: 'No builder specified and no active builder. Usage: builder.coverage <name> or builder.open <name> first.'
+          };
+        }
+        builderName = ctx.activeBuilder;
+      }
+
+      // Get seed (default 42 for reproducibility)
+      const seed = getNumberArg(cmd, 1, 'seed') ?? 42;
+
+      try {
+        // Load the builder YAML
+        const stored = await storage.get(builderName);
+        const yamlDefinition = await parseYamlWithLibrary(stored.content);
+
+        // Create executor function
+        const executeBuilder = async (overrides: Record<string, any>) => {
+          return await parseAndExecuteBuilder(yamlDefinition, { seed, overrides });
+        };
+
+        // Run coverage test
+        const report = await testDecisionCoverage(yamlDefinition, executeBuilder, seed);
+
+        return {
+          success: true,
+          data: {
+            builder: report.builderName,
+            seed: report.seed,
+            coverage_percent: report.coveragePercent,
+            summary: {
+              total: report.totalDecisions,
+              covered: report.covered,
+              uncovered: report.uncovered,
+              partial: report.partial,
+              errors: report.errors
+            },
+            decisions: report.decisions.map(d => ({
+              name: d.name,
+              type: d.type,
+              status: d.status,
+              options: d.options,
+              notes: d.notes,
+              error: d.error,
+              results: d.optionResults
+            })),
+            // Convenience groupings
+            covered_decisions: report.decisions.filter(d => d.status === 'covered').map(d => d.name),
+            uncovered_decisions: report.decisions.filter(d => d.status === 'uncovered').map(d => d.name),
+            partial_decisions: report.decisions.filter(d => d.status === 'partial').map(d => d.name)
+          }
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          error: `Coverage test failed: ${err.message}`
+        };
+      }
+    }
+  },
+
+  {
+    action: 'check_plan',
+    description: 'Compare builder output against its sophistication plan',
+    usage: 'builder.check_plan [<name>] [tier=N]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      // Get builder name from arg or use active builder
+      let builderName = getArg(cmd, 0, 'name');
+      if (!builderName) {
+        if (!ctx.activeBuilder) {
+          return {
+            success: false,
+            error: 'No builder specified and no active builder. Usage: builder.check_plan <name> or builder.open <name> first.'
+          };
+        }
+        builderName = ctx.activeBuilder;
+      }
+
+      if (!ctx.lastRun || !ctx.lastRun.mesh) {
+        return {
+          success: false,
+          error: 'No builder has been run yet. Use builder.run first.'
+        };
+      }
+
+      // Parse optional tier argument
+      let tier: number | undefined;
+      if (cmd.options.tier) {
+        tier = parseInt(cmd.options.tier, 10);
+        if (isNaN(tier) || tier < 0 || tier > 3) {
+          return { success: false, error: 'Invalid tier. Use tier=0, tier=1, tier=2, or tier=3.' };
+        }
+      }
+
+      try {
+        // Load the sophistication plan YAML
+        const { parse: parseYaml } = await import('yaml');
+        const planPath = join(process.cwd(), 'builders', 'reference', 'plans', `${builderName}.plan.yaml`);
+        const planContent = await readFile(planPath, 'utf-8');
+        const plan = parseYaml(planContent);
+
+        // Build validation context from last run
+        const output = ctx.lastRun;
+        const validationContext = {
+          builderName: output.builderName,
+          mesh: output.mesh,
+          measurements: output.measurements,
+          decisions: output.decisions,
+          tags: output.sceneGraph?.getAllTags?.() || [],
+          traces: output.traces,
+          qualityMeta: output.qualityMeta
+        };
+
+        const result = compareSophisticationPlan(plan, validationContext, tier);
+
+        return {
+          success: true,
+          data: {
+            builder: result.builder,
+            tier_checked: result.tier_checked,
+            summary: result.summary,
+            checks: result.checks,
+            // Convenience groupings
+            passed: result.checks.filter(c => c.status === 'pass'),
+            failed: result.checks.filter(c => c.status === 'fail'),
+            skipped: result.checks.filter(c => c.status === 'skip')
+          }
+        };
+      } catch (err: any) {
+        if (err.code === 'ENOENT') {
+          return {
+            success: false,
+            error: `No sophistication plan found for '${builderName}'. Expected: builders/reference/plans/${builderName}.plan.yaml`
+          };
+        }
+        return {
+          success: false,
+          error: `Plan check failed: ${err.message}`
+        };
+      }
+    }
+  },
+
+  {
+    action: 'export_psd',
+    description: 'Export last builder run as PSD (Procedurable Scene Description) format',
+    usage: 'builder.export_psd',
+    execute: async (_cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const { serializeToPSD, validatePSDScene } = await import('../../../generation/builder/PSD');
+      const scene = serializeToPSD(ctx.lastRun);
+      const errors = validatePSDScene(scene);
+
+      return {
+        success: true,
+        data: {
+          scene,
+          validation: errors.length === 0 ? 'valid' : { errors },
+          summary: {
+            name: scene.name,
+            primCount: Object.keys(scene.prims).length,
+            materialCount: scene.materials.length,
+            meshPrims: Object.values(scene.prims).filter(p => p.type === 'Mesh').length,
+            instancePrims: Object.values(scene.prims).filter(p => p.type === 'Instance').length,
+            xformPrims: Object.values(scene.prims).filter(p => p.type === 'Xform').length
+          }
         }
       };
     }

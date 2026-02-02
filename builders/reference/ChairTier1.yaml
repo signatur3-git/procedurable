@@ -1,0 +1,453 @@
+# ChairTier1 - Quality Tier 1 Reference Builder
+#
+# This is the REFERENCE implementation for what Tier 1 quality looks like.
+# Compare your builders against this to understand the silhouette-correct standard.
+#
+# Tier 1 Definition: Sketch / Silhouette Correct
+# - Object is recognizable from its silhouette
+# - Parts have correct proportions
+# - Uses lofts, basic lathe, simple shapes
+# - No edge treatment, single material
+# - Decisions affect proportions and major style choices
+# - Triangle budget: 100-1,000 triangles
+
+version: "1.0"
+name: ChairTier1
+description: Tier 1 reference - silhouette correct chair with recognizable form
+author: procedurable
+tags: [furniture, seating, reference, tier-1, quality-reference]
+
+# =============================================================================
+# QUALITY - This defines what Tier 1 IS
+# =============================================================================
+quality:
+  target_tier: 1                    # This IS the target tier
+  current_tier: 1                   # Achieved tier matches target
+
+  tier_gaps: []                     # None - this is the reference
+
+  # What makes this Tier 1 (and not Tier 0 or 2)
+  tier_characteristics:
+    above_tier_0:
+      - "Legs use tapered lofts instead of box primitives"
+      - "Seat is a proper slab with thickness, not just a box volume"
+      - "Back is a shaped panel, not a bounding box"
+      - "Stretchers exist as geometry (when enabled)"
+    below_tier_2:
+      - "Back is still a single panel regardless of back_style decision"
+      - "No edge bevels or chamfers"
+      - "Single material throughout"
+      - "Seat has no contour (flat top surface)"
+      - "Legs are simple tapered cylinders, no foot detail"
+
+  parts:
+    seat:
+      tier: 1
+      notes: "Box with proper proportions and thickness. Silhouette correct but no edge treatment."
+    legs:
+      tier: 1
+      notes: "Tapered lofted cylinders. Recognizable leg form but simple geometry."
+    back:
+      tier: 1
+      notes: "Flat panel with correct position and angle. Not a volume box, but not resolved form either."
+    stretchers:
+      tier: 1
+      notes: "Simple cylinders connecting legs. Present when enabled."
+
+  decision_coverage:
+    geometry_affecting:
+      - leg_taper               # Changes bottom radius
+      - has_stretchers          # Adds/removes stretcher geometry
+      - back_angle              # Tilts back panel
+      - width_variation         # Scales overall width
+      - depth_variation         # Scales overall depth
+    decorative_only:
+      - back_style              # Declared but all produce same panel
+    coverage_percentage: 83     # 5/6 decisions affect output
+
+  # What Tier 1 is FOR
+  tier_1_purpose:
+    - "Proportion exploration: get the overall shape right"
+    - "Style language: round vs angular, proportions"
+    - "Background assets: chairs seen from distance"
+    - "Rapid iteration: quick feedback on form"
+
+  upgrade_path:
+    to_tier_2:
+      - "Implement back_style variants (solid panel with thickness, slats, ladder rungs)"
+      - "Add edge bevels to seat (needs C2 bevel tool)"
+      - "Add seat contour (slight dish shape)"
+      - "Add multi-material (wood + optional upholstery)"
+      - "Add leg foot detail (subtle taper or pad)"
+
+# =============================================================================
+# DECISIONS - Proportions and major style choices
+# =============================================================================
+decisions:
+  back_style:
+    type: choice
+    options: [solid, slat, ladder]
+    weights: [0.6, 0.25, 0.15]
+
+  leg_taper:
+    type: number
+    min: 0.7
+    max: 1.0
+
+  back_angle:
+    type: number
+    min: 3
+    max: 8
+
+  has_stretchers:
+    type: boolean
+    probability: 0.5
+
+  width_variation:
+    type: number
+    min: -0.02
+    max: 0.02
+
+  depth_variation:
+    type: number
+    min: -0.02
+    max: 0.02
+
+# =============================================================================
+# MEASUREMENTS - Standard dining chair dimensions
+# =============================================================================
+measurements:
+  seat_width:
+    base: 0.42
+    variation: width_variation
+    source: "Standard dining chair width"
+
+  seat_depth:
+    base: 0.38
+    variation: depth_variation
+    source: "Standard dining chair depth"
+
+  seat_height:
+    value: 0.45
+    source: "Ergonomic seating height"
+
+  seat_thickness:
+    value: 0.025
+    source: "Solid wood seat thickness"
+
+  leg_radius:
+    value: 0.018
+    source: "Chair leg radius"
+
+  leg_inset:
+    value: 0.035
+    source: "Leg inset from seat edge"
+
+  back_height:
+    value: 0.35
+    source: "Back support height above seat"
+
+  back_thickness:
+    value: 0.012
+    source: "Back panel thickness"
+
+  stretcher_radius:
+    value: 0.012
+    source: "Stretcher cross-section radius"
+
+  stretcher_height:
+    value: 0.12
+    source: "Stretcher height from floor"
+
+# =============================================================================
+# DERIVED VALUES
+# =============================================================================
+derived:
+  half_width: "seat_width / 2"
+  half_depth: "seat_depth / 2"
+  seat_top: "seat_height + seat_thickness"
+  leg_bottom_radius: "leg_radius * leg_taper"
+  leg_x: "half_width - leg_inset"
+  leg_z: "half_depth - leg_inset"
+  back_z: "-half_depth + back_thickness / 2"
+  # Simple back angle offset (approximate)
+  back_angle_offset: "back_angle * 0.01"
+
+# =============================================================================
+# MATERIALS - Single material for Tier 1
+# =============================================================================
+materials:
+  wood:
+    color: { r: 0.545, g: 0.353, b: 0.169 }
+
+# =============================================================================
+# GEOMETRY - Silhouette-correct forms
+# =============================================================================
+geometry:
+  # =========================================================================
+  # SEAT - Box with proper dimensions and thickness
+  # Tier 1: Has thickness, correct proportions, but no edge treatment
+  # =========================================================================
+  - box:
+      name: seat
+      center: { x: 0, y: "seat_height + seat_thickness/2", z: 0 }
+      size: { x: "seat_width", y: "seat_thickness", z: "seat_depth" }
+      color: $wood
+
+  # =========================================================================
+  # BACK PANEL - Flat panel with slight angle
+  # Tier 1: Recognizable back form, but same geometry regardless of style
+  # =========================================================================
+  - vertex: back_bl
+    position: { x: "-half_width + 0.02", y: "seat_top", z: "back_z" }
+
+  - vertex: back_br
+    position: { x: "half_width - 0.02", y: "seat_top", z: "back_z" }
+
+  - vertex: back_tr
+    position: { x: "half_width - 0.02", y: "seat_top + back_height", z: "back_z - back_angle_offset" }
+
+  - vertex: back_tl
+    position: { x: "-half_width + 0.02", y: "seat_top + back_height", z: "back_z - back_angle_offset" }
+
+  # Front face
+  - face: back_front
+    vertices: [back_bl, back_br, back_tr, back_tl]
+    color: $wood
+
+  # Back face (for slight thickness appearance)
+  - vertex: back_bl_rear
+    position: { x: "-half_width + 0.02", y: "seat_top", z: "back_z - back_thickness" }
+
+  - vertex: back_br_rear
+    position: { x: "half_width - 0.02", y: "seat_top", z: "back_z - back_thickness" }
+
+  - vertex: back_tr_rear
+    position: { x: "half_width - 0.02", y: "seat_top + back_height", z: "back_z - back_angle_offset - back_thickness" }
+
+  - vertex: back_tl_rear
+    position: { x: "-half_width + 0.02", y: "seat_top + back_height", z: "back_z - back_angle_offset - back_thickness" }
+
+  - face: back_rear
+    vertices: [back_br_rear, back_bl_rear, back_tl_rear, back_tr_rear]
+    color: $wood
+
+  # Top edge
+  - face: back_top
+    vertices: [back_tl, back_tr, back_tr_rear, back_tl_rear]
+    color: $wood
+
+  # Bottom edge
+  - face: back_bottom
+    vertices: [back_bl_rear, back_br_rear, back_br, back_bl]
+    color: $wood
+
+  # Left edge
+  - face: back_left
+    vertices: [back_bl_rear, back_bl, back_tl, back_tl_rear]
+    color: $wood
+
+  # Right edge
+  - face: back_right
+    vertices: [back_br, back_br_rear, back_tr_rear, back_tr]
+    color: $wood
+
+  # =========================================================================
+  # LEGS - Tapered lofted cylinders (4)
+  # Tier 1: Simple taper, 8 segments, capped
+  # =========================================================================
+
+  # --- BACK LEFT LEG ---
+  - circle: leg_bl_top
+    center: { x: "-leg_x", y: "seat_height", z: "-leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    normal: [0, 1, 0]
+
+  - circle: leg_bl_bottom
+    center: { x: "-leg_x", y: 0, z: "-leg_z" }
+    radius: "leg_bottom_radius"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - loft: leg_bl
+    from: leg_bl_bottom
+    to: leg_bl_top
+    color: $wood
+
+  - cap: leg_bl_cap_top
+    loop: leg_bl_top
+    color: $wood
+
+  - cap: leg_bl_cap_bottom
+    loop: leg_bl_bottom
+    flip: true
+    color: $wood
+
+  # --- BACK RIGHT LEG ---
+  - circle: leg_br_top
+    center: { x: "leg_x", y: "seat_height", z: "-leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    normal: [0, 1, 0]
+
+  - circle: leg_br_bottom
+    center: { x: "leg_x", y: 0, z: "-leg_z" }
+    radius: "leg_bottom_radius"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - loft: leg_br
+    from: leg_br_bottom
+    to: leg_br_top
+    color: $wood
+
+  - cap: leg_br_cap_top
+    loop: leg_br_top
+    color: $wood
+
+  - cap: leg_br_cap_bottom
+    loop: leg_br_bottom
+    flip: true
+    color: $wood
+
+  # --- FRONT LEFT LEG ---
+  - circle: leg_fl_top
+    center: { x: "-leg_x", y: "seat_height", z: "leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    normal: [0, 1, 0]
+
+  - circle: leg_fl_bottom
+    center: { x: "-leg_x", y: 0, z: "leg_z" }
+    radius: "leg_bottom_radius"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - loft: leg_fl
+    from: leg_fl_bottom
+    to: leg_fl_top
+    color: $wood
+
+  - cap: leg_fl_cap_top
+    loop: leg_fl_top
+    color: $wood
+
+  - cap: leg_fl_cap_bottom
+    loop: leg_fl_bottom
+    flip: true
+    color: $wood
+
+  # --- FRONT RIGHT LEG ---
+  - circle: leg_fr_top
+    center: { x: "leg_x", y: "seat_height", z: "leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    normal: [0, 1, 0]
+
+  - circle: leg_fr_bottom
+    center: { x: "leg_x", y: 0, z: "leg_z" }
+    radius: "leg_bottom_radius"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - loft: leg_fr
+    from: leg_fr_bottom
+    to: leg_fr_top
+    color: $wood
+
+  - cap: leg_fr_cap_top
+    loop: leg_fr_top
+    color: $wood
+
+  - cap: leg_fr_cap_bottom
+    loop: leg_fr_bottom
+    flip: true
+    color: $wood
+
+  # =========================================================================
+  # STRETCHERS - Simple cylinders connecting legs (conditional)
+  # Tier 1: Present when enabled, simple lofted cylinders
+  # =========================================================================
+  - when: has_stretchers
+    geometry:
+      # Side stretcher (left)
+      - circle: str_l_front
+        center: { x: "-leg_x", y: "stretcher_height", z: "leg_z - 0.02" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [0, 0, 1]
+
+      - circle: str_l_back
+        center: { x: "-leg_x", y: "stretcher_height", z: "-leg_z + 0.02" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [0, 0, -1]
+
+      - loft: stretcher_left
+        from: str_l_front
+        to: str_l_back
+        color: $wood
+
+      - cap: str_l_front_cap
+        loop: str_l_front
+        color: $wood
+
+      - cap: str_l_back_cap
+        loop: str_l_back
+        flip: true
+        color: $wood
+
+      # Side stretcher (right)
+      - circle: str_r_front
+        center: { x: "leg_x", y: "stretcher_height", z: "leg_z - 0.02" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [0, 0, 1]
+
+      - circle: str_r_back
+        center: { x: "leg_x", y: "stretcher_height", z: "-leg_z + 0.02" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [0, 0, -1]
+
+      - loft: stretcher_right
+        from: str_r_front
+        to: str_r_back
+        color: $wood
+
+      - cap: str_r_front_cap
+        loop: str_r_front
+        color: $wood
+
+      - cap: str_r_back_cap
+        loop: str_r_back
+        flip: true
+        color: $wood
+
+      # Front cross stretcher
+      - circle: str_f_left
+        center: { x: "-leg_x + 0.02", y: "stretcher_height", z: "leg_z" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [-1, 0, 0]
+
+      - circle: str_f_right
+        center: { x: "leg_x - 0.02", y: "stretcher_height", z: "leg_z" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [1, 0, 0]
+
+      - loft: stretcher_front
+        from: str_f_left
+        to: str_f_right
+        color: $wood
+
+      - cap: str_f_left_cap
+        loop: str_f_left
+        color: $wood
+
+      - cap: str_f_right_cap
+        loop: str_f_right
+        flip: true
+        color: $wood

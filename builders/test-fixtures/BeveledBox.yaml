@@ -1,0 +1,33 @@
+# BeveledBox.yaml - Simple box with bevel to test topology
+# Used to verify bevel operation produces correct face winding
+
+version: "1.0"
+name: BeveledBox
+description: Simple beveled box for testing bevel topology
+author: procedurable
+tags: [demo, test, bevel]
+
+measurements:
+  box_size:
+    value: 1.0
+    source: "Box dimensions"
+
+  bevel_width:
+    value: 0.1
+    source: "Bevel width"
+
+materials:
+  gray:
+    color: { r: 0.5, g: 0.5, b: 0.5 }
+
+geometry:
+  - box:
+      name: cube
+      center: { x: 0, y: 0.5, z: 0 }
+      size: { x: "box_size", y: "box_size", z: "box_size" }
+      color: $gray
+
+  - bevel: cube_bevel
+    width: "bevel_width"
+    segments: 1
+    angle_threshold: 0.52  # ~30 degrees in radians

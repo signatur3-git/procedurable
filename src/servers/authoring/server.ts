@@ -27,6 +27,7 @@ import { worldNamespace } from './commands/world';
 import { sceneNamespace } from './commands/scene';
 import { geometryNamespace } from './commands/geometry';
 import { textNamespace } from './commands/text';
+import { psdNamespace } from './commands/psd';
 import { parseAndExecuteBuilder, parseYamlWithLibrary } from '../../generation/builder/YamlBuilderParser';
 import { TracedOutput } from '../../generation/builder/TracedBuilder';
 import { proceduralFontRegistry } from '../../generation/text/ProceduralFont';
@@ -51,6 +52,7 @@ registry.registerNamespace(worldNamespace);
 registry.registerNamespace(sceneNamespace);
 registry.registerNamespace(geometryNamespace);
 registry.registerNamespace(textNamespace);
+registry.registerNamespace(psdNamespace);
 
 // Global state
 let activeBuilder: string | null = null;
@@ -196,8 +198,8 @@ async function runYamlBuilder(name: string, seed: number, overrides?: Record<str
         };
       }
 
-      // Check if this builder is in the YAML cache
-      const cachedBuilder = yamlBuilderCache.get(subName);
+      // Check if this builder is in the YAML cache (supports basename fallback for subdirectories)
+      const cachedBuilder = resolveFromCache(subName);
       if (cachedBuilder) {
         // Create an async wrapper that runs the cached YAML builder
         return async (subSeed: number, subOverrides?: Record<string, any>) => {
@@ -227,7 +229,7 @@ function createBuilderResolver(): (name: string) => ((seed: number, overrides?: 
       };
     }
 
-    const cachedBuilder = yamlBuilderCache.get(subName);
+    const cachedBuilder = resolveFromCache(subName);
     if (cachedBuilder) {
       return async (subSeed: number, subOverrides?: Record<string, any>) => {
         return await parseAndExecuteBuilder(cachedBuilder, {
@@ -240,6 +242,24 @@ function createBuilderResolver(): (name: string) => ((seed: number, overrides?: 
 
     return null;
   };
+}
+
+/**
+ * Resolve a builder from cache by exact name or basename fallback.
+ * Supports subdirectory organization: "DiningChair" matches "catalog/DiningChair".
+ */
+function resolveFromCache(name: string): any | undefined {
+  // Try exact match first
+  const exact = yamlBuilderCache.get(name);
+  if (exact) return exact;
+
+  // Basename fallback: search for entries ending with /name
+  for (const [key, value] of yamlBuilderCache.entries()) {
+    const basename = key.includes('/') ? key.split('/').pop() : key;
+    if (basename === name) return value;
+  }
+
+  return undefined;
 }
 
 // Cache for pre-loaded YAML builder definitions
@@ -320,6 +340,7 @@ function createContext(): CommandContext {
     activeBuilderSource,
     lastRun,
     runHistory,
+    lastPSDScene: null, // Lazily populated by psd commands
     measurementOverrides,
     decisionOverrides,
     getBuilder,

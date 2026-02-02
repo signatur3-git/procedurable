@@ -46,7 +46,8 @@ Procedurable is a **decision-driven procedural authoring platform** for generati
 │           Command Parser → Namespaced Handlers   │
 ├─────────────────────────────────────────────────┤
 │           Builder Engine                         │
-│  YAML Parser → TracedBuilder → Geometry → Mesh   │
+│  YamlBuilderParser → YamlBuilderExecutor         │
+│      → Command Registry → TracedBuilder → Mesh   │
 ├─────────────────────────────────────────────────┤
 │           Foundation                             │
 │  Math · Spatial · Geometry · Text · Materials    │
@@ -57,6 +58,11 @@ Procedurable is a **decision-driven procedural authoring platform** for generati
 ```
 
 The layers enforce a dependency rule: each layer may only depend on the layer directly below it. The **MCP server is intentionally thin and stable** — all capability extension happens in the Authoring Server's command handlers, which hot-reload.
+
+The **Builder Engine** uses a modular architecture:
+- `YamlBuilderParser` (118 lines) - entry point, delegates to executor
+- `YamlBuilderExecutor` (669 lines) - processes 7 phases
+- Command Registry - 14 geometry command handlers for extensibility
 
 ## What Makes This Different
 

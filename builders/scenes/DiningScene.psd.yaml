@@ -1,0 +1,165 @@
+# Example PSD (Procedurable Scene Description) v0.1
+# Hand-written example showing the output format for a DiningScene builder
+# This is NOT a builder — it's what a builder produces after execution.
+#
+# B2-001
+
+version: "0.1"
+name: DiningScene
+generator: "DiningScene seed=42"
+
+materials:
+  - name: oak_wood
+    color: [0.6, 0.4, 0.2]
+    roughness: 0.7
+    metalness: 0.0
+  - name: oak_dark
+    color: [0.45, 0.28, 0.15]
+    roughness: 0.65
+    metalness: 0.0
+
+metadata:
+  buildTime: 0.052
+  qualityTier: 1
+  seed: 42
+
+prims:
+  # ---- Root ----
+  /DiningScene:
+    type: Xform
+    parent: null
+    children:
+      - /DiningScene/table
+      - /DiningScene/__prototypes__
+      - /DiningScene/chair_0
+      - /DiningScene/chair_1
+      - /DiningScene/chair_2
+      - /DiningScene/chair_3
+    transform:
+      position: [0, 0, 0]
+      rotation: [0, 0, 0]
+      scale: [1, 1, 1]
+    tags: [scene, dining, furniture_group]
+    bounds:
+      min: [-1.2, 0, -0.8]
+      max: [1.2, 0.9, 0.8]
+    builderName: DiningScene
+
+  # ---- Table (merged mesh) ----
+  /DiningScene/table:
+    type: Mesh
+    parent: /DiningScene
+    children: []
+    transform:
+      position: [0, 0, 0]
+      rotation: [0, 0, 0]
+      scale: [1, 1, 1]
+    tags: [furniture, table, surface, dining_table]
+    bounds:
+      min: [-0.6, 0, -0.4]
+      max: [0.6, 0.75, 0.4]
+    builderName: Table
+    geometry:
+      vertices: [-0.6,0.75,-0.4, 0.6,0.75,-0.4, 0.6,0.75,0.4, -0.6,0.75,0.4]  # simplified — top face only
+      normals: [0,1,0, 0,1,0, 0,1,0, 0,1,0]
+      indices: [0,1,2, 0,2,3]
+    materialSlots: [0, 0]  # both triangles use oak_wood
+    skeleton: null
+    jointWeights: []
+
+  # ---- Prototypes (not rendered directly, referenced by instances) ----
+  /DiningScene/__prototypes__:
+    type: Xform
+    parent: /DiningScene
+    children:
+      - /DiningScene/__prototypes__/DiningChair
+    transform:
+      position: [0, 0, 0]
+      rotation: [0, 0, 0]
+      scale: [1, 1, 1]
+    tags: [prototype_group]
+    bounds:
+      min: [0, 0, 0]
+      max: [0, 0, 0]
+
+  /DiningScene/__prototypes__/DiningChair:
+    type: Mesh
+    parent: /DiningScene/__prototypes__
+    children: []
+    transform:
+      position: [0, 0, 0]
+      rotation: [0, 0, 0]
+      scale: [1, 1, 1]
+    tags: [furniture, seating, chair, dining_chair]
+    bounds:
+      min: [-0.22, 0, -0.22]
+      max: [0.22, 0.9, 0.22]
+    builderName: DiningChair
+    geometry:
+      vertices: [-0.22,0.45,-0.22, 0.22,0.45,-0.22, 0.22,0.45,0.22, -0.22,0.45,0.22]  # simplified — seat only
+      normals: [0,1,0, 0,1,0, 0,1,0, 0,1,0]
+      indices: [0,1,2, 0,2,3]
+    materialSlots: [1, 1]  # both triangles use oak_dark
+    skeleton: null
+    jointWeights: []
+
+  # ---- Chair instances ----
+  /DiningScene/chair_0:
+    type: Instance
+    parent: /DiningScene
+    children: []
+    transform:
+      position: [-0.6, 0, -0.65]
+      rotation: [0, 0, 0]
+      scale: [1, 1, 1]
+    tags: [furniture, seating, chair]
+    bounds:
+      min: [-0.82, 0, -0.87]
+      max: [-0.38, 0.9, -0.43]
+    prototype: /DiningScene/__prototypes__/DiningChair
+    seed: 42
+
+  /DiningScene/chair_1:
+    type: Instance
+    parent: /DiningScene
+    children: []
+    transform:
+      position: [0.6, 0, -0.65]
+      rotation: [0, 0, 0]
+      scale: [1, 1, 1]
+    tags: [furniture, seating, chair]
+    bounds:
+      min: [0.38, 0, -0.87]
+      max: [0.82, 0.9, -0.43]
+    prototype: /DiningScene/__prototypes__/DiningChair
+    seed: 43
+
+  /DiningScene/chair_2:
+    type: Instance
+    parent: /DiningScene
+    children: []
+    transform:
+      position: [-0.6, 0, 0.65]
+      rotation: [0, 3.14159, 0]
+      scale: [1, 1, 1]
+    tags: [furniture, seating, chair]
+    bounds:
+      min: [-0.82, 0, 0.43]
+      max: [-0.38, 0.9, 0.87]
+    prototype: /DiningScene/__prototypes__/DiningChair
+    seed: 44
+
+  /DiningScene/chair_3:
+    type: Instance
+    parent: /DiningScene
+    children: []
+    transform:
+      position: [0.6, 0, 0.65]
+      rotation: [0, 3.14159, 0]
+      scale: [1, 1, 1]
+    tags: [furniture, seating, chair]
+    bounds:
+      min: [0.38, 0, 0.43]
+      max: [0.82, 0.9, 0.87]
+    prototype: /DiningScene/__prototypes__/DiningChair
+    seed: 45

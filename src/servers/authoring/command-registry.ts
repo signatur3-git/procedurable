@@ -17,6 +17,9 @@ export interface CommandContext {
   lastRun: any | null;  // TracedOutput
   runHistory: any[];
 
+  // Cached PSD scene (B2-003) - lazily populated from lastRun
+  lastPSDScene: any | null;  // PSDScene
+
   // Persistent overrides (applied on every run)
   measurementOverrides: Map<string, number>;
   decisionOverrides: Map<string, any>;

@@ -1,0 +1,70 @@
+# DiningChair Sophistication Plan
+# Describes what the builder should achieve at each quality tier
+
+builder: DiningChair
+domain: furniture/seating
+
+tier_0_placeholder:
+  description: "Bounding volumes for layout and collision"
+  parts: [seat_box, leg_cylinders_x4, back_box]
+  tools_needed: [box, cylinder]
+  decisions: [seat_height, seat_width, seat_depth]
+
+tier_1_silhouette:
+  description: "Recognizable chair shape with correct proportions"
+  parts:
+    seat: "Flat slab with correct proportions and thickness"
+    legs: "Tapered cylinders via loft"
+    back: "Rectangular panel"
+    stretchers: "Optional connecting rods between legs"
+  tools_needed: [box, loft, circle]
+  decisions: [leg_taper, has_stretchers, stretcher_height, back_recline,
+              width_variation, depth_variation, back_height_variation]
+  upgrades_from_t0:
+    - "Legs use loft for taper instead of raw cylinders"
+    - "Back panel exists (even if thin)"
+    - "Stretchers conditionally appear based on has_stretchers"
+
+tier_2_form_resolved:
+  description: "Solid, believable chair with distinct style variants"
+  parts:
+    seat:
+      geometry: "Box with rounded top edges (subdivide or profile extrude)"
+      detail: "Slight concave contour on sitting surface via seat_curve"
+      variation: "seat_shape changes between square/rounded/contoured"
+    legs:
+      geometry: "Loft with proper cross-section per style"
+      detail: "Square legs get chamfered corners, round legs taper smoothly"
+      variation: "leg_style actually changes cross-section geometry"
+      variants:
+        round: "Circle cross-section with taper"
+        square: "Square cross-section with optional chamfer"
+        tapered: "Circle with pronounced taper ratio"
+        turned: "Multi-radius lathe profile"
+    back:
+      geometry: "Different per back_style"
+      variants:
+        solid: "Panel with thickness, slight curve, rounded top edge"
+        slat: "N vertical slats with gaps, each a lofted bar"
+        ladder: "N horizontal rungs between uprights"
+        spindle: "N turned spindles (lathe profile)"
+    stretchers:
+      geometry: "Turned rods between legs"
+      detail: "Slightly thicker at center (lathe profile)"
+  tools_needed: [loft, lathe, box, circle, conditional_geometry, multi_material]
+  decisions_that_affect_geometry:
+    - "back_style -> completely different back geometry"
+    - "leg_style -> different cross-section"
+    - "seat_shape -> different seat profile"
+    - "slat_count -> number of slats when back_style=slat"
+    - "ladder_rung_count -> number of rungs when back_style=ladder"
+    - "spindle_count -> number of spindles when back_style=spindle"
+  materials:
+    - "wood_body: varies by wood_type decision"
+    - "cushion: optional, different color"
+
+tier_3_detail:
+  description: "Close-up ready chair with surface refinement"
+  requires_tools_not_yet_built: [bevel, noise_displacement, UV_generation]
+  deferred: true
+  notes: "Beveled seat edges, wood grain displacement, proper UVs for texture mapping"

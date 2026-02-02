@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx jest:*)",
+      "Bash(npx tsc:*)",
+      "Bash(npx vitest run:*)",
+      "Bash(ls:*)",
+      "Bash(NODE_OPTIONS='--experimental-vm-modules' npx jest:*)",
+      "Bash(dir:*)",
+      "Bash(find:*)",
+      "Bash(git mv:*)",
+      "Bash(cat:*)"
+    ]
+  }
+}

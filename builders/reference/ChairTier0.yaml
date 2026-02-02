@@ -1,0 +1,178 @@
+# ChairTier0 - Quality Tier 0 Reference Builder
+#
+# This is the REFERENCE implementation for what Tier 0 quality looks like.
+# Use this as a baseline for understanding the minimum viable representation.
+#
+# Tier 0 Definition: Bounding volume / placeholder quality
+# - Boxes representing approximate volumes
+# - Only dimensional decisions (height, width, depth)
+# - Purpose: Layout testing, spatial planning, collision volumes
+# - Triangle budget: < 100 triangles
+
+version: "1.0"
+name: ChairTier0
+description: Tier 0 reference - bounding box placeholders for a chair
+author: procedurable
+tags: [furniture, seating, reference, tier-0, quality-reference]
+
+# =============================================================================
+# QUALITY - This defines what Tier 0 IS
+# =============================================================================
+quality:
+  target_tier: 0                    # This IS the target tier - it's complete at Tier 0
+  current_tier: 0                   # Achieved tier matches target
+
+  # No tier gaps because this IS the Tier 0 reference
+  tier_gaps: []
+
+  parts:
+    seat_volume:
+      tier: 0
+      notes: "Simple box representing seat bounding volume"
+    leg_volumes:
+      tier: 0
+      notes: "Four box volumes approximating leg positions"
+    back_volume:
+      tier: 0
+      notes: "Box representing back panel bounding volume"
+
+  decision_coverage:
+    geometry_affecting:
+      - seat_height           # Affects vertical position
+      - seat_width            # Affects box width
+      - seat_depth            # Affects box depth
+      - back_height           # Affects back box height
+      - has_back              # Adds/removes back volume
+    decorative_only: []       # All decisions affect geometry at Tier 0
+    coverage_percentage: 100  # All decisions work
+
+  # What Tier 0 is FOR
+  tier_0_purpose:
+    - "Layout testing: place chairs around tables to check clearances"
+    - "Spatial planning: verify room fits N chairs"
+    - "Collision volumes: approximate hit-testing during composition"
+    - "Rapid prototyping: get proportions right before adding detail"
+
+  upgrade_path:
+    to_tier_1:
+      - "Replace seat box with proper proportioned slab"
+      - "Replace leg boxes with tapered cylinders (loft)"
+      - "Add stretcher options"
+      - "Add back style decision (even if single implementation)"
+
+# =============================================================================
+# DECISIONS - Only dimensional choices at Tier 0
+# =============================================================================
+decisions:
+  has_back:
+    type: boolean
+    probability: 0.9
+
+  seat_width_choice:
+    type: number
+    min: 0.38
+    max: 0.46
+
+  seat_depth_choice:
+    type: number
+    min: 0.34
+    max: 0.42
+
+  back_height_choice:
+    type: number
+    min: 0.30
+    max: 0.45
+
+# =============================================================================
+# MEASUREMENTS - Standard chair dimensions
+# =============================================================================
+measurements:
+  seat_width:
+    value: seat_width_choice
+    source: "Dining chair seat width range"
+
+  seat_depth:
+    value: seat_depth_choice
+    source: "Dining chair seat depth range"
+
+  seat_height:
+    value: 0.45
+    source: "Ergonomic seating height"
+
+  seat_thickness:
+    value: 0.025
+    source: "Seat volume thickness"
+
+  leg_size:
+    value: 0.04
+    source: "Leg bounding box size (square)"
+
+  back_height:
+    value: back_height_choice
+    source: "Back panel height"
+
+  back_thickness:
+    value: 0.04
+    source: "Back volume thickness"
+
+# =============================================================================
+# DERIVED VALUES
+# =============================================================================
+derived:
+  half_width: "seat_width / 2"
+  half_depth: "seat_depth / 2"
+  seat_top: "seat_height + seat_thickness"
+  leg_half: "leg_size / 2"
+  leg_x: "half_width - leg_size"
+  leg_z: "half_depth - leg_size"
+
+# =============================================================================
+# GEOMETRY - Simple box primitives only
+# =============================================================================
+geometry:
+  # -------------------------------------------------------------------------
+  # SEAT VOLUME - Single box
+  # -------------------------------------------------------------------------
+  - box:
+      name: seat_volume
+      center: { x: "0", y: "seat_height + seat_thickness/2", z: "0" }
+      size: { x: "seat_width", y: "seat_thickness", z: "seat_depth" }
+      color: { r: 0.545, g: 0.271, b: 0.075 }
+
+  # -------------------------------------------------------------------------
+  # LEG VOLUMES - Four boxes (not cylinders - Tier 0 is primitives only)
+  # -------------------------------------------------------------------------
+  - box:
+      name: leg_bl
+      center: { x: "-leg_x", y: "seat_height / 2", z: "-leg_z" }
+      size: { x: "leg_size", y: "seat_height", z: "leg_size" }
+      color: { r: 0.396, g: 0.263, b: 0.129 }
+
+  - box:
+      name: leg_br
+      center: { x: "leg_x", y: "seat_height / 2", z: "-leg_z" }
+      size: { x: "leg_size", y: "seat_height", z: "leg_size" }
+      color: { r: 0.396, g: 0.263, b: 0.129 }
+
+  - box:
+      name: leg_fl
+      center: { x: "-leg_x", y: "seat_height / 2", z: "leg_z" }
+      size: { x: "leg_size", y: "seat_height", z: "leg_size" }
+      color: { r: 0.396, g: 0.263, b: 0.129 }
+
+  - box:
+      name: leg_fr
+      center: { x: "leg_x", y: "seat_height / 2", z: "leg_z" }
+      size: { x: "leg_size", y: "seat_height", z: "leg_size" }
+      color: { r: 0.396, g: 0.263, b: 0.129 }
+
+  # -------------------------------------------------------------------------
+  # BACK VOLUME - Conditional box
+  # -------------------------------------------------------------------------
+  - when: has_back
+    geometry:
+      - box:
+          name: back_volume
+          center: { x: 0, y: "seat_top + back_height/2", z: "-half_depth + back_thickness/2" }
+          size: { x: "seat_width", y: "back_height", z: "back_thickness" }
+          color: { r: 0.545, g: 0.271, b: 0.075 }

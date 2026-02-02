@@ -1,0 +1,700 @@
+# ChairTier2 - Quality Tier 2 Reference Builder
+#
+# This is the REFERENCE implementation for what Tier 2 quality looks like.
+# This is the target quality level for most production assets.
+#
+# Tier 2 Definition: Form-Resolved / Solid Model
+# - Each part has proper 3D volume and closed mesh
+# - No single-face panels - everything has thickness
+# - Decisions produce DIFFERENT geometry (back_style actually changes the back)
+# - Multiple materials distinguish parts
+# - Edge treatment matches style (bevels blocked by missing C2, documented)
+# - Triangle budget: 1,000-10,000 triangles
+
+version: "1.0"
+name: ChairTier2
+description: Tier 2 reference - form-resolved chair with style variants and multi-material
+author: procedurable
+tags: [furniture, seating, reference, tier-2, quality-reference]
+
+# =============================================================================
+# QUALITY - This defines what Tier 2 IS
+# =============================================================================
+quality:
+  target_tier: 2
+  current_tier: 2
+
+  # Tier 2 gaps that would be fixed if C2 (bevel) existed
+  tier_gaps:
+    - "Edge bevels blocked by missing C2 bevel tool"
+    - "Seat contour (dish shape) would need subdivide + displace"
+
+  tier_characteristics:
+    above_tier_1:
+      - "Back style decision produces completely different geometry per option"
+      - "Solid back has thickness (box, not quad)"
+      - "Slat back has multiple vertical bars"
+      - "Ladder back has horizontal rungs"
+      - "Multiple materials: wood body + accent color"
+      - "All meshes are closed volumes (watertight)"
+    below_tier_3:
+      - "No edge bevels (blocked by missing C2 tool)"
+      - "No surface detail or texture variation"
+      - "No joinery visible (mortise/tenon, dowels)"
+      - "No UVs for texture mapping"
+
+  parts:
+    seat:
+      tier: 2
+      notes: "Closed box with thickness. Would have rounded edges with C2 bevel."
+
+    legs:
+      tier: 2
+      notes: "Tapered lofted cylinders, fully capped. Proper cross-section."
+
+    back_frame:
+      tier: 2
+      notes: "Vertical posts with proper thickness connecting seat to top rail."
+
+    back_fill:
+      tier: 2
+      notes: "Varies by back_style: solid panel, slats, or ladder rungs. Each is a closed mesh."
+
+    stretchers:
+      tier: 2
+      notes: "Fully capped cylinders when enabled."
+
+  decision_coverage:
+    geometry_affecting:
+      - back_style             # ACTUALLY produces different geometry
+      - leg_taper              # Changes leg bottom radius
+      - has_stretchers         # Adds/removes stretcher geometry
+      - slat_count             # Number of slats when back_style==slat
+      - rung_count             # Number of rungs when back_style==ladder
+    decorative_only: []        # All decisions work at Tier 2
+    coverage_percentage: 100
+
+  tier_2_purpose:
+    - "Production furniture assets"
+    - "Mid-ground game objects"
+    - "Furniture catalog visualization"
+    - "Interior design tools"
+
+  upgrade_path:
+    to_tier_3:
+      - "Add edge bevels (needs C2)"
+      - "Add joinery details at leg/seat junction"
+      - "Add subtle surface variation (needs C5 deformers)"
+      - "Add UV coordinates for texture mapping (needs C4)"
+      - "Add wood grain direction per part"
+
+# =============================================================================
+# DECISIONS - All affect output geometry
+# =============================================================================
+decisions:
+  back_style:
+    type: choice
+    options: [solid, slat, ladder]
+    weights: [0.4, 0.35, 0.25]
+
+  leg_taper:
+    type: number
+    min: 0.75
+    max: 1.0
+
+  has_stretchers:
+    type: boolean
+    probability: 0.5
+
+  slat_count:
+    type: count
+    min: 3
+    max: 5
+    condition: back_style == "slat"
+
+  rung_count:
+    type: count
+    min: 2
+    max: 4
+    condition: back_style == "ladder"
+
+# =============================================================================
+# MEASUREMENTS - All with real-world sources
+# =============================================================================
+measurements:
+  seat_width:
+    value: 0.42
+    source: "Standard dining chair width"
+
+  seat_depth:
+    value: 0.38
+    source: "Standard dining chair depth"
+
+  seat_height:
+    value: 0.45
+    source: "Ergonomic seating height"
+
+  seat_thickness:
+    value: 0.025
+    source: "Solid wood seat thickness"
+
+  leg_radius:
+    value: 0.018
+    source: "Chair leg radius"
+
+  leg_inset:
+    value: 0.035
+    source: "Leg inset from seat edge"
+
+  back_height:
+    value: 0.38
+    source: "Back support height above seat"
+
+  back_post_radius:
+    value: 0.015
+    source: "Back post radius"
+
+  back_panel_thickness:
+    value: 0.015
+    source: "Solid back panel thickness"
+
+  slat_width:
+    value: 0.035
+    source: "Slat bar width"
+
+  slat_thickness:
+    value: 0.012
+    source: "Slat bar depth"
+
+  rung_radius:
+    value: 0.012
+    source: "Ladder rung radius"
+
+  top_rail_height:
+    value: 0.045
+    source: "Top rail cross-section height"
+
+  top_rail_depth:
+    value: 0.025
+    source: "Top rail cross-section depth"
+
+  stretcher_radius:
+    value: 0.012
+    source: "Stretcher cross-section radius"
+
+  stretcher_height:
+    value: 0.12
+    source: "Stretcher height from floor"
+
+# =============================================================================
+# DERIVED VALUES
+# =============================================================================
+derived:
+  half_width: "seat_width / 2"
+  half_depth: "seat_depth / 2"
+  seat_top: "seat_height + seat_thickness"
+  leg_bottom_radius: "leg_radius * leg_taper"
+  leg_x: "half_width - leg_inset"
+  leg_z: "half_depth - leg_inset"
+
+  # Back post positions
+  back_post_x: "half_width - 0.025"
+  back_post_z: "-half_depth + back_post_radius"
+  back_top: "seat_top + back_height"
+
+  # Slat spacing calculation
+  slat_spacing: "(seat_width - 0.08) / (slat_count + 1)"
+  slat_start_x: "-half_width + 0.04 + slat_spacing"
+
+  # Rung spacing calculation
+  rung_spacing: "(back_height - top_rail_height - 0.04) / (rung_count + 1)"
+  rung_start_y: "seat_top + 0.04 + rung_spacing"
+
+# =============================================================================
+# MATERIALS - Multiple materials for Tier 2
+# =============================================================================
+materials:
+  wood_primary:
+    color: { r: 0.545, g: 0.353, b: 0.169 }
+
+  wood_accent:
+    color: { r: 0.396, g: 0.263, b: 0.129 }
+
+# =============================================================================
+# GEOMETRY - Form-resolved with style variants
+# =============================================================================
+geometry:
+  # =========================================================================
+  # SEAT - Closed box with proper thickness (Tier 2)
+  # =========================================================================
+  - box:
+      name: seat
+      center: { x: 0, y: "seat_height + seat_thickness/2", z: 0 }
+      size: { x: "seat_width", y: "seat_thickness", z: "seat_depth" }
+      color: $wood_primary
+
+  # =========================================================================
+  # BACK POSTS - Vertical cylinders forming back frame (always present)
+  # =========================================================================
+  # Left back post
+  - circle: back_post_l_bottom
+    center: { x: "-back_post_x", y: "seat_top", z: "back_post_z" }
+    radius: "back_post_radius"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - circle: back_post_l_top
+    center: { x: "-back_post_x", y: "back_top", z: "back_post_z" }
+    radius: "back_post_radius"
+    segments: 8
+    normal: [0, 1, 0]
+
+  - loft: back_post_left
+    from: back_post_l_bottom
+    to: back_post_l_top
+    color: $wood_accent
+
+  - cap: back_post_l_bottom_cap
+    loop: back_post_l_bottom
+    flip: true
+    color: $wood_accent
+
+  - cap: back_post_l_top_cap
+    loop: back_post_l_top
+    color: $wood_accent
+
+  # Right back post
+  - circle: back_post_r_bottom
+    center: { x: "back_post_x", y: "seat_top", z: "back_post_z" }
+    radius: "back_post_radius"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - circle: back_post_r_top
+    center: { x: "back_post_x", y: "back_top", z: "back_post_z" }
+    radius: "back_post_radius"
+    segments: 8
+    normal: [0, 1, 0]
+
+  - loft: back_post_right
+    from: back_post_r_bottom
+    to: back_post_r_top
+    color: $wood_accent
+
+  - cap: back_post_r_bottom_cap
+    loop: back_post_r_bottom
+    flip: true
+    color: $wood_accent
+
+  - cap: back_post_r_top_cap
+    loop: back_post_r_top
+    color: $wood_accent
+
+  # =========================================================================
+  # TOP RAIL - Horizontal bar at top of back (always present)
+  # =========================================================================
+  - box:
+      name: top_rail
+      center: { x: 0, y: "back_top - top_rail_height/2", z: "back_post_z" }
+      size: { x: "seat_width - 0.04", y: "top_rail_height", z: "top_rail_depth" }
+      color: $wood_accent
+
+  # =========================================================================
+  # BACK FILL: SOLID PANEL (when back_style == solid)
+  # Tier 2: Actual 3D box with thickness, not a floating quad
+  # =========================================================================
+  - when: back_style == "solid"
+    geometry:
+      - box:
+          name: back_panel
+          center: { x: 0, y: "seat_top + (back_height - top_rail_height)/2", z: "back_post_z" }
+          size: { x: "seat_width - 0.06", y: "back_height - top_rail_height - 0.02", z: "back_panel_thickness" }
+          color: $wood_primary
+
+  # =========================================================================
+  # BACK FILL: SLATS (when back_style == slat)
+  # Tier 2: Multiple vertical bars, each a closed box
+  # =========================================================================
+  - when: back_style == "slat"
+    geometry:
+      # Slat 1
+      - box:
+          name: slat_1
+          center: { x: "slat_start_x", y: "seat_top + (back_height - top_rail_height)/2", z: "back_post_z" }
+          size: { x: "slat_width", y: "back_height - top_rail_height - 0.03", z: "slat_thickness" }
+          color: $wood_primary
+
+      # Slat 2
+      - box:
+          name: slat_2
+          center: { x: "slat_start_x + slat_spacing", y: "seat_top + (back_height - top_rail_height)/2", z: "back_post_z" }
+          size: { x: "slat_width", y: "back_height - top_rail_height - 0.03", z: "slat_thickness" }
+          color: $wood_primary
+
+      # Slat 3
+      - box:
+          name: slat_3
+          center: { x: "slat_start_x + slat_spacing * 2", y: "seat_top + (back_height - top_rail_height)/2", z: "back_post_z" }
+          size: { x: "slat_width", y: "back_height - top_rail_height - 0.03", z: "slat_thickness" }
+          color: $wood_primary
+
+      # Slat 4 (when slat_count >= 4)
+      - when: slat_count >= 4
+        geometry:
+          - box:
+              name: slat_4
+              center: { x: "slat_start_x + slat_spacing * 3", y: "seat_top + (back_height - top_rail_height)/2", z: "back_post_z" }
+              size: { x: "slat_width", y: "back_height - top_rail_height - 0.03", z: "slat_thickness" }
+              color: $wood_primary
+
+      # Slat 5 (when slat_count >= 5)
+      - when: slat_count >= 5
+        geometry:
+          - box:
+              name: slat_5
+              center: { x: "slat_start_x + slat_spacing * 4", y: "seat_top + (back_height - top_rail_height)/2", z: "back_post_z" }
+              size: { x: "slat_width", y: "back_height - top_rail_height - 0.03", z: "slat_thickness" }
+              color: $wood_primary
+
+  # =========================================================================
+  # BACK FILL: LADDER RUNGS (when back_style == ladder)
+  # Tier 2: Multiple horizontal cylinders, each capped
+  # =========================================================================
+  - when: back_style == "ladder"
+    geometry:
+      # Rung 1
+      - circle: rung_1_left
+        center: { x: "-back_post_x + back_post_radius", y: "rung_start_y", z: "back_post_z" }
+        radius: "rung_radius"
+        segments: 6
+        normal: [-1, 0, 0]
+
+      - circle: rung_1_right
+        center: { x: "back_post_x - back_post_radius", y: "rung_start_y", z: "back_post_z" }
+        radius: "rung_radius"
+        segments: 6
+        normal: [1, 0, 0]
+
+      - loft: rung_1
+        from: rung_1_left
+        to: rung_1_right
+        color: $wood_primary
+
+      - cap: rung_1_left_cap
+        loop: rung_1_left
+        color: $wood_primary
+
+      - cap: rung_1_right_cap
+        loop: rung_1_right
+        flip: true
+        color: $wood_primary
+
+      # Rung 2
+      - circle: rung_2_left
+        center: { x: "-back_post_x + back_post_radius", y: "rung_start_y + rung_spacing", z: "back_post_z" }
+        radius: "rung_radius"
+        segments: 6
+        normal: [-1, 0, 0]
+
+      - circle: rung_2_right
+        center: { x: "back_post_x - back_post_radius", y: "rung_start_y + rung_spacing", z: "back_post_z" }
+        radius: "rung_radius"
+        segments: 6
+        normal: [1, 0, 0]
+
+      - loft: rung_2
+        from: rung_2_left
+        to: rung_2_right
+        color: $wood_primary
+
+      - cap: rung_2_left_cap
+        loop: rung_2_left
+        color: $wood_primary
+
+      - cap: rung_2_right_cap
+        loop: rung_2_right
+        flip: true
+        color: $wood_primary
+
+      # Rung 3 (when rung_count >= 3)
+      - when: rung_count >= 3
+        geometry:
+          - circle: rung_3_left
+            center: { x: "-back_post_x + back_post_radius", y: "rung_start_y + rung_spacing * 2", z: "back_post_z" }
+            radius: "rung_radius"
+            segments: 6
+            normal: [-1, 0, 0]
+
+          - circle: rung_3_right
+            center: { x: "back_post_x - back_post_radius", y: "rung_start_y + rung_spacing * 2", z: "back_post_z" }
+            radius: "rung_radius"
+            segments: 6
+            normal: [1, 0, 0]
+
+          - loft: rung_3
+            from: rung_3_left
+            to: rung_3_right
+            color: $wood_primary
+
+          - cap: rung_3_left_cap
+            loop: rung_3_left
+            color: $wood_primary
+
+          - cap: rung_3_right_cap
+            loop: rung_3_right
+            flip: true
+            color: $wood_primary
+
+      # Rung 4 (when rung_count >= 4)
+      - when: rung_count >= 4
+        geometry:
+          - circle: rung_4_left
+            center: { x: "-back_post_x + back_post_radius", y: "rung_start_y + rung_spacing * 3", z: "back_post_z" }
+            radius: "rung_radius"
+            segments: 6
+            normal: [-1, 0, 0]
+
+          - circle: rung_4_right
+            center: { x: "back_post_x - back_post_radius", y: "rung_start_y + rung_spacing * 3", z: "back_post_z" }
+            radius: "rung_radius"
+            segments: 6
+            normal: [1, 0, 0]
+
+          - loft: rung_4
+            from: rung_4_left
+            to: rung_4_right
+            color: $wood_primary
+
+          - cap: rung_4_left_cap
+            loop: rung_4_left
+            color: $wood_primary
+
+          - cap: rung_4_right_cap
+            loop: rung_4_right
+            flip: true
+            color: $wood_primary
+
+  # =========================================================================
+  # LEGS - Tapered lofted cylinders, fully capped (Tier 2)
+  # =========================================================================
+
+  # --- BACK LEFT LEG ---
+  - circle: leg_bl_top
+    center: { x: "-leg_x", y: "seat_height", z: "-leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    normal: [0, 1, 0]
+
+  - circle: leg_bl_bottom
+    center: { x: "-leg_x", y: 0, z: "-leg_z" }
+    radius: "leg_bottom_radius"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - loft: leg_bl
+    from: leg_bl_bottom
+    to: leg_bl_top
+    color: $wood_accent
+
+  - cap: leg_bl_cap_top
+    loop: leg_bl_top
+    color: $wood_accent
+
+  - cap: leg_bl_cap_bottom
+    loop: leg_bl_bottom
+    flip: true
+    color: $wood_accent
+
+  # --- BACK RIGHT LEG ---
+  - circle: leg_br_top
+    center: { x: "leg_x", y: "seat_height", z: "-leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    normal: [0, 1, 0]
+
+  - circle: leg_br_bottom
+    center: { x: "leg_x", y: 0, z: "-leg_z" }
+    radius: "leg_bottom_radius"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - loft: leg_br
+    from: leg_br_bottom
+    to: leg_br_top
+    color: $wood_accent
+
+  - cap: leg_br_cap_top
+    loop: leg_br_top
+    color: $wood_accent
+
+  - cap: leg_br_cap_bottom
+    loop: leg_br_bottom
+    flip: true
+    color: $wood_accent
+
+  # --- FRONT LEFT LEG ---
+  - circle: leg_fl_top
+    center: { x: "-leg_x", y: "seat_height", z: "leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    normal: [0, 1, 0]
+
+  - circle: leg_fl_bottom
+    center: { x: "-leg_x", y: 0, z: "leg_z" }
+    radius: "leg_bottom_radius"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - loft: leg_fl
+    from: leg_fl_bottom
+    to: leg_fl_top
+    color: $wood_accent
+
+  - cap: leg_fl_cap_top
+    loop: leg_fl_top
+    color: $wood_accent
+
+  - cap: leg_fl_cap_bottom
+    loop: leg_fl_bottom
+    flip: true
+    color: $wood_accent
+
+  # --- FRONT RIGHT LEG ---
+  - circle: leg_fr_top
+    center: { x: "leg_x", y: "seat_height", z: "leg_z" }
+    radius: "leg_radius"
+    segments: 8
+    normal: [0, 1, 0]
+
+  - circle: leg_fr_bottom
+    center: { x: "leg_x", y: 0, z: "leg_z" }
+    radius: "leg_bottom_radius"
+    segments: 8
+    normal: [0, -1, 0]
+
+  - loft: leg_fr
+    from: leg_fr_bottom
+    to: leg_fr_top
+    color: $wood_accent
+
+  - cap: leg_fr_cap_top
+    loop: leg_fr_top
+    color: $wood_accent
+
+  - cap: leg_fr_cap_bottom
+    loop: leg_fr_bottom
+    flip: true
+    color: $wood_accent
+
+  # =========================================================================
+  # STRETCHERS - Capped cylinders connecting legs (conditional, Tier 2)
+  # =========================================================================
+  - when: has_stretchers
+    geometry:
+      # Side stretcher (left)
+      - circle: str_l_front
+        center: { x: "-leg_x", y: "stretcher_height", z: "leg_z - 0.02" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [0, 0, 1]
+
+      - circle: str_l_back
+        center: { x: "-leg_x", y: "stretcher_height", z: "-leg_z + 0.02" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [0, 0, -1]
+
+      - loft: stretcher_left
+        from: str_l_front
+        to: str_l_back
+        color: $wood_primary
+
+      - cap: str_l_front_cap
+        loop: str_l_front
+        color: $wood_primary
+
+      - cap: str_l_back_cap
+        loop: str_l_back
+        flip: true
+        color: $wood_primary
+
+      # Side stretcher (right)
+      - circle: str_r_front
+        center: { x: "leg_x", y: "stretcher_height", z: "leg_z - 0.02" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [0, 0, 1]
+
+      - circle: str_r_back
+        center: { x: "leg_x", y: "stretcher_height", z: "-leg_z + 0.02" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [0, 0, -1]
+
+      - loft: stretcher_right
+        from: str_r_front
+        to: str_r_back
+        color: $wood_primary
+
+      - cap: str_r_front_cap
+        loop: str_r_front
+        color: $wood_primary
+
+      - cap: str_r_back_cap
+        loop: str_r_back
+        flip: true
+        color: $wood_primary
+
+      # Front cross stretcher
+      - circle: str_f_left
+        center: { x: "-leg_x + 0.02", y: "stretcher_height", z: "leg_z" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [-1, 0, 0]
+
+      - circle: str_f_right
+        center: { x: "leg_x - 0.02", y: "stretcher_height", z: "leg_z" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [1, 0, 0]
+
+      - loft: stretcher_front
+        from: str_f_left
+        to: str_f_right
+        color: $wood_primary
+
+      - cap: str_f_left_cap
+        loop: str_f_left
+        color: $wood_primary
+
+      - cap: str_f_right_cap
+        loop: str_f_right
+        flip: true
+        color: $wood_primary
+
+      # Back cross stretcher
+      - circle: str_b_left
+        center: { x: "-leg_x + 0.02", y: "stretcher_height", z: "-leg_z" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [-1, 0, 0]
+
+      - circle: str_b_right
+        center: { x: "leg_x - 0.02", y: "stretcher_height", z: "-leg_z" }
+        radius: "stretcher_radius"
+        segments: 6
+        normal: [1, 0, 0]
+
+      - loft: stretcher_back
+        from: str_b_left
+        to: str_b_right
+        color: $wood_primary
+
+      - cap: str_b_left_cap
+        loop: str_b_left
+        color: $wood_primary
+
+      - cap: str_b_right_cap
+        loop: str_b_right
+        flip: true
+        color: $wood_primary

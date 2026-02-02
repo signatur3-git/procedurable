@@ -3,6 +3,26 @@ import { Face } from './Face';
 import { Vec3 } from '../math/Vec3';
 import { AABB } from '../math/AABB';
 
+/**
+ * Represents an edge in a mesh with adjacent face information.
+ * vertexA and vertexB are indices into the mesh's vertex array.
+ * faceLeft and faceRight are indices into the mesh's face array (-1 if boundary).
+ */
+export interface MeshEdge {
+  vertexA: number;
+  vertexB: number;
+  faceLeft: number;   // -1 for boundary edge
+  faceRight: number;  // -1 for boundary edge
+  tag?: string;       // Optional tag for explicit selection
+}
+
+/**
+ * Key for edge deduplication (order-independent)
+ */
+function edgeKey(a: number, b: number): string {
+  return a < b ? `${a}-${b}` : `${b}-${a}`;
+}
+
 export class Mesh {
   public vertices: Vertex[];
   public faces: Face[];
@@ -147,5 +167,167 @@ export class Mesh {
       uvs: hasUVs ? new Float32Array(uvs) : undefined,
       indices: new Uint32Array(indices)
     };
+  }
+
+  /**
+   * Build edge map: edge key → { faces: number[], vertexA, vertexB }
+   * Internal helper for edge operations.
+   */
+  private buildEdgeMap(): Map<string, { vertexA: number; vertexB: number; faces: number[] }> {
+    const edgeMap = new Map<string, { vertexA: number; vertexB: number; faces: number[] }>();
+
+    for (let faceIdx = 0; faceIdx < this.faces.length; faceIdx++) {
+      const face = this.faces[faceIdx];
+      const indices = face.indices;
+
+      for (let i = 0; i < indices.length; i++) {
+        const a = indices[i];
+        const b = indices[(i + 1) % indices.length];
+        const key = edgeKey(a, b);
+
+        if (!edgeMap.has(key)) {
+          edgeMap.set(key, { vertexA: Math.min(a, b), vertexB: Math.max(a, b), faces: [] });
+        }
+        edgeMap.get(key)!.faces.push(faceIdx);
+      }
+    }
+
+    return edgeMap;
+  }
+
+  /**
+   * Get all edges in the mesh with adjacent face information.
+   */
+  getEdges(): MeshEdge[] {
+    const edgeMap = this.buildEdgeMap();
+    const edges: MeshEdge[] = [];
+
+    for (const { vertexA, vertexB, faces } of edgeMap.values()) {
+      edges.push({
+        vertexA,
+        vertexB,
+        faceLeft: faces[0] ?? -1,
+        faceRight: faces[1] ?? -1
+      });
+    }
+
+    return edges;
+  }
+
+  /**
+   * Calculate the angle between two adjacent faces at an edge (in radians).
+   * Returns PI for boundary edges (one face only).
+   */
+  private getEdgeAngle(edge: MeshEdge): number {
+    if (edge.faceLeft === -1 || edge.faceRight === -1) {
+      // Boundary edge - treat as sharp (180 degrees = PI radians)
+      return Math.PI;
+    }
+
+    const normalA = this.getFaceNormal(this.faces[edge.faceLeft]);
+    const normalB = this.getFaceNormal(this.faces[edge.faceRight]);
+
+    // Dot product gives cos(angle between normals)
+    // Edge angle = PI - angle between normals (for dihedral angle)
+    const dot = normalA.dot(normalB);
+    // Clamp to avoid floating point errors with acos
+    const clampedDot = Math.max(-1, Math.min(1, dot));
+    const normalAngle = Math.acos(clampedDot);
+
+    // Dihedral angle = PI - normalAngle
+    // Sharp edges have small dihedral angle (normals point in similar directions on flat surface)
+    // But for edge detection, we want the external angle
+    return normalAngle;
+  }
+
+  /**
+   * Get edges sharper than a given angle threshold.
+   * @param angleThreshold Angle in radians (e.g., Math.PI / 6 for 30 degrees)
+   * @returns Edges where the angle between adjacent faces exceeds the threshold
+   */
+  getSharpEdges(angleThreshold: number): MeshEdge[] {
+    const allEdges = this.getEdges();
+    return allEdges.filter(edge => {
+      const angle = this.getEdgeAngle(edge);
+      return angle > angleThreshold;
+    });
+  }
+
+  /**
+   * Get boundary edges (edges with only one adjacent face).
+   */
+  getBoundaryEdges(): MeshEdge[] {
+    return this.getEdges().filter(e => e.faceLeft === -1 || e.faceRight === -1);
+  }
+
+  /**
+   * Tag specific edges for later selection.
+   * @param edgeSelector Function that returns true for edges to tag
+   * @param tag Tag name to apply
+   * @returns Tagged edges
+   */
+  tagEdges(edgeSelector: (edge: MeshEdge, mesh: Mesh) => boolean, tag: string): MeshEdge[] {
+    const edges = this.getEdges();
+    const taggedEdges: MeshEdge[] = [];
+
+    for (const edge of edges) {
+      if (edgeSelector(edge, this)) {
+        edge.tag = tag;
+        taggedEdges.push(edge);
+      }
+    }
+
+    // Store tagged edges for later retrieval
+    if (!this._taggedEdges) {
+      this._taggedEdges = new Map<string, MeshEdge[]>();
+    }
+    const existing = this._taggedEdges.get(tag) || [];
+    this._taggedEdges.set(tag, [...existing, ...taggedEdges]);
+
+    return taggedEdges;
+  }
+
+  /**
+   * Internal storage for tagged edges
+   */
+  private _taggedEdges?: Map<string, MeshEdge[]>;
+
+  /**
+   * Get edges by their tag name.
+   * @param tag Tag name to search for
+   * @returns Edges with the specified tag
+   */
+  getEdgesByTag(tag: string): MeshEdge[] {
+    if (!this._taggedEdges) {
+      return [];
+    }
+    return this._taggedEdges.get(tag) || [];
+  }
+
+  /**
+   * Get the world-space position of an edge's midpoint.
+   */
+  getEdgeMidpoint(edge: MeshEdge): Vec3 {
+    const a = this.vertices[edge.vertexA].position;
+    const b = this.vertices[edge.vertexB].position;
+    return a.add(b).mul(0.5);
+  }
+
+  /**
+   * Get the direction vector of an edge (normalized).
+   */
+  getEdgeDirection(edge: MeshEdge): Vec3 {
+    const a = this.vertices[edge.vertexA].position;
+    const b = this.vertices[edge.vertexB].position;
+    return b.sub(a).normalize();
+  }
+
+  /**
+   * Get the length of an edge.
+   */
+  getEdgeLength(edge: MeshEdge): number {
+    const a = this.vertices[edge.vertexA].position;
+    const b = this.vertices[edge.vertexB].position;
+    return a.sub(b).length();
   }
 }

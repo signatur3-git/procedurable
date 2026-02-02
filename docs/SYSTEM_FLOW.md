@@ -40,7 +40,9 @@ same primitives.
 
 | Service | Responsibility | Primary Location | Notes |
 |--------|----------------|------------------|-------|
-| `YamlBuilderParser` | Parse YAML builder files and emit geometry commands | `src/generation/builder/YamlBuilderParser.ts` | Central entry point for builder authoring. |
+| `YamlBuilderParser` | Entry point for YAML builder execution | `src/generation/builder/YamlBuilderParser.ts` | Delegates to `YamlBuilderExecutor`. |
+| `YamlBuilderExecutor` | Execute parsed YAML through 7 phases | `src/generation/builder/YamlBuilderExecutor.ts` | Uses command registry for geometry. |
+| Command Registry | Process geometry commands via handlers | `src/generation/builder/commands/` | 14 modular command handlers. |
 | `ExpressionService` / `MathService` | Expression evaluation, derived values | `src/generation/builder/ExpressionService.ts`, `src/platform/math/MathService.ts` | All math/condition logic should be routed here. |
 | `Shape2D` | 2D polygonal shapes | `src/platform/geometry/Shape2D.ts` | Used by extrude and 2D ops; avoid duplicate shape formats. |
 | `Path2D` | Bezier-preserving vector paths | `src/platform/geometry/Path2D.ts` | Source for vector shapes before tessellation. |
@@ -59,7 +61,7 @@ same primitives.
 - Extrusion logic outside `Extrude`.
 
 **Preferred extension points:**
-- Add new commands to `YamlBuilderParser` rather than custom builder logic.
+- Add new geometry commands via command handlers in `src/generation/builder/commands/`.
 - Add new geometry features inside `src/platform/geometry/*` with documented APIs.
 - Add authoring affordances via DSL commands rather than new ad-hoc file formats.
 

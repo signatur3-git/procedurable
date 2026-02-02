@@ -166,11 +166,29 @@ export function poissonDiskScatter(
   }
 
   // Step 1: Generate initial point
-  const initialX = bounds.minX + rng.next() * width;
-  const initialZ = bounds.minZ + rng.next() * depth;
+  // Keep trying until we find a valid starting point (respects density field)
+  let foundInitialPoint = false;
+  let initialAttempts = 0;
+  const maxInitialAttempts = 1000; // Prevent infinite loop
 
-  if (isValidPoint(initialX, initialZ)) {
-    addPoint(initialX, initialZ);
+  while (!foundInitialPoint && initialAttempts < maxInitialAttempts) {
+    const initialX = bounds.minX + rng.next() * width;
+    const initialZ = bounds.minZ + rng.next() * depth;
+
+    if (isValidPoint(initialX, initialZ)) {
+      addPoint(initialX, initialZ);
+      foundInitialPoint = true;
+    }
+    initialAttempts++;
+  }
+
+  // If no initial point found (e.g., entire area below density threshold), return empty
+  if (!foundInitialPoint) {
+    return {
+      points: [],
+      rejectedAttempts: initialAttempts,
+      successfulPoints: 0
+    };
   }
 
   // Step 2: Process active list

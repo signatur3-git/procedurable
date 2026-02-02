@@ -13,7 +13,7 @@ export default {
   ],
   // Transform ESM modules like earcut
   transformIgnorePatterns: [
-    '/node_modules/(?!(earcut)/)'
+    'node_modules/(?!(earcut)/)'
   ],
   transform: {
     '^.+\\.tsx?$': [
@@ -22,6 +22,11 @@ export default {
         useESM: true,
       },
     ],
+    '^.+\\.jsx?$': [
+      'ts-jest',
+      {
+        useESM: true,
+      },
+    ],
   },
 };
-

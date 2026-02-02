@@ -88,11 +88,12 @@ export function extrude2D(shape: Shape2D, params: ExtrudeParams): ExtrudedGeomet
     const i3 = i1 + pointCount;
     const i4 = i2 + pointCount;
 
-    // Create quad as two triangles
-    // Triangle 1: front-bottom-left, front-bottom-right, back-bottom-right
-    faces.push([i1, i2, i4]);
-    // Triangle 2: front-bottom-left, back-bottom-right, back-bottom-left
-    faces.push([i1, i4, i3]);
+    // Create quad as two triangles with CCW winding when viewed from outside
+    // For a shape wound CCW in XZ (looking down -Y), normals point outward
+    // Triangle 1: front-left, back-left, back-right
+    faces.push([i1, i3, i4]);
+    // Triangle 2: front-left, back-right, front-right
+    faces.push([i1, i4, i2]);
   }
 
   // Generate caps
@@ -193,9 +194,11 @@ function extrude2DWithBevel(
       const i3 = nextLayerIdx + i;
       const i4 = nextLayerIdx + ((i + 1) % pointCount);
 
-      // Create quad as two triangles
-      faces.push([i1, i2, i4]);
-      faces.push([i1, i4, i3]);
+      // Create quad as two triangles with CCW winding when viewed from outside
+      // Triangle 1: current-left, next-left, next-right
+      faces.push([i1, i3, i4]);
+      // Triangle 2: current-left, next-right, current-right
+      faces.push([i1, i4, i2]);
     }
   }
 

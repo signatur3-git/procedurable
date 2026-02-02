@@ -206,32 +206,52 @@ New commands are added by creating new handler files - no MCP changes needed.
 
 ```
 src/
-├── mcp/
-│   └── http-server.ts        # Stable MCP (ping, execute_commands, get_state, get_help)
-├── authoring/
-│   ├── server.ts             # Express + WebSocket, hot-reloadable
-│   ├── command-parser.ts     # DSL string → parsed args
-│   ├── command-registry.ts   # Handler discovery + registration
-│   └── commands/             # Command handlers (extensible)
-│       ├── builder.ts
-│       ├── measurement.ts
-│       ├── decision.ts
-│       ├── loop.ts
-│       ├── vertex.ts
-│       ├── face.ts
-│       └── curve.ts
-├── builder/
-│   ├── TracedBuilder.ts      # Core infrastructure
-│   ├── YamlBuilderParser.ts  # YAML → TracedBuilder calls
-│   ├── ExpressionService.ts  # Unified expression evaluation
-│   └── ChairBuilder.ts       # Reference implementation
-├── core/
-│   ├── MathService.ts        # Math expression evaluator (mathjs)
-│   └── ...                   # Other core utilities
-└── dashboard/
-    ├── App.vue               # Main layout
-    ├── SeedGrid.vue          # 3×3 render grid
-    └── InspectorPanel.vue    # Measurements, decisions, traces
+├── servers/
+│   ├── mcp/
+│   │   └── http-server.ts        # Stable MCP (ping, execute_commands, get_state, get_help)
+│   └── authoring/
+│       ├── server.ts             # Express + WebSocket, hot-reloadable
+│       ├── command-parser.ts     # DSL string → parsed args
+│       └── commands/             # DSL command handlers
+│           ├── builder.ts
+│           ├── measurement.ts
+│           ├── decision.ts
+│           └── scene.ts
+├── generation/
+│   └── builder/
+│       ├── TracedBuilder.ts      # Core infrastructure
+│       ├── YamlBuilderParser.ts  # Entry point (118 lines, delegates to executor)
+│       ├── YamlBuilderExecutor.ts # Execution engine (669 lines)
+│       ├── YamlBuilderTypes.ts   # All YAML schema interfaces
+│       ├── ExpressionService.ts  # Unified expression evaluation
+│       ├── MaterialResolver.ts   # Color/material resolution
+│       ├── GeometryCommandHandler.ts # Command handler interface
+│       └── commands/             # Geometry command handlers
+│           ├── index.ts          # Registry factory
+│           ├── BoxCommand.ts
+│           ├── VertexCommand.ts
+│           ├── CircleCommand.ts
+│           ├── LoopCommand.ts
+│           ├── FaceCommand.ts
+│           ├── LoftCommand.ts
+│           ├── CapCommand.ts
+│           ├── LatheCommand.ts
+│           ├── SweepCommand.ts
+│           ├── SubdivideCommand.ts
+│           ├── BevelCommand.ts
+│           ├── RadialArrayCommand.ts
+│           ├── Extrude2DCommand.ts
+│           └── ControlFlowCommands.ts
+├── platform/
+│   ├── geometry/                 # Mesh, Face, Vertex, etc.
+│   ├── math/                     # Vec3, AABB, MathService
+│   ├── scene/                    # Placement, SceneGraph
+│   └── spatial/                  # Scatter, PoissonDisk
+├── storage/
+│   ├── FileSystemStorage.ts      # Dev mode storage
+│   └── S3Storage.ts              # Production storage
+└── tests/
+    └── __tests__/                # Jest test files
 ```
 
 ---

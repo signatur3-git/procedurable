@@ -215,6 +215,7 @@ export interface TracedOutput {
     seed?: number;
   }>;
   sceneGraph?: any;  // SceneGraph - Semantic scene representation (P2-M2d-005)
+  qualityGateResult?: any;  // QualityGateResult from evaluateQualityTier (A2-001)
   validation: {
     issues: ValidationIssue[];
     bounds: { min: Vec3; max: Vec3; center: Vec3; size: Vec3 };
@@ -875,14 +876,16 @@ export class TracedBuilder {
     const n = loop1.indices.length;
     for (let i = 0; i < n; i++) {
       const next = (i + 1) % n;
-      // Face winding: loop1[i] -> loop2[i] -> loop2[next] -> loop1[next]
-      // This creates outward-facing normals when both loops wind counter-clockwise
-      // and loop1 is above loop2
+      // Face winding: loop1[next] -> loop2[next] -> loop2[i] -> loop1[i]
+      // This creates quad faces with outward-facing normals when both loops
+      // are wound counter-clockwise. Compatible with cap convention:
+      // - loop1 cap (bottom/from): use flip=true
+      // - loop2 cap (top/to): use flip=false
       this.mesh.addFace(new Face([
-        loop1.indices[i],
-        loop2.indices[i],
+        loop1.indices[next],
         loop2.indices[next],
-        loop1.indices[next]
+        loop2.indices[i],
+        loop1.indices[i]
       ], color));
     }
 

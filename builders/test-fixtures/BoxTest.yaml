@@ -1,0 +1,15 @@
+version: "1.0"
+name: BoxTest
+description: Simple box test
+
+measurements:
+  size:
+    value: 1
+    source: "Box size"
+
+geometry:
+  - box:
+      name: test_box
+      center: { x: "0", y: "0.5", z: "0" }
+      size: { x: "1", y: "1", z: "1" }
+      color: { r: 0.5, g: 0.3, b: 0.2 }

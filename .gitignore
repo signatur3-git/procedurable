@@ -15,3 +15,12 @@ coverage/
 docs/.vitepress/cache/
 docs/.vitepress/dist/
 
+# Temporary test output files
+jest-*.txt
+all-tests.txt
+build.log
+test-tier2.mjs
+
+# Windows nul artifact
+nul
+

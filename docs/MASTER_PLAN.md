@@ -105,7 +105,7 @@ See `CODE_STRUCTURE_EVALUATION.md` for full details.
 | Milestone | Purpose |
 |-----------|---------|
 | A1: Quality Declaration | Add `quality:` section to YAML format; retrofit existing builders |
-| A2: Quality Gates | Automated tier validation in ValidationAPI; machine-readable suggestions for agent loop |
+| A2: Quality Gates | Automated tier validation in ValidationAPI; machine-readable suggestions for agent loop. **A2-001 done** ✅ |
 | A3: Decision Coverage | Verify every decision option produces different output |
 | A4: Sophistication Plans | First-class format for planning builder quality before coding |
 

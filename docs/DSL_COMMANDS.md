@@ -264,6 +264,58 @@ Get serialized mesh geometry for rendering (vertices, faces, normals).
 
 **Usage:** `builder.mesh`
 
+### `builder.coverage [<name>] [seed=N]`
+
+Test decision coverage for a builder. Runs the builder multiple times with each decision option forced to verify that decisions actually affect the output geometry.
+
+**Usage:**
+- `builder.coverage` - Test active builder with seed 42
+- `builder.coverage DiningChair` - Test specific builder
+- `builder.coverage seed=123` - Test active builder with specific seed
+
+**Response:**
+```json
+{
+  "builder": "DiningChair",
+  "seed": 42,
+  "coverage_percent": 50,
+  "summary": {
+    "total": 10,
+    "covered": 5,
+    "uncovered": 4,
+    "partial": 1,
+    "errors": 0
+  },
+  "decisions": [
+    {
+      "name": "has_stretchers",
+      "type": "boolean",
+      "status": "covered",
+      "results": [
+        { "value": true, "vertexCount": 124, "faceCount": 67, "differs": true },
+        { "value": false, "vertexCount": 100, "faceCount": 55, "differs": false }
+      ]
+    },
+    {
+      "name": "seat_shape",
+      "type": "choice",
+      "status": "uncovered",
+      "options": ["square", "rounded", "contoured"],
+      "notes": "All options produce identical geometry"
+    }
+  ],
+  "covered_decisions": ["has_stretchers", "leg_taper"],
+  "uncovered_decisions": ["seat_shape", "back_style"],
+  "partial_decisions": ["leg_style"]
+}
+```
+
+**Notes:**
+- `covered`: All options produce different geometry (vertex/face counts differ)
+- `uncovered`: All options produce identical geometry
+- `partial`: Some options produce different geometry
+- Uses vertex and face counts to compare outputs (same counts = same geometry)
+
 ---
 
 ## Measurement Commands
@@ -911,6 +963,86 @@ geometry:
 
 ---
 
+### bevel (C2-003)
+
+Bevel sharp edges of existing mesh geometry. Creates smooth or chamfered edge transitions that catch light and give a professional finish to hard-surface models.
+
+**Syntax:**
+```yaml
+geometry:
+  - bevel: <name>
+    mesh: <target_mesh>
+    width: <number|expression>
+    segments: <number|expression>      # Optional, default: 1
+    angle_threshold: <number|expression>  # Optional, default: 0.52 (~30°)
+```
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| bevel | string | Yes | Name for this operation (for tracing) |
+| mesh | string | Yes | Name of the mesh to bevel (currently uses entire mesh) |
+| width | number/expr | Yes | Bevel width in meters |
+| segments | number/expr | No | 1 = chamfer (flat cut), 2+ = smooth rounded bevel |
+| angle_threshold | number/expr | No | Angle in radians; edges sharper than this are beveled (default: π/6 ≈ 30°) |
+
+**Examples:**
+
+```yaml
+# Simple chamfer on a box
+geometry:
+  - box:
+      name: my_box
+      center: { x: 0, y: 0.5, z: 0 }
+      size: { x: 1, y: 1, z: 1 }
+  
+  - bevel: chamfered
+    mesh: my_box
+    width: 0.05
+    segments: 1
+
+# Smooth bevel with multiple segments
+geometry:
+  - box:
+      name: rounded_box
+      center: { x: 0, y: 0.5, z: 0 }
+      size: { x: 1, y: 1, z: 1 }
+  
+  - bevel: smooth_edges
+    mesh: rounded_box
+    width: 0.08
+    segments: 4
+    angle_threshold: 0.52  # 30 degrees
+
+# Expression-based parameters
+measurements:
+  bevel_size:
+    value: 0.1
+  quality_segments:
+    value: 3
+
+geometry:
+  - box:
+      name: configurable_box
+      center: { x: 0, y: 0.5, z: 0 }
+      size: { x: 1, y: 1, z: 1 }
+  
+  - bevel: quality_bevel
+    mesh: configurable_box
+    width: bevel_size
+    segments: quality_segments
+```
+
+**Use cases:** Furniture edges, mechanical parts, architectural details, any hard-surface model that needs professional edge treatment.
+
+**Notes:**
+- Width is automatically clamped to 40% of the smallest mesh dimension to prevent self-intersection
+- Zero or negative width results in no change
+- The bevel applies to all edges sharper than the angle threshold
+- Colors and materials from the original mesh are preserved
+
+---
+
 ## Text Commands (P2-M4)
 
 Font loading and text-to-geometry conversion for signage, labels, and engravings.
@@ -1216,6 +1348,208 @@ List all available tags in the current scene graph.
 
 ---
 
+## PSD Scene Query Commands (B2-003)
+
+Commands for querying and inspecting PSD (Procedurable Scene Description) scenes. These work with the serialized scene format from `builder.export_psd`.
+
+### `psd.query_by_tag`
+
+Find prims by tag (recursive — searches descendants). Uses tag aggregation so parents are found if any descendant has the tag.
+
+**Usage:** `psd.query_by_tag <tag>`
+
+**Example:**
+```bash
+psd.query_by_tag furniture
+```
+
+**Returns:**
+```json
+{
+  "tag": "furniture",
+  "count": 3,
+  "prims": [
+    {
+      "path": "/Root/table",
+      "type": "Xform",
+      "tags": ["furniture", "table"],
+      "aggregatedTags": ["furniture", "table", "tabletop", "legs"]
+    }
+  ]
+}
+```
+
+### `psd.get_bounds`
+
+Get AABB bounds for a prim.
+
+**Usage:** `psd.get_bounds <prim_path>`
+
+**Example:**
+```bash
+psd.get_bounds /Root/table
+```
+
+**Returns:**
+```json
+{
+  "path": "/Root/table",
+  "bounds": {
+    "min": { "x": -0.5, "y": 0.0, "z": -0.25 },
+    "max": { "x": 0.5, "y": 0.8, "z": 0.25 }
+  },
+  "size": { "x": 1.0, "y": 0.8, "z": 0.5 },
+  "center": { "x": 0.0, "y": 0.4, "z": 0.0 }
+}
+```
+
+### `psd.list_prims`
+
+List all prims with hierarchy information.
+
+**Usage:** `psd.list_prims`
+
+**Returns:**
+```json
+{
+  "primCount": 5,
+  "prims": [
+    { "path": "/Root", "type": "Xform", "depth": 0, "childCount": 2, "tags": ["scene"] },
+    { "path": "/Root/mesh", "type": "Mesh", "depth": 1, "childCount": 0, "tags": [] },
+    { "path": "/Root/chair_0", "type": "Instance", "depth": 1, "childCount": 0, "tags": [] }
+  ]
+}
+```
+
+### `psd.get_materials`
+
+Get all materials and their assignments.
+
+**Usage:** `psd.get_materials`
+
+**Returns:**
+```json
+{
+  "materialCount": 2,
+  "materials": [
+    {
+      "index": 0,
+      "name": "wood",
+      "color": { "r": "0.545", "g": "0.353", "b": "0.169" },
+      "roughness": 0.5,
+      "metalness": 0.0,
+      "usedBy": ["/Root/mesh"],
+      "triangleCount": 384
+    }
+  ]
+}
+```
+
+### `psd.overview`
+
+Get top-level scene overview with aggregated metadata. Useful for understanding large scenes without drilling down.
+
+**Usage:** `psd.overview`
+
+**Returns:**
+```json
+{
+  "sceneName": "DiningChair",
+  "generator": "DiningChair seed=42",
+  "totalPrims": 5,
+  "totalMaterials": 2,
+  "roots": [
+    {
+      "path": "/DiningChair",
+      "type": "Xform",
+      "childCount": 2,
+      "descendantCount": 4,
+      "bounds": { "min": {...}, "max": {...} },
+      "aggregatedTags": ["furniture", "seating"]
+    }
+  ]
+}
+```
+
+### `psd.inspect`
+
+Inspect a specific prim — returns its direct children details for drill-down navigation.
+
+**Usage:** `psd.inspect <prim_path>`
+
+**Example:**
+```bash
+psd.inspect /Root/table
+```
+
+**Returns:**
+```json
+{
+  "path": "/Root/table",
+  "type": "Xform",
+  "tags": ["furniture"],
+  "bounds": {...},
+  "transform": {
+    "position": { "x": 0, "y": 0, "z": 0 },
+    "rotation": { "x": 0, "y": 0, "z": 0 },
+    "scale": { "x": 1, "y": 1, "z": 1 }
+  },
+  "childCount": 2,
+  "children": [
+    { "path": "/Root/table/top", "type": "Mesh", "tags": ["tabletop"], "childCount": 0 },
+    { "path": "/Root/table/legs", "type": "Xform", "tags": ["structural"], "childCount": 4 }
+  ]
+}
+```
+
+### `psd.distance`
+
+Calculate distance between two prims. Returns both center-to-center and approximate surface-to-surface distance.
+
+**Usage:** `psd.distance <prim_a> <prim_b>`
+
+**Example:**
+```bash
+psd.distance /Root/table /Root/chair
+```
+
+**Returns:**
+```json
+{
+  "primA": "/Root/table",
+  "primB": "/Root/chair",
+  "centerToCenter": 1.5234,
+  "surfaceToSurface": 0.4567,
+  "note": "surfaceToSurface is approximate (uses bounding box radii)"
+}
+```
+
+### `psd.prims_within`
+
+Find prims within a radius of a given prim. Useful for spatial queries like "what's near the table?".
+
+**Usage:** `psd.prims_within <prim_path> radius=<r>`
+
+**Example:**
+```bash
+psd.prims_within /Root/table radius=2
+```
+
+**Returns:**
+```json
+{
+  "center": "/Root/table",
+  "radius": 2,
+  "count": 4,
+  "prims": [
+    { "path": "/Root/chair_0", "type": "Instance", "tags": [], "centerToCenter": 1.2 },
+    { "path": "/Root/chair_1", "type": "Instance", "tags": [], "centerToCenter": 1.3 }
+  ]
+}
+```
+
+---
+
 ## Geometry Query Commands (P2-M3)
 
 ### `geometry.shape2d`
@@ -1250,6 +1584,63 @@ geometry.shape2d type=ellipse radiusX=2 radiusZ=1 segments=32
     { "x": -1, "z": 0.5 }
   ]
 }
+```
+
+---
+
+### `geometry.boolean2d`
+
+Perform 2D boolean operations (union, subtract, intersect) on polygon shapes.
+
+**Usage:**
+```bash
+geometry.boolean2d op=union subject=rect:2,2 clip=rect:2,2,1,0
+geometry.boolean2d op=subtract subject=circle:2 clip=rect:1,1
+geometry.boolean2d op=intersect subject=rect:4,4 clip=circle:2,32
+```
+
+**Parameters:**
+- `op` (or `operation`) - Operation type: union, subtract, intersect
+- `subject` (or `a`) - Subject polygon in format `type:params`
+- `clip` (or `b`) - Clip polygon in format `type:params`
+
+**Shape Specification Format:**
+- `rect:width,height[,x,z]` - Rectangle (center position optional)
+- `circle:radius[,segments,x,z]` - Circle (segments/position optional)
+- `ellipse:radiusX,radiusZ[,segments,x,z]` - Ellipse
+
+**Operations:**
+- `union` - Combine both shapes into one
+- `subtract` (or `difference`) - Remove clip shape from subject
+- `intersect` (or `intersection`) - Keep only overlapping area
+
+**Returns:**
+```json
+{
+  "operation": "subtract",
+  "resultCount": 1,
+  "totalArea": "11.566",
+  "polygons": [
+    {
+      "index": 0,
+      "outerPointCount": 36,
+      "holeCount": 1,
+      "area": "12.566"
+    }
+  ]
+}
+```
+
+**Examples:**
+```bash
+# Union two overlapping squares
+geometry.boolean2d op=union subject=rect:2,2 clip=rect:2,2,1,0
+
+# Create a circle with a square hole
+geometry.boolean2d op=subtract subject=circle:2,32 clip=rect:1,1
+
+# Find intersection of two shapes
+geometry.boolean2d op=intersect subject=rect:4,4 clip=circle:2,32
 ```
 
 ---

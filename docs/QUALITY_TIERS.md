@@ -81,6 +81,38 @@ Every builder should declare its target tier and current tier. This makes the ga
 
 ---
 
+## 2.1 Reference Builders
+
+Each tier has a reference implementation that demonstrates exactly what that quality level looks like. Compare your builders against these references.
+
+| Tier | Reference Builder | Description |
+|------|------------------|-------------|
+| 0 | [`builders/examples/ChairTier0.yaml`](../builders/examples/ChairTier0.yaml) | Bounding boxes only. Boxes for seat, legs, back. |
+| 1 | [`builders/examples/ChairTier1.yaml`](../builders/examples/ChairTier1.yaml) | Silhouette correct. Lofted legs, proper seat slab, flat back panel. |
+| 2 | [`builders/examples/ChairTier2.yaml`](../builders/examples/ChairTier2.yaml) | Form-resolved. back_style produces different geometry, multi-material, closed meshes. |
+
+### What Makes Each Tier
+
+**Tier 0 → Tier 1 transition:**
+- Replace box primitives with lofts (legs)
+- Add proper proportioned parts
+- Add conditional geometry (stretchers)
+
+**Tier 1 → Tier 2 transition:**
+- Decisions produce DIFFERENT geometry (not just metadata)
+- All meshes are closed volumes
+- Multiple materials distinguish parts
+- Named parts have proper 3D thickness
+
+### Using References for Quality Assessment
+
+1. Open your builder alongside the reference
+2. Check: Does your builder have the same structural parts?
+3. Check: Do your decisions actually change the output like the reference?
+4. Check: Does your builder use the same tool complexity (lofts, conditionals, etc.)?
+
+---
+
 ## 3. Builder Quality Declaration (Proposed YAML Addition)
 
 ```yaml
@@ -222,6 +254,50 @@ tier_3_detail:
   deferred: true
   notes: "Document what would be needed but don't attempt"
 ```
+
+### Schema Reference
+
+Sophistication plans use the `.plan.yaml` extension and live in `builders/plans/`. The schema:
+
+```yaml
+builder: string          # Builder name (must match a builder YAML)
+domain: string           # Domain path (e.g., "furniture/seating")
+
+# One section per tier, keyed as tier_N_<label>:
+tier_0_placeholder:
+  description: string    # What this tier achieves
+  parts: list | map      # Parts at this tier (list for T0, map with details for T1+)
+  tools_needed: list     # Geometry tools required (box, loft, lathe, etc.)
+  decisions: list        # Decisions active at this tier
+
+tier_1_silhouette:
+  description: string
+  parts:
+    <part_name>: string | map   # String summary or detailed map:
+      geometry: string          #   How it's built
+      detail: string            #   Surface quality notes
+      variation: string         #   How decisions affect it
+      variants:                 #   Per-option geometry (for choice decisions)
+        <option>: string
+  tools_needed: list
+  decisions: list
+  upgrades_from_t0: list        # What changed from previous tier
+
+tier_2_form_resolved:
+  description: string
+  parts: map                    # Detailed part descriptions (see above)
+  tools_needed: list
+  decisions_that_affect_geometry: list  # Decision -> geometry mapping
+  materials: list               # Named material slots
+
+tier_3_detail:                  # Optional — document even if deferred
+  description: string
+  requires_tools_not_yet_built: list
+  deferred: boolean
+  notes: string
+```
+
+Plans are validated against builder output via `builder.check_plan` (see A4-002).
 
 ### Why This Matters
 

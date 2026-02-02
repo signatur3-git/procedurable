@@ -27,6 +27,13 @@ interface RunResult {
   issues: number;
   instanceCount?: number;
   hasInstances?: boolean;
+  quality?: {
+    target_tier: number;
+    achieved_tier: number;
+    gates_passed: number;
+    gates_failed: number;
+    suggestion_count: number;
+  };
 }
 
 interface CellState {
@@ -444,7 +451,8 @@ async function runCurrentSeed() {
         measurements,
         issues: runData.issues,
         instanceCount: instanceData.count || 0,
-        hasInstances: instanceData.count > 0
+        hasInstances: instanceData.count > 0,
+        quality: runData.quality
       };
 
       // Update mesh in 3D view
@@ -477,6 +485,16 @@ function updateMainOverlay() {
   const cell = state.cell;
   if (!cell) return;
 
+  // A2-003: Generate quality badge
+  const getQualityBadge = (result: RunResult | null) => {
+    if (!result?.quality) return '';
+    const q = result.quality;
+    const tierMatch = q.achieved_tier >= q.target_tier;
+    const badgeClass = tierMatch ? 'quality-badge quality-pass' : 'quality-badge quality-fail';
+    const icon = tierMatch ? '✓' : '⚠';
+    return `<span class="${badgeClass}">T${q.achieved_tier}${icon}</span>`;
+  };
+
   if (cell.loading) {
     elements.mainCell.classList.add('loading');
     elements.mainOverlay.innerHTML = `
@@ -485,10 +503,18 @@ function updateMainOverlay() {
     `;
   } else if (cell.result) {
     elements.mainCell.classList.remove('loading');
+    const qualityBadge = getQualityBadge(cell.result);
     elements.mainOverlay.innerHTML = `
-      <span class="cell-seed">Seed: ${cell.seed}</span>
+      <span class="cell-seed">Seed: ${cell.seed} ${qualityBadge}</span>
       <span class="cell-stats">${cell.result.vertices}v ${cell.result.faces}f</span>
     `;
+    // A2-003: Update grid title with quality badge
+    if (state.activeBuilder && cell.result.quality) {
+      const q = cell.result.quality;
+      const tierMatch = q.achieved_tier >= q.target_tier;
+      const badgeStyle = tierMatch ? 'color: #4caf50;' : 'color: #ff9800;';
+      elements.gridTitle.innerHTML = `${state.activeBuilder} <span style="${badgeStyle} font-size: 0.8em;">T${q.achieved_tier}</span>`;
+    }
   } else {
     elements.mainCell.classList.remove('loading');
     elements.mainOverlay.innerHTML = `
