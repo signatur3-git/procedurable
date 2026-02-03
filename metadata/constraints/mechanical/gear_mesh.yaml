@@ -1,0 +1,75 @@
+# Gear Mesh Constraint
+# Validates that two gears can properly mesh together
+
+key: constraints/mechanical/gear_mesh
+createdAt: "2026-02-05T00:00:00.000Z"
+modifiedAt: "2026-02-05T00:00:00.000Z"
+description: |
+  Validates that two meshing gears have compatible parameters:
+  - Matching pitch (module or diametral pitch)
+  - Correct center distance for proper engagement
+  - Opposite rotation directions
+
+  Usage Example:
+    constraints:
+      - schema: constraints/mechanical/gear_mesh
+        bindings:
+          gear1_module: driver_module
+          gear2_module: driven_module
+          gear1_teeth: driver_teeth
+          gear2_teeth: driven_teeth
+          center_distance: assembly_center_distance
+tags:
+  - constraint
+  - mechanical
+  - gear
+
+value:
+  name: gear_mesh
+  description: Validates gear meshing compatibility
+
+  variables:
+    gear1_module:
+      type: number
+      description: Module (pitch) of first gear in meters
+    gear2_module:
+      type: number
+      description: Module (pitch) of second gear in meters
+    gear1_teeth:
+      type: number
+      description: Number of teeth on first gear
+    gear2_teeth:
+      type: number
+      description: Number of teeth on second gear
+    center_distance:
+      type: number
+      description: Distance between gear centers in meters
+
+  rules:
+    - type: expression
+      description: Gears must have matching module (pitch)
+      expression: "abs(gear1_module - gear2_module) < 0.0001"
+
+    - type: range
+      description: Module must be positive
+      target: gear1_module
+      min: 0.0001
+
+    - type: range
+      description: Module must be positive
+      target: gear2_module
+      min: 0.0001
+
+    - type: range
+      description: First gear must have at least 6 teeth
+      target: gear1_teeth
+      min: 6
+
+    - type: range
+      description: Second gear must have at least 6 teeth
+      target: gear2_teeth
+      min: 6
+
+    - type: expression
+      description: Center distance must match gear geometry (pitch radii sum)
+      expression: "abs(center_distance - (gear1_module * (gear1_teeth + gear2_teeth) / 2)) < gear1_module * 0.1"

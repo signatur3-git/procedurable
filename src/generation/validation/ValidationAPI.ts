@@ -9,7 +9,7 @@
  */
 
 import { Mesh } from '../../platform/geometry/Mesh';
-import { checkMeshValidity, checkMeshTopology } from './MeshChecks';
+import { checkMeshValidity, checkMeshTopology, checkMeshUVs } from './MeshChecks';
 import { getMeshBounds } from './MeshValidation';
 
 /**
@@ -761,6 +761,59 @@ function runMeshValidityChecks(context: ValidationContext): ValidationCheck[] {
       check: 'mesh_topology',
       status: 'pass',
       reason: 'Mesh topology is valid (no non-manifold edges, consistent winding, no isolated vertices)'
+    });
+  }
+
+  // UV validation checks
+  const uvCheck = checkMeshUVs(context.mesh);
+
+  if (uvCheck.stats.verticesWithoutUV > 0 && uvCheck.stats.verticesWithUV > 0) {
+    // Mixed UV coverage is a problem - some vertices have UVs, some don't
+    checks.push({
+      check: 'uv_coverage_mixed',
+      status: 'warning',
+      reason: `Mixed UV coverage: ${uvCheck.stats.verticesWithUV} vertices with UVs, ${uvCheck.stats.verticesWithoutUV} without`,
+      suggestion: 'Ensure all vertices have UVs or use box projection to add them'
+    });
+  } else if (uvCheck.stats.verticesWithoutUV > 0) {
+    // No UVs at all - informational for now
+    checks.push({
+      check: 'uv_coverage_none',
+      status: 'pass',  // Not an error - some meshes intentionally skip UVs
+      reason: `Mesh has no UV coordinates (${context.mesh.vertices.length} vertices)`
+    });
+  } else if (uvCheck.stats.verticesWithUV > 0) {
+    checks.push({
+      check: 'uv_coverage',
+      status: 'pass',
+      reason: `All ${uvCheck.stats.verticesWithUV} vertices have UV coordinates`
+    });
+  }
+
+  if (uvCheck.stats.degenerateFaces > 0) {
+    checks.push({
+      check: 'uv_degenerate',
+      status: 'warning',
+      reason: `${uvCheck.stats.degenerateFaces} faces have degenerate UVs (collapsed to line/point)`,
+      suggestion: 'Degenerate UVs cause texture distortion - check face UV layout'
+    });
+  }
+
+  if (uvCheck.stats.distortedFaces > 0) {
+    checks.push({
+      check: 'uv_distortion',
+      status: 'warning',
+      reason: `${uvCheck.stats.distortedFaces} faces have severely distorted UVs (10x+ stretch ratio)`,
+      suggestion: 'High UV distortion causes texture stretching - consider UV unwrapping'
+    });
+  }
+
+  if (uvCheck.errors.length > 0) {
+    checks.push({
+      check: 'uv_validity',
+      status: 'fail',
+      reason: uvCheck.errors.join('; '),
+      suggestion: 'Check for NaN or Infinity UV values'
     });
   }
 

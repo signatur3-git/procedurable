@@ -410,8 +410,9 @@ let defaultStore: MetadataStore | null = null;
  */
 export function getMetadataStore(): MetadataStore {
   if (!defaultStore) {
-    // Use absolute path relative to project root
-    const projectRoot = path.resolve(__dirname, '../..');
+    // Use process.cwd() for ESM compatibility (server runs as ESNext modules where __dirname is unavailable)
+    // process.cwd() is always the project root when the server is started from D:/workspaces/procedurable
+    const projectRoot = process.cwd();
     defaultStore = new MetadataStore({
       rootDir: path.join(projectRoot, 'metadata')
     });

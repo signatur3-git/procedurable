@@ -31,7 +31,7 @@ describe('GeometryCommandHandler', () => {
     it('should list all registered handlers', () => {
       const registry = createStandardRegistry();
 
-      expect(registry.size).toBe(22);
+      expect(registry.size).toBe(26);  // Updated for grid/for commands
       const keys = registry.getHandlers().map(h => h.commandKey);
 
       // Primitive geometry

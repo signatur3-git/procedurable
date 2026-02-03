@@ -4,6 +4,10 @@ export interface VertexAttributes {
   normal?: Vec3;
   uv?: [number, number];
   color?: [number, number, number];
+  /** Smooth group ID — vertices with the same smoothGroup share averaged normals.
+   *  Vertices split for UV seams retain the same smoothGroup so normals stay smooth.
+   *  Different smoothGroup IDs produce hard edges (e.g. box faces, cap vs body). */
+  smoothGroup?: number;
 }
 
 export class Vertex {
@@ -21,7 +25,8 @@ export class Vertex {
       {
         normal: this.attributes.normal?.clone(),
         uv: this.attributes.uv ? [...this.attributes.uv] as [number, number] : undefined,
-        color: this.attributes.color ? [...this.attributes.color] as [number, number, number] : undefined
+        color: this.attributes.color ? [...this.attributes.color] as [number, number, number] : undefined,
+        smoothGroup: this.attributes.smoothGroup
       }
     );
   }
@@ -47,6 +52,11 @@ export class Vertex {
         v1.attributes.color[1] + (v2.attributes.color[1] - v1.attributes.color[1]) * t,
         v1.attributes.color[2] + (v2.attributes.color[2] - v1.attributes.color[2]) * t
       ];
+    }
+
+    // Propagate smoothGroup if both vertices share it
+    if (v1.attributes.smoothGroup !== undefined && v1.attributes.smoothGroup === v2.attributes.smoothGroup) {
+      attributes.smoothGroup = v1.attributes.smoothGroup;
     }
 
     return new Vertex(position, attributes);

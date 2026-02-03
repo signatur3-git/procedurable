@@ -6,6 +6,7 @@
  * report their sizes, and see each other's decisions.
  *
  * P2-M2d-003, B5-002 (Request/Offer Negotiation Protocol)
+ * F2-002: Style cascading through composition
  */
 
 // =============================================================================
@@ -75,13 +76,58 @@ export class SharedContext {
   private requirements: Map<string, SpatialRequirement> = new Map();
   private offers: Map<string, SpatialOffer> = new Map();
 
+  // F2-002: Cascading style
+  private _style: string | undefined;
+
   constructor(initialState?: Record<string, any>) {
     if (initialState) {
       for (const [key, value] of Object.entries(initialState)) {
         this.store.set(key, value);
         this.initialValues.set(key, value);
       }
+      // F2-002: Extract style from initial state if present
+      if (initialState.style) {
+        this._style = initialState.style;
+      }
     }
+  }
+
+  // ===========================================================================
+  // F2-002: Style Cascading API
+  // ===========================================================================
+
+  /**
+   * Get the current style (inherited from parent or set explicitly)
+   */
+  getStyle(): string | undefined {
+    return this._style;
+  }
+
+  /**
+   * Set the style (for propagation to children)
+   */
+  setStyle(style: string): void {
+    this._style = style;
+  }
+
+  /**
+   * Create a child context that inherits this context's style
+   * Used when composing child builders
+   */
+  createChildContext(childOverrides?: Record<string, any>): SharedContext {
+    const child = new SharedContext(childOverrides);
+    // Inherit style from parent unless child explicitly overrides
+    if (this._style && !child._style) {
+      child._style = this._style;
+    }
+    // Copy requirements and offers for visibility
+    for (const [id, req] of this.requirements) {
+      child.requirements.set(id, req);
+    }
+    for (const [id, offer] of this.offers) {
+      child.offers.set(id, offer);
+    }
+    return child;
   }
 
   // ===========================================================================

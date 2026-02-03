@@ -58,7 +58,7 @@ function makeMesh(path: string, parent: string, tags: string[] = []): PSDMeshPri
       indices: [0, 1, 2, 0, 2, 3]
     },
     materialSlots: [0, 0],
-    skeleton: null,
+    skeleton: undefined,
     jointWeights: []
   };
 }
@@ -207,12 +207,12 @@ describe('PSD v0.1', () => {
       expect(errors.some(e => e.includes('non-existent prototype'))).toBe(true);
     });
 
-    it('should verify skeleton stub is null on mesh prims', () => {
+    it('should verify skeleton is undefined on mesh prims without skeletons', () => {
       const scene = makeValidScene();
-      // All mesh prims should have skeleton: null
+      // All mesh prims without skeletons should have skeleton: undefined
       for (const prim of Object.values(scene.prims)) {
         if (prim.type === 'Mesh') {
-          expect((prim as PSDMeshPrim).skeleton).toBeNull();
+          expect((prim as PSDMeshPrim).skeleton).toBeUndefined();
           expect((prim as PSDMeshPrim).jointWeights).toEqual([]);
         }
       }
@@ -226,7 +226,7 @@ describe('PSD v0.1', () => {
       expect(mesh.geometry.normals).toBeDefined();
       expect(mesh.geometry.indices).toBeDefined();
       expect(mesh.materialSlots).toBeDefined();
-      expect(mesh.skeleton).toBeNull();
+      expect(mesh.skeleton).toBeUndefined();
       expect(mesh.jointWeights).toEqual([]);
     });
 
@@ -287,9 +287,9 @@ describe('PSD v0.1', () => {
       expect(meshPrim.geometry.normals.length).toBe(meshPrim.geometry.vertices.length);
       expect(meshPrim.geometry.indices.length).toBeGreaterThan(0);
 
-      // Phase 3 stubs
-      expect(meshPrim.skeleton).toBeNull();
-      expect(meshPrim.jointWeights).toEqual([]);
+      // Skeleton and weights are undefined when not defined (E1-001, E2-001)
+      expect(meshPrim.skeleton).toBeUndefined();
+      expect(meshPrim.jointWeights).toBeUndefined();
 
       // Should have at least one material
       expect(scene.materials.length).toBeGreaterThan(0);
@@ -457,6 +457,81 @@ describe('PSD v0.1', () => {
       // UVs should be 2 floats per vertex
       const vertexCount = deserialized.vertices.length / 3;
       expect(deserialized.uvs.length).toBe(vertexCount * 2);
+    });
+  });
+
+  describe('Morph Targets (E3-002)', () => {
+    it('should include morph targets in PSD mesh prim', async () => {
+      const { TracedBuilder } = require('../../generation/builder/TracedBuilder');
+      const { Vec3 } = require('../../platform/math/Vec3');
+
+      const builder = new TracedBuilder('MorphTest', 42);
+
+      // Create a simple triangle mesh
+      builder.placeVertex('v0', { x: '0', y: '0', z: '0' });
+      builder.placeVertex('v1', { x: '1', y: '0', z: '0' });
+      builder.placeVertex('v2', { x: '0.5', y: '1', z: '0' });
+      builder.createFace('f0', ['v0', 'v1', 'v2']);
+
+      // Register morph targets
+      builder.registerMorphTargets([
+        {
+          name: 'stretch',
+          offsets: [
+            { vertexIndex: 0, offset: new Vec3(-0.5, 0, 0) },
+            { vertexIndex: 1, offset: new Vec3(0.5, 0, 0) }
+          ],
+          defaultWeight: 0,
+          description: 'Horizontal stretch'
+        },
+        {
+          name: 'tall',
+          offsets: [
+            { vertexIndex: 2, offset: new Vec3(0, 0.5, 0) }
+          ],
+          defaultWeight: 0.5,
+          description: 'Make taller'
+        }
+      ]);
+
+      const output = builder.build();
+      const scene = serializeToPSD(output);
+      const meshPrim = scene.prims['/MorphTest/mesh'] as PSDMeshPrim;
+
+      expect(meshPrim.morphTargets).toBeDefined();
+      expect(meshPrim.morphTargets!.length).toBe(2);
+
+      // Check first target
+      const stretch = meshPrim.morphTargets!.find(t => t.name === 'stretch');
+      expect(stretch).toBeDefined();
+      expect(stretch!.offsets.length).toBe(2);
+      expect(stretch!.defaultWeight).toBe(0);
+      expect(stretch!.description).toBe('Horizontal stretch');
+
+      // Check offset format
+      const offset0 = stretch!.offsets.find(o => o.vertexIndex === 0);
+      expect(offset0).toBeDefined();
+      expect(offset0!.offset).toEqual([-0.5, 0, 0]);
+
+      // Check second target
+      const tall = meshPrim.morphTargets!.find(t => t.name === 'tall');
+      expect(tall).toBeDefined();
+      expect(tall!.offsets.length).toBe(1);
+      expect(tall!.defaultWeight).toBe(0.5);
+    });
+
+    it('should not include morphTargets field if none defined', async () => {
+      const yaml: YamlBuilderDefinition = {
+        version: '1.0',
+        name: 'NoMorphTest',
+        geometry: [{ box: { name: 'box', center: { x: 0, y: 0, z: 0 }, size: { x: 1, y: 1, z: 1 } } }]
+      };
+
+      const output = await parseAndExecuteBuilder(yaml, { seed: 42 });
+      const scene = serializeToPSD(output);
+      const meshPrim = scene.prims['/NoMorphTest/mesh'] as PSDMeshPrim;
+
+      expect(meshPrim.morphTargets).toBeUndefined();
     });
   });
 });

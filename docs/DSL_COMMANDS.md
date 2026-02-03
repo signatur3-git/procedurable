@@ -264,6 +264,103 @@ Get serialized mesh geometry for rendering (vertices, faces, normals).
 
 **Usage:** `builder.mesh`
 
+### `builder.export_gltf [filename]`
+
+Export last builder run as GLB (binary glTF 2.0) file.
+
+**Usage:**
+- `builder.export_gltf` - Export with builder name
+- `builder.export_gltf MyChair` - Export with custom filename
+
+**Response:**
+```json
+{
+  "path": "output/MyChair.glb",
+  "vertexCount": 124,
+  "triangleCount": 67,
+  "materialCount": 1,
+  "byteSize": 4096,
+  "hasUVs": true,
+  "summary": "Exported 67 triangles, 1 material(s), with UVs → output/MyChair.glb (4.0 KB)"
+}
+```
+
+### `builder.export_psd`
+
+Export last builder run as PSD (Procedurable Scene Description) format.
+
+**Usage:** `builder.export_psd`
+
+**Response:**
+```json
+{
+  "scene": { "name": "DiningChair", "prims": {...}, "materials": [...] },
+  "validation": "valid",
+  "summary": { "name": "DiningChair", "primCount": 12, "materialCount": 2 }
+}
+```
+
+### `builder.export_scene_gltf [filename]`
+
+Export PSD scene as GLB with hierarchy and instancing (C6-002).
+
+**Usage:** `builder.export_scene_gltf [filename]`
+
+**Response:**
+```json
+{
+  "path": "output/scene.glb",
+  "nodeCount": 15,
+  "meshCount": 5,
+  "instanceCount": 10,
+  "materialCount": 3,
+  "vertexCount": 500,
+  "triangleCount": 300,
+  "byteSize": 12288,
+  "summary": "Exported scene: 15 nodes, 5 meshes, 10 instances, 300 triangles → output/scene.glb (12.0 KB)"
+}
+```
+
+### `builder.export_rigged_gltf [filename]`
+
+Export last builder run as rigged GLB with skeleton and vertex weights (E4-001).
+
+**Usage:** `builder.export_rigged_gltf [filename]`
+
+**Requires:** Builder must have skeleton and vertex weights defined.
+
+**Response:**
+```json
+{
+  "path": "output/creature_rigged.glb",
+  "vertexCount": 200,
+  "triangleCount": 150,
+  "materialCount": 1,
+  "jointCount": 15,
+  "skinnedVertexCount": 180,
+  "byteSize": 8192,
+  "hasUVs": false,
+  "summary": "Exported rigged model: 15 joints, 180/200 skinned vertices, 150 triangles → output/creature_rigged.glb (8.0 KB)"
+}
+```
+
+### `builder.morph_targets`
+
+List available morph targets from the last builder run (E3-002).
+
+**Usage:** `builder.morph_targets`
+
+**Response:**
+```json
+{
+  "targets": [
+    { "name": "smile", "vertexCount": 50, "defaultWeight": 0 },
+    { "name": "frown", "vertexCount": 45, "defaultWeight": 0 }
+  ],
+  "count": 2
+}
+```
+
 ### `builder.coverage [<name>] [seed=N]`
 
 Test decision coverage for a builder. Runs the builder multiple times with each decision option forced to verify that decisions actually affect the output geometry.
@@ -315,6 +412,105 @@ Test decision coverage for a builder. Runs the builder multiple times with each 
 - `uncovered`: All options produce identical geometry
 - `partial`: Some options produce different geometry
 - Uses vertex and face counts to compare outputs (same counts = same geometry)
+
+### `builder.register_role <builder_name> role=<role> [style=<style>] [priority=<n>]`
+
+Register a builder for a role (F3-001). Allows composition by role instead of explicit builder name.
+
+**Usage:**
+- `builder.register_role DiningChair role=seating` - Register for any style
+- `builder.register_role ModernChair role=seating style=modern priority=10` - Style-specific
+
+**Response:**
+```json
+{
+  "builder": "DiningChair",
+  "role": "seating",
+  "style": "(any)",
+  "priority": 0,
+  "message": "Registered 'DiningChair' for role 'seating'"
+}
+```
+
+### `builder.list_roles`
+
+List all roles and their registered builders (F3-001).
+
+**Usage:** `builder.list_roles`
+
+**Response:**
+```json
+{
+  "count": 2,
+  "roles": [
+    { "role": "seating", "candidates": 2, "builders": ["DiningChair", "ModernChair"], "source": "metadata" },
+    { "role": "table", "candidates": 1, "builders": ["Table"], "source": "registered" }
+  ],
+  "message": "2 role(s) defined"
+}
+```
+
+### `builder.resolve_role <role> [style=<style>]`
+
+Resolve a role to a builder name (F3-001).
+
+**Usage:**
+- `builder.resolve_role seating` - Resolve with no style preference
+- `builder.resolve_role seating style=modern` - Prefer modern-specific builders
+
+**Response:**
+```json
+{
+  "role": "seating",
+  "style": "modern",
+  "builder": "ModernChair",
+  "source": "exact_match",
+  "message": "Role 'seating' resolves to builder 'ModernChair' (exact_match)"
+}
+```
+
+**Resolution order:**
+1. `exact_match`: Builder explicitly registered for this role + style
+2. `default`: Builder registered for this role with no style restriction
+3. `style_match`: First available candidate (fallback)
+
+### `builder.role_info <role>`
+
+Get detailed info about a role (F3-001).
+
+**Usage:** `builder.role_info seating`
+
+**Response:**
+```json
+{
+  "role": "seating",
+  "description": "Furniture designed for sitting - chairs, stools, benches",
+  "candidates": [
+    { "builder": "DiningChair", "styles": ["modern", "industrial"], "priority": 20 },
+    { "builder": "DiningChair", "priority": 10, "description": "Default fallback" }
+  ],
+  "source": "metadata"
+}
+```
+
+### Using Roles in YAML Compositions
+
+Instead of specifying `builder:`, use `role:` for style-aware builder selection:
+
+```yaml
+compose:
+  # Traditional: explicit builder name
+  chair1:
+    builder: DiningChair
+    offset: { x: 0, y: 0, z: 0 }
+
+  # F3-001: Role-based resolution
+  chair2:
+    role: seating  # Resolves to best builder for current style
+    offset: { x: 1, y: 0, z: 0 }
+```
+
+When a scene has `style: modern`, the `role: seating` will resolve to the builder registered for `seating + modern`.
 
 ---
 
@@ -458,6 +654,342 @@ Check if a builder exists in storage.
   "name": "DiningChairYaml",
   "exists": true
 }
+```
+
+---
+
+## Style Commands
+
+Commands for managing style definitions (F2-001).
+
+### `style.list`
+
+List all available style definitions.
+
+**Usage:** `style.list`
+
+**Response:**
+```json
+{
+  "count": 3,
+  "styles": ["modern", "rustic", "industrial"],
+  "message": "3 style(s) available"
+}
+```
+
+### `style.get <name>`
+
+Get a style definition by name.
+
+**Usage:** `style.get modern`
+
+**Response:**
+```json
+{
+  "name": "Modern",
+  "style": {
+    "name": "Modern",
+    "description": "Clean lines, minimal ornamentation...",
+    "decision_defaults": { "leg_style": "straight", ... },
+    "material_palette": { "primary_wood": { "rgb": [...], "roughness": 0.3 }, ... }
+  }
+}
+```
+
+### `style.preview <name>`
+
+Preview a style's decision defaults and material palette.
+
+**Usage:** `style.preview industrial`
+
+**Response:**
+```json
+{
+  "name": "Industrial",
+  "description": "Raw materials, exposed construction...",
+  "decision_defaults": { "leg_style": "square", "edge_radius": 0.0 },
+  "material_palette": { "accent_metal": { "rgb": [0.44, 0.47, 0.49], "metalness": 0.9 } },
+  "proportion_rules": ["seat_height / total_height >= 0.33"],
+  "pattern_preferences": { "symmetry": "functional", "ornamentation": "none" }
+}
+```
+
+### `style.define <name> definition=<json>`
+
+Create or update a style definition.
+
+**Usage:** `style.define minimal definition={"name":"Minimal","decision_defaults":{"edge_radius":0},"material_palette":{"primary":{"rgb":[1,1,1]}}}`
+
+### `style.delete <name>`
+
+Delete a style definition.
+
+**Usage:** `style.delete minimal`
+
+### Built-in Styles
+
+| Style | Description | Key Decision Defaults |
+|-------|-------------|----------------------|
+| `modern` | Clean lines, minimal ornamentation | `leg_style: straight`, `edge_radius: 0.005` |
+| `rustic` | Warm, natural, handcrafted | `leg_style: turned`, `edge_radius: 0.01` |
+| `industrial` | Raw, utilitarian, exposed | `leg_style: square`, `edge_radius: 0.0` |
+
+### Using Styles in YAML Builders
+
+Set a style at the top level of a YAML builder:
+
+```yaml
+version: "1.0"
+name: StyledChair
+style: industrial  # Uses industrial decision defaults
+
+decisions:
+  leg_style:
+    type: choice
+    options: [square, round, turned]
+    # Will default to "square" from industrial style
+```
+
+### Style Cascading (F2-002)
+
+Styles cascade through composition. Children inherit the parent's style unless they override it:
+
+```yaml
+version: "1.0"
+name: StyledRoom
+style: modern  # Parent style
+
+compose:
+  chair:
+    builder: DiningChair
+    # Inherits "modern" style from parent
+
+  lamp:
+    builder: DeskLamp
+    style: industrial  # Override: uses industrial instead of modern
+
+  table:
+    builder: DiningTable
+    # Inherits "modern" style from parent
+```
+
+**Resolution order:**
+1. Child's explicit `style:` in composition
+2. Parent's inherited style (via `__style__` override)
+3. No style (random decisions)
+
+Access style properties in expressions:
+- `$style.decision.leg_style` - Get decision default from style
+- `$style.palette.primary_wood.roughness` - Get material property
+- `$style.symmetry` - Get pattern preference
+
+### Role-Based Materials (F2-003)
+
+Materials can reference style palette roles instead of explicit colors:
+
+```yaml
+version: "1.0"
+name: StyledFurniture
+style: industrial
+
+materials:
+  # Traditional explicit color
+  frame:
+    color: "#444444"
+    metalness: 0.8
+
+  # Role-based: resolved from style palette
+  wood_surface:
+    role: primary_wood
+    # Uses industrial style's primary_wood: rgb, roughness, metalness
+
+  # Role with fallback
+  accent:
+    role: accent_metal
+    fallback_color: "#888888"  # Used if role not in palette
+```
+
+**Resolution order:**
+1. Role found in style palette → use palette's color + PBR properties
+2. Role not found, `fallback_color` specified → use fallback
+3. Role not found, `color` specified → use explicit color
+4. None of above → default grey
+
+**Available roles in built-in styles:**
+| Role | Modern | Rustic | Industrial |
+|------|--------|--------|------------|
+| `primary_wood` | white lacquer | natural oak | reclaimed wood |
+| `secondary_wood` | walnut | dark walnut | concrete |
+| `accent_metal` | chrome | wrought iron | raw steel |
+| `fabric` | warm grey | linen | aged leather |
+
+---
+
+## Constraint Commands
+
+Commands for defining and evaluating constraint schemas (F1-001, F1-003).
+
+### `constraint.define <key> schema=<json>`
+
+Define a constraint schema. The schema must include name, variables, and rules.
+
+**Usage:** `constraint.define range_check schema={"name":"range_check","variables":{"x":{"type":"number"}},"rules":[{"type":"range","target":"x","min":0,"max":100}]}`
+
+**Response:**
+```json
+{
+  "key": "range_check",
+  "schema": "range_check",
+  "description": null,
+  "variables": 1,
+  "rules": 1,
+  "message": "Constraint schema 'range_check' defined with 1 rules"
+}
+```
+
+### `constraint.load <metadata_key>`
+
+Load a constraint schema from the metadata store into memory.
+
+**Usage:** `constraint.load constraints/mechanical/gear_mesh`
+
+**Response:**
+```json
+{
+  "key": "constraints/mechanical/gear_mesh",
+  "schema": "gear_mesh",
+  "description": "Validates gear meshing compatibility",
+  "variables": 5,
+  "rules": 5,
+  "message": "Constraint schema 'constraints/mechanical/gear_mesh' loaded from metadata"
+}
+```
+
+### `constraint.evaluate <key> var1=value1 var2=value2`
+
+Evaluate a constraint schema against provided variable bindings. Checks both in-memory schemas and metadata store.
+
+**Usage:** `constraint.evaluate range_check x=50`
+
+**Usage with metadata key:** `constraint.evaluate constraints/spatial/clearance object1_x=0 object1_y=0 object1_z=0 object2_x=1 object2_y=0 object2_z=0 min_clearance=0.5`
+
+**Response:**
+```json
+{
+  "schema": "range_check",
+  "passed": true,
+  "summary": { "total": 1, "passed": 1, "failed": 0 },
+  "results": [
+    {
+      "type": "range",
+      "description": null,
+      "passed": true,
+      "message": "x=50 is within range [0, 100]"
+    }
+  ],
+  "message": "All 1 constraints passed"
+}
+```
+
+### `constraint.list`
+
+List all defined constraint schemas.
+
+**Usage:** `constraint.list`
+
+**Response:**
+```json
+{
+  "count": 1,
+  "schemas": [
+    {
+      "key": "range_check",
+      "name": "range_check",
+      "description": null,
+      "variables": 1,
+      "rules": 1
+    }
+  ],
+  "message": "1 constraint schema(s) defined"
+}
+```
+
+### `constraint.get <key>`
+
+Get a constraint schema definition.
+
+**Usage:** `constraint.get range_check`
+
+### `constraint.delete <key>`
+
+Delete a constraint schema.
+
+**Usage:** `constraint.delete range_check`
+
+### `constraint.validate schema=<json>`
+
+Validate a constraint schema definition without storing it.
+
+**Usage:** `constraint.validate schema={"name":"test","variables":{"x":{"type":"number"}},"rules":[{"type":"range","target":"x","min":0}]}`
+
+**Response:**
+```json
+{
+  "valid": true,
+  "schema": "test",
+  "variables": 1,
+  "rules": 1,
+  "message": "Schema is valid"
+}
+```
+
+### Constraint Schema Format
+
+```json
+{
+  "name": "schema_name",
+  "description": "Optional description",
+  "variables": {
+    "var_name": {
+      "type": "number|string|boolean|position|set|grid",
+      "description": "Optional variable description"
+    }
+  },
+  "rules": [
+    { "type": "expression", "expression": "x > 0" },
+    { "type": "unique", "target": "items" },
+    { "type": "range", "target": "x", "min": 0, "max": 100 },
+    { "type": "reference", "target": "color", "allowed": ["red", "green", "blue"] }
+  ]
+}
+```
+
+**Rule Types:**
+- `expression`: Boolean expression (e.g., `a + b <= 10`)
+- `unique`: No duplicates in a set or grid
+- `range`: Value within min/max bounds
+- `reference`: Value must be in allowed set
+
+### Built-in Constraint Libraries (F1-003)
+
+The following constraint schemas are available in the metadata store:
+
+| Key | Domain | Purpose |
+|-----|--------|---------|
+| `constraints/mechanical/gear_mesh` | Mechanical | Validates gear meshing: pitch match, center distance, tooth counts |
+| `constraints/spatial/no_overlap` | Spatial | AABB non-intersection for placed objects |
+| `constraints/spatial/clearance` | Spatial | Minimum distance between object centers |
+| `constraints/music/time_signature` | Music | Time signature validity: beats per bar, beat unit, bar duration |
+| `constraints/chess/valid_position` | Games | Chess position legality: king counts, adjacency, piece limits |
+
+**Example: Validate gear meshing**
+```
+constraint.evaluate constraints/mechanical/gear_mesh gear1_module=0.002 gear2_module=0.002 gear1_teeth=20 gear2_teeth=40 center_distance=0.06
+```
+
+**Example: Check clearance**
+```
+constraint.evaluate constraints/spatial/clearance object1_x=0 object1_y=0 object1_z=0 object2_x=1 object2_y=0 object2_z=0 min_clearance=0.9
 ```
 
 ---
@@ -1345,6 +1877,45 @@ List all available tags in the current scene graph.
 **Usage:** `scene.tags`
 
 **Returns:** Array of unique tags from all nodes in the scene.
+
+### `scene.generate_at_lod`
+
+Re-generate the current scene at a specific LOD tier (G2-001). Sub-builders with `lod_min` above the specified tier are skipped.
+
+**Usage:** `scene.generate_at_lod <tier> [seed=<n>]`
+
+**Parameters:**
+- `tier` (required): LOD tier 0-4 where 0 is lowest detail and 4 is highest
+- `seed` (optional): Random seed for generation. Defaults to last run seed or current time.
+
+**Example:**
+```bash
+scene.generate_at_lod 2 seed=42
+```
+
+**Returns:**
+```json
+{
+  "builder": "FurnishedRoom",
+  "seed": 42,
+  "lodBudget": 2,
+  "vertices": 1250,
+  "faces": 410,
+  "bounds": {
+    "width": "4.000m",
+    "height": "3.000m",
+    "depth": "5.000m"
+  },
+  "skippedCompositions": 3,
+  "message": "Generated at LOD 2. 3 composition(s) skipped due to lod_min constraint."
+}
+```
+
+**Notes:**
+- Lower LOD tiers produce simpler geometry with fewer sub-builders
+- Use `lod_min` in compositions to control which details appear at each LOD level
+- Use `lod_tier` in compositions to force sub-builders to generate at specific quality tiers
+- Skipped compositions are tracked in measurements as `__lod_skipped__<name>`
 
 ---
 

@@ -9,7 +9,6 @@ quality:
   current_tier: 0
   tier_gaps:
     - "Floor is a flat box slab with no detail"
-    - "furniture_count decision declared but unused - always composes fixed Table + ChairInBounds"
     - "No walls, ceiling, or room enclosure"
     - "shared_context theme values not used by children for styling"
   parts:
@@ -18,15 +17,14 @@ quality:
       notes: "6-face box slab. Functional but primitive"
     furniture:
       tier: 0
-      notes: "Composed Table + ChairInBounds. Quality depends on child builders"
+      notes: "Composed Table + DiningChair. Quality depends on child builders"
   decision_coverage:
-    geometry_affecting: []
-    decorative_only:
-      - furniture_count  # Declared but unused in composition
-    coverage_percentage: 0
+    geometry_affecting:
+      - furniture_count  # Drives chair count around table via placement
+    decorative_only: []
+    coverage_percentage: 100
   upgrade_path:
     to_tier_1:
-      - "Use furniture_count to drive actual placement count"
       - "Add wall geometry for room enclosure"
       - "Wire shared_context theme to child builder material overrides"
 
@@ -108,12 +106,13 @@ compose:
       table_depth: "$top_depth"
       table_height: "$height"
 
-  chair_1:
-    builder: ChairInBounds
-    offset: { x: -1, y: 0, z: 1.5 }
-    read_context: [theme, table_width, table_depth]
-    constraints:
-      max_width: 0.5
-      max_height: 0.9
-    write_context:
-      chair_1_height: "$final_height"
+# Chairs placed around the table using furniture_count — facing inward
+placement:
+  mode: around_rectangle
+  builder: DiningChair
+  count: furniture_count
+  center: { x: 0, y: 0, z: 0 }
+  width: 1.6
+  depth: 1.0
+  facing: inward
+  min_distance: 0.1

@@ -1,0 +1,109 @@
+# Style Palettes - Mid-Century Modern
+# Organic curves, tapered round legs, warm walnut tones, functional elegance
+# Format: F2-001 StyleDefinition with decision_defaults and material_palette
+
+key: styles/mid_century_modern
+createdAt: "2026-02-22T00:00:00.000Z"
+modifiedAt: "2026-02-22T00:00:00.000Z"
+description: Mid-century modern design style - organic curves, tapered round legs, warm walnut tones
+tags:
+  - style
+  - mid_century_modern
+  - retro
+  - scandinavian
+
+value:
+  name: MidCenturyModern
+  description: Organic curves, tapered round legs, warm walnut tones, functional elegance
+
+  # F2-001: Decision defaults - hallmarks of mid-century modern
+  decision_defaults:
+    leg_style: tapered          # Signature tapered round legs
+    back_style: solid           # Solid backs with organic silhouettes
+    arm_style: curved           # Gentle arm curves
+    edge_treatment: rounded     # Softly rounded edges
+    surface_finish: oiled       # Warm, hand-rubbed oil finish
+    edge_radius: 0.008          # Gentle rounding
+    leg_taper: 0.55             # Strong taper - feet much narrower than top
+    bevel_width: 0.003          # Subtle bevel details
+    table_style: rectangular    # Clean rectangular forms
+    vase_style: classic         # Organic curves for decorative pieces
+
+  # F2-001: Material palette - warm walnut, teak, and cream tones
+  material_palette:
+    primary_wood:
+      rgb: [0.48, 0.32, 0.20]
+      roughness: 0.45
+      metalness: 0.0
+      name: walnut
+    secondary_wood:
+      rgb: [0.72, 0.54, 0.36]
+      roughness: 0.5
+      metalness: 0.0
+      name: teak
+    accent_metal:
+      rgb: [0.85, 0.75, 0.60]
+      roughness: 0.3
+      metalness: 0.7
+      name: brushed_brass
+    fabric:
+      rgb: [0.96, 0.92, 0.80]
+      roughness: 0.7
+      metalness: 0.0
+      name: warm_cream
+
+  # F2-001: Proportion rules - mid-century proportional guidelines
+  proportion_rules:
+    - "seat_height / total_height >= 0.38"
+    - "seat_width / seat_depth >= 0.85"
+    - "seat_width / seat_depth <= 1.25"
+    - "leg_width / seat_width <= 0.08"
+
+  # F2-001: Pattern preferences
+  pattern_preferences:
+    symmetry: bilateral
+    repetition: low
+    ornamentation: minimal_organic
+
+  # Legacy fields preserved for backward compatibility
+  colors:
+    primary:
+      - { name: walnut, hex: "#7B5230", rgb: [0.48, 0.32, 0.20] }
+      - { name: teak, hex: "#B88A5B", rgb: [0.72, 0.54, 0.36] }
+      - { name: ebony, hex: "#3A2812", rgb: [0.23, 0.16, 0.07] }
+    accent:
+      - { name: brushed_brass, hex: "#D9BF99", rgb: [0.85, 0.75, 0.60] }
+      - { name: mustard_yellow, hex: "#E8B84B", rgb: [0.91, 0.72, 0.29] }
+      - { name: olive_green, hex: "#6B7B3A", rgb: [0.42, 0.48, 0.23] }
+    neutral:
+      - { name: warm_cream, hex: "#F5EBD0", rgb: [0.96, 0.92, 0.80] }
+      - { name: off_white, hex: "#FAF6EE", rgb: [0.98, 0.96, 0.93] }
+
+  materials:
+    primary:
+      - { name: walnut, roughness: 0.45, metalness: 0.0 }
+      - { name: teak, roughness: 0.5, metalness: 0.0 }
+      - { name: rosewood, roughness: 0.4, metalness: 0.0 }
+    secondary:
+      - { name: brushed_brass, roughness: 0.3, metalness: 0.7 }
+      - { name: wool_felt, roughness: 0.9, metalness: 0.0 }
+      - { name: leather, roughness: 0.5, metalness: 0.0 }
+
+  proportions:
+    edge_radius: 0.008        # Soft rounded edges
+    leg_taper: 0.55           # Strong taper (55% of base width at tip)
+    bevel_width: 0.003        # Subtle bevels
+    symmetry: bilateral       # Symmetric forms
+
+  ornamentation:
+    level: minimal_organic
+    allowed:
+      - tapered_legs
+      - organic_curves
+      - wood_grain_texture
+      - subtle_bevel
+    forbidden:
+      - geometric_patterns
+      - chrome_accents
+      - sharp_industrial_edges
+      - carved_ornamental_details

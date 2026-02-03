@@ -1,0 +1,228 @@
+# ChessBoard.yaml
+# H3-001: Chess board with pieces in a procedurally generated legal position
+# Demonstrates: composition, PSD tags, grid iteration, conditional materials
+
+name: ChessBoard
+description: An 8x8 chess board with 64 individually colored squares
+
+decisions:
+  board_style:
+    type: choice
+    options: [classic, modern, tournament]
+    default: classic
+  game_phase:
+    type: choice
+    options: [opening, midgame, endgame]
+    default: midgame
+
+measurements:
+  # Board dimensions
+  square_size:
+    value: 0.05
+    source: "Standard chess square size"
+  board_thickness:
+    value: 0.01
+    source: "Board thickness"
+  board_margin:
+    value: 0.005
+    source: "Margin around squares"
+  board_size:
+    value: 0.41
+    source: "8 * square_size + 2 * board_margin"
+  square_height:
+    value: 0.002
+    source: "Height of square surface"
+  # Piece heights - different for each piece type
+  pawn_height:
+    value: 0.035
+    source: "Pawn height"
+  rook_height:
+    value: 0.040
+    source: "Rook height"
+  knight_height:
+    value: 0.045
+    source: "Knight height"
+  bishop_height:
+    value: 0.050
+    source: "Bishop height"
+  queen_height:
+    value: 0.055
+    source: "Queen height"
+  king_height:
+    value: 0.060
+    source: "King height"
+
+derived:
+  half_board: "board_size / 2"
+  half_square: "square_size / 2"
+  # Board origin (bottom-left corner of squares)
+  board_origin: "-(square_size * 4)"
+
+materials:
+  light_wood:
+    color: "#F0D9B5"
+    roughness: 0.4
+    metalness: 0.0
+  dark_wood:
+    color: "#B58863"
+    roughness: 0.4
+    metalness: 0.0
+  edge_wood:
+    color: "#5D4037"
+    roughness: 0.6
+    metalness: 0.0
+
+geometry:
+  # Board base/frame
+  - box:
+      name: board_base
+      center: { x: 0, y: "-board_thickness / 2", z: 0 }
+      size: { x: board_size, y: board_thickness, z: board_size }
+      color: $edge_wood
+
+  # Generate 64 squares using grid command
+  # Light squares: (row + col) is even
+  # Dark squares: (row + col) is odd
+  - grid:
+      rows: 8
+      cols: 8
+    geometry:
+      # Light squares - when (row + col) % 2 == 0
+      - if: "(row + col) % 2 == 0"
+        then:
+          - box:
+              name: "square_${row}_${col}"
+              center:
+                x: "board_origin + col * square_size + half_square"
+                y: "square_height / 2"
+                z: "board_origin + row * square_size + half_square"
+              size: { x: square_size, y: square_height, z: square_size }
+              color: $light_wood
+        else:
+          - box:
+              name: "square_${row}_${col}"
+              center:
+                x: "board_origin + col * square_size + half_square"
+                y: "square_height / 2"
+                z: "board_origin + row * square_size + half_square"
+              size: { x: square_size, y: square_height, z: square_size }
+              color: $dark_wood
+
+# Compose chess pieces in starting position
+# Piece heights: pawn=0.035, rook=0.040, knight=0.045, bishop=0.050, queen=0.055, king=0.060
+compose:
+  # White back row (rank 1: a1=col0, b1=col1, ..., h1=col7)
+  white_rook_a:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 0 * square_size + half_square", y: square_height, z: "board_origin + half_square" }
+    overrides: { piece_type: rook, piece_height: 0.040, piece_color: white, square: a1 }
+
+  white_knight_b:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 1 * square_size + half_square", y: square_height, z: "board_origin + half_square" }
+    overrides: { piece_type: knight, piece_height: 0.045, piece_color: white, square: b1 }
+
+  white_bishop_c:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 2 * square_size + half_square", y: square_height, z: "board_origin + half_square" }
+    overrides: { piece_type: bishop, piece_height: 0.050, piece_color: white, square: c1 }
+
+  white_queen:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 3 * square_size + half_square", y: square_height, z: "board_origin + half_square" }
+    overrides: { piece_type: queen, piece_height: 0.055, piece_color: white, square: d1 }
+
+  white_king:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 4 * square_size + half_square", y: square_height, z: "board_origin + half_square" }
+    overrides: { piece_type: king, piece_height: 0.060, piece_color: white, square: e1 }
+
+  white_bishop_f:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 5 * square_size + half_square", y: square_height, z: "board_origin + half_square" }
+    overrides: { piece_type: bishop, piece_height: 0.050, piece_color: white, square: f1 }
+
+  white_knight_g:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 6 * square_size + half_square", y: square_height, z: "board_origin + half_square" }
+    overrides: { piece_type: knight, piece_height: 0.045, piece_color: white, square: g1 }
+
+  white_rook_h:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 7 * square_size + half_square", y: square_height, z: "board_origin + half_square" }
+    overrides: { piece_type: rook, piece_height: 0.040, piece_color: white, square: h1 }
+
+  # Black back row (rank 8: a8=col0, b8=col1, ..., h8=col7)
+  black_rook_a:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 0 * square_size + half_square", y: square_height, z: "board_origin + 7 * square_size + half_square" }
+    overrides: { piece_type: rook, piece_height: 0.040, piece_color: black, square: a8 }
+
+  black_knight_b:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 1 * square_size + half_square", y: square_height, z: "board_origin + 7 * square_size + half_square" }
+    overrides: { piece_type: knight, piece_height: 0.045, piece_color: black, square: b8 }
+
+  black_bishop_c:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 2 * square_size + half_square", y: square_height, z: "board_origin + 7 * square_size + half_square" }
+    overrides: { piece_type: bishop, piece_height: 0.050, piece_color: black, square: c8 }
+
+  black_queen:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 3 * square_size + half_square", y: square_height, z: "board_origin + 7 * square_size + half_square" }
+    overrides: { piece_type: queen, piece_height: 0.055, piece_color: black, square: d8 }
+
+  black_king:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 4 * square_size + half_square", y: square_height, z: "board_origin + 7 * square_size + half_square" }
+    overrides: { piece_type: king, piece_height: 0.060, piece_color: black, square: e8 }
+
+  black_bishop_f:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 5 * square_size + half_square", y: square_height, z: "board_origin + 7 * square_size + half_square" }
+    overrides: { piece_type: bishop, piece_height: 0.050, piece_color: black, square: f8 }
+
+  black_knight_g:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 6 * square_size + half_square", y: square_height, z: "board_origin + 7 * square_size + half_square" }
+    overrides: { piece_type: knight, piece_height: 0.045, piece_color: black, square: g8 }
+
+  black_rook_h:
+    builder: catalog/components/ChessPiece
+    offset: { x: "board_origin + 7 * square_size + half_square", y: square_height, z: "board_origin + 7 * square_size + half_square" }
+    overrides: { piece_type: rook, piece_height: 0.040, piece_color: black, square: h8 }
+
+  # White pawns (rank 2: a2..h2, using repeat)
+  white_pawn:
+    builder: catalog/components/ChessPiece
+    repeat: { count: 8, as: pawn_col }
+    offset: { x: "board_origin + pawn_col * square_size + half_square", y: square_height, z: "board_origin + 1 * square_size + half_square" }
+    overrides: { piece_type: pawn, piece_height: 0.035, piece_color: white }
+
+  # Black pawns (rank 7: a7..h7, using repeat)
+  black_pawn:
+    builder: catalog/components/ChessPiece
+    repeat: { count: 8, as: pawn_col }
+    offset: { x: "board_origin + pawn_col * square_size + half_square", y: square_height, z: "board_origin + 6 * square_size + half_square" }
+    overrides: { piece_type: pawn, piece_height: 0.035, piece_color: black }
+
+constraints:
+  - schema: constraints/chess/valid_position
+    description: Validate the chess starting position follows legal position rules
+    bindings:
+      white_king_count: "1"
+      black_king_count: "1"
+      white_king_rank: "1"
+      white_king_file: "5"
+      black_king_rank: "8"
+      black_king_file: "5"
+      white_pawn_count: "8"
+      black_pawn_count: "8"
+      white_total_pieces: "16"
+      black_total_pieces: "16"
+
+tags:
+  type: chess_board
+  style: "$board_style"
+  phase: "$game_phase"

@@ -4,6 +4,15 @@ import { Face } from './Face';
 import { Vertex } from './Vertex';
 import { Vec3 } from '../math/Vec3';
 import { perlin3d } from '../math/MathService';
+import {
+  MorphTarget,
+  MorphTargetSet,
+  MorphApplyOptions,
+  MorphBlendResult,
+  applyMorphTargets as applyMorphTargetsCore,
+  createMorphTarget as createMorphTargetCore,
+  createMorphTargetFromOffsets as createMorphTargetFromOffsetsCore
+} from './MorphTarget';
 
 /**
  * Helper function to create edge key (order-independent)
@@ -12,7 +21,88 @@ function edgeKey(a: number, b: number): string {
   return a < b ? `${a}-${b}` : `${b}-${a}`;
 }
 
+/**
+ * Calculate box-projection UV for a position based on normal direction.
+ * Projects position onto the dominant axis plane to get consistent UVs.
+ * Uses world-scale: 1 world unit = 1 UV unit.
+ */
+function boxProjectUV(position: Vec3, normal?: Vec3): [number, number] {
+  // Default to +Y up if no normal provided
+  const n = normal || new Vec3(0, 1, 0);
+  const absX = Math.abs(n.x);
+  const absY = Math.abs(n.y);
+  const absZ = Math.abs(n.z);
+
+  // Choose projection plane based on dominant normal axis
+  if (absX >= absY && absX >= absZ) {
+    // Project onto YZ plane (looking along X axis)
+    return [position.z, position.y];
+  } else if (absY >= absZ) {
+    // Project onto XZ plane (looking along Y axis)
+    return [position.x, position.z];
+  } else {
+    // Project onto XY plane (looking along Z axis)
+    return [position.x, position.y];
+  }
+}
+
 export class MeshOperations {
+  /**
+   * Apply box-projection UVs to a mesh.
+   * This is useful for meshes that don't have UVs (like createBoxWithSharedVertices)
+   * or for re-projecting UVs after deformation operations.
+   *
+   * @param mesh The mesh to apply UVs to (will be modified in place, or pass a clone)
+   * @param scale Scale factor for UVs (1.0 = 1 world unit = 1 UV unit)
+   * @returns The modified mesh
+   */
+  static applyBoxProjectUVs(mesh: Mesh, scale: number = 1.0): Mesh {
+    // First, compute per-face normals for projection direction
+    const faceNormals: Vec3[] = [];
+    for (const face of mesh.faces) {
+      if (face.indices.length >= 3) {
+        const v0 = mesh.vertices[face.indices[0]].position;
+        const v1 = mesh.vertices[face.indices[1]].position;
+        const v2 = mesh.vertices[face.indices[2]].position;
+        const edge1 = v1.sub(v0);
+        const edge2 = v2.sub(v0);
+        const normal = edge1.cross(edge2).normalize();
+        faceNormals.push(normal);
+      } else {
+        faceNormals.push(new Vec3(0, 1, 0)); // Default up
+      }
+    }
+
+    // Build a map of which faces each vertex belongs to
+    const vertexToFaces: number[][] = mesh.vertices.map(() => []);
+    for (let f = 0; f < mesh.faces.length; f++) {
+      for (const idx of mesh.faces[f].indices) {
+        vertexToFaces[idx].push(f);
+      }
+    }
+
+    // Apply box projection UVs to each vertex based on averaged face normals
+    for (let v = 0; v < mesh.vertices.length; v++) {
+      const vertex = mesh.vertices[v];
+
+      // Average the normals of adjacent faces
+      let avgNormal = new Vec3(0, 0, 0);
+      for (const f of vertexToFaces[v]) {
+        avgNormal = avgNormal.add(faceNormals[f]);
+      }
+      if (vertexToFaces[v].length > 0) {
+        avgNormal = avgNormal.mul(1 / vertexToFaces[v].length).normalize();
+      } else {
+        avgNormal = new Vec3(0, 1, 0);
+      }
+
+      const uv = boxProjectUV(vertex.position, avgNormal);
+      vertex.attributes.uv = [uv[0] * scale, uv[1] * scale];
+    }
+
+    return mesh;
+  }
+
   static extrude(loop: EdgeLoop, direction: Vec3, segments: number = 1): Mesh {
     const mesh = new Mesh();
     const loops: EdgeLoop[] = [loop];
@@ -97,60 +187,84 @@ export class MeshOperations {
     if (reverse) indices.reverse();
     mesh.addFace(new Face(indices));
   }
-  static createBox(width: number, height: number, depth: number): Mesh {
+  static createBox(width: number, height: number, depth: number, uvMode: 'normalized' | 'world_scale' = 'normalized'): Mesh {
     const mesh = new Mesh();
     const hw = width / 2, hh = height / 2, hd = depth / 2;
 
+    // Professional cube unwrap: project UVs consistently so checker patterns work
+    // Each face uses planar projection from its facing axis
+    // U/V are assigned so that when looking at the face from outside:
+    //   - U increases left-to-right
+    //   - V increases bottom-to-top
+    // This ensures consistent checker patterns on all faces
+
+    // Helper to compute UV based on world position and face orientation
+    const uv = (u: number, v: number, uScale: number, vScale: number): [number, number] => {
+      if (uvMode === 'normalized') {
+        return [u / uScale, v / vScale];
+      } else {
+        // world_scale: 1 UV unit = 1 world unit
+        return [u, v];
+      }
+    };
+
     // Create vertices per-face for proper UVs (24 vertices for 6 faces)
-    // Each face has 4 vertices with UV coordinates [0,0], [1,0], [1,1], [0,1]
 
-    // Back face (-Z) - looking from behind
-    const backStart = mesh.vertices.length;
-    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, -hd), { uv: [0, 0] })); // bottom-left
-    mesh.addVertex(new Vertex(new Vec3(hw, -hh, -hd), { uv: [1, 0] }));  // bottom-right
-    mesh.addVertex(new Vertex(new Vec3(hw, hh, -hd), { uv: [1, 1] }));   // top-right
-    mesh.addVertex(new Vertex(new Vec3(-hw, hh, -hd), { uv: [0, 1] }));  // top-left
-    mesh.addFace(new Face([backStart + 3, backStart + 2, backStart + 1, backStart + 0]));
+    // Each face gets its own smoothGroup for hard edges at box corners
 
-    // Front face (+Z) - looking from front
+    // Front face (+Z) - looking from +Z toward origin
+    // U = X position, V = Y position
     const frontStart = mesh.vertices.length;
-    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, hd), { uv: [0, 0] }));
-    mesh.addVertex(new Vertex(new Vec3(hw, -hh, hd), { uv: [1, 0] }));
-    mesh.addVertex(new Vertex(new Vec3(hw, hh, hd), { uv: [1, 1] }));
-    mesh.addVertex(new Vertex(new Vec3(-hw, hh, hd), { uv: [0, 1] }));
-    mesh.addFace(new Face([frontStart + 0, frontStart + 1, frontStart + 2, frontStart + 3]));
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, hd), { uv: uv(0, 0, width, height), smoothGroup: 1 }));
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, hd), { uv: uv(width, 0, width, height), smoothGroup: 1 }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, hd), { uv: uv(width, height, width, height), smoothGroup: 1 }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, hd), { uv: uv(0, height, width, height), smoothGroup: 1 }));
+    mesh.addFace(new Face([frontStart, frontStart + 1, frontStart + 2, frontStart + 3]));
 
-    // Left face (-X)
-    const leftStart = mesh.vertices.length;
-    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, -hd), { uv: [0, 0] }));
-    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, hd), { uv: [1, 0] }));
-    mesh.addVertex(new Vertex(new Vec3(-hw, hh, hd), { uv: [1, 1] }));
-    mesh.addVertex(new Vertex(new Vec3(-hw, hh, -hd), { uv: [0, 1] }));
-    mesh.addFace(new Face([leftStart + 0, leftStart + 1, leftStart + 2, leftStart + 3]));
+    // Back face (-Z) - looking from -Z toward origin (mirrored X)
+    // U = -X position (flipped for correct orientation), V = Y position
+    const backStart = mesh.vertices.length;
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, -hd), { uv: uv(0, 0, width, height), smoothGroup: 2 }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, -hd), { uv: uv(width, 0, width, height), smoothGroup: 2 }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, -hd), { uv: uv(width, height, width, height), smoothGroup: 2 }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, -hd), { uv: uv(0, height, width, height), smoothGroup: 2 }));
+    mesh.addFace(new Face([backStart, backStart + 1, backStart + 2, backStart + 3]));
 
-    // Right face (+X)
+    // Right face (+X) - looking from +X toward origin
+    // U = -Z position (so +Z is left when looking at face), V = Y position
     const rightStart = mesh.vertices.length;
-    mesh.addVertex(new Vertex(new Vec3(hw, -hh, -hd), { uv: [0, 0] }));
-    mesh.addVertex(new Vertex(new Vec3(hw, -hh, hd), { uv: [1, 0] }));
-    mesh.addVertex(new Vertex(new Vec3(hw, hh, hd), { uv: [1, 1] }));
-    mesh.addVertex(new Vertex(new Vec3(hw, hh, -hd), { uv: [0, 1] }));
-    mesh.addFace(new Face([rightStart + 3, rightStart + 2, rightStart + 1, rightStart + 0]));
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, hd), { uv: uv(0, 0, depth, height), smoothGroup: 3 }));
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, -hd), { uv: uv(depth, 0, depth, height), smoothGroup: 3 }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, -hd), { uv: uv(depth, height, depth, height), smoothGroup: 3 }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, hd), { uv: uv(0, height, depth, height), smoothGroup: 3 }));
+    mesh.addFace(new Face([rightStart, rightStart + 1, rightStart + 2, rightStart + 3]));
 
-    // Top face (+Y)
+    // Left face (-X) - looking from -X toward origin
+    // U = Z position, V = Y position
+    const leftStart = mesh.vertices.length;
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, -hd), { uv: uv(0, 0, depth, height), smoothGroup: 4 }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, hd), { uv: uv(depth, 0, depth, height), smoothGroup: 4 }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, hd), { uv: uv(depth, height, depth, height), smoothGroup: 4 }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, -hd), { uv: uv(0, height, depth, height), smoothGroup: 4 }));
+    mesh.addFace(new Face([leftStart, leftStart + 1, leftStart + 2, leftStart + 3]));
+
+    // Top face (+Y) - looking from +Y down
+    // U = X position, V = -Z position (so +Z is at bottom of UV)
     const topStart = mesh.vertices.length;
-    mesh.addVertex(new Vertex(new Vec3(-hw, hh, -hd), { uv: [0, 0] }));
-    mesh.addVertex(new Vertex(new Vec3(hw, hh, -hd), { uv: [1, 0] }));
-    mesh.addVertex(new Vertex(new Vec3(hw, hh, hd), { uv: [1, 1] }));
-    mesh.addVertex(new Vertex(new Vec3(-hw, hh, hd), { uv: [0, 1] }));
-    mesh.addFace(new Face([topStart + 3, topStart + 2, topStart + 1, topStart + 0]));
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, hd), { uv: uv(0, 0, width, depth), smoothGroup: 5 }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, hd), { uv: uv(width, 0, width, depth), smoothGroup: 5 }));
+    mesh.addVertex(new Vertex(new Vec3(hw, hh, -hd), { uv: uv(width, depth, width, depth), smoothGroup: 5 }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, hh, -hd), { uv: uv(0, depth, width, depth), smoothGroup: 5 }));
+    mesh.addFace(new Face([topStart, topStart + 1, topStart + 2, topStart + 3]));
 
-    // Bottom face (-Y)
+    // Bottom face (-Y) - looking from -Y up
+    // U = X position, V = Z position
     const bottomStart = mesh.vertices.length;
-    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, -hd), { uv: [0, 0] }));
-    mesh.addVertex(new Vertex(new Vec3(hw, -hh, -hd), { uv: [1, 0] }));
-    mesh.addVertex(new Vertex(new Vec3(hw, -hh, hd), { uv: [1, 1] }));
-    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, hd), { uv: [0, 1] }));
-    mesh.addFace(new Face([bottomStart + 0, bottomStart + 1, bottomStart + 2, bottomStart + 3]));
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, -hd), { uv: uv(0, 0, width, depth), smoothGroup: 6 }));
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, -hd), { uv: uv(width, 0, width, depth), smoothGroup: 6 }));
+    mesh.addVertex(new Vertex(new Vec3(hw, -hh, hd), { uv: uv(width, depth, width, depth), smoothGroup: 6 }));
+    mesh.addVertex(new Vertex(new Vec3(-hw, -hh, hd), { uv: uv(0, depth, width, depth), smoothGroup: 6 }));
+    mesh.addFace(new Face([bottomStart, bottomStart + 1, bottomStart + 2, bottomStart + 3]));
 
     mesh.calculateNormals();
     return mesh;
@@ -207,7 +321,7 @@ export class MeshOperations {
         const z = radius * Math.sin(phi) * Math.sin(theta);
         const pos = new Vec3(x, y, z);
         const normal = pos.normalize();
-        mesh.addVertex(new Vertex(pos, { normal, uv: [u, v] }));
+        mesh.addVertex(new Vertex(pos, { normal, uv: [u, v], smoothGroup: 1 }));
       }
     }
     for (let ring = 0; ring < rings; ring++) {
@@ -276,6 +390,11 @@ export class MeshOperations {
     // Each face gets its own copy of vertices on beveled edges
     const faceVertexMap = new Map<string, number>();
 
+    // SmoothGroup assignment: each original face gets its own smoothGroup
+    // so flat faces stay flat.  Chamfer/bevel strips share a single
+    // smoothGroup so they blend smoothly with each other (rounded edge).
+    const CHAMFER_SMOOTH_GROUP = mesh.faces.length + 1;
+
     // First: copy all vertices, creating per-face copies for beveled vertices
     for (let i = 0; i < mesh.vertices.length; i++) {
       const vertex = mesh.vertices[i];
@@ -284,7 +403,15 @@ export class MeshOperations {
       if (connectedEdges.length === 0) {
         // Not on beveled edge - just copy
         vertexMap.set(i, result.vertices.length);
-        result.addVertex(vertex.clone());
+        const cloned = vertex.clone();
+        // Find which face owns this vertex and assign its smoothGroup
+        for (let f = 0; f < mesh.faces.length; f++) {
+          if (mesh.faces[f].indices.includes(i)) {
+            cloned.attributes.smoothGroup = f + 1;  // 1-based, unique per original face
+            break;
+          }
+        }
+        result.addVertex(cloned);
       }
       // Beveled vertices are created per-face in the next step
     }
@@ -333,6 +460,16 @@ export class MeshOperations {
 
         const newVertex = vertex.clone();
         newVertex.position = currPos.add(offset);
+        // Assign the owning face's smoothGroup so flat faces stay flat
+        newVertex.attributes.smoothGroup = faceIdx + 1;
+        // Recalculate UV for new position using box projection based on face normal
+        // First compute approximate face normal from adjacent edges
+        const edgeA = toPrev;
+        const edgeB = toNext.mul(-1);
+        const faceNormal = edgeA.cross(edgeB).normalize();
+        if (newVertex.attributes.uv) {
+          newVertex.attributes.uv = boxProjectUV(newVertex.position, faceNormal);
+        }
         faceVertexMap.set(key, result.vertices.length);
         result.addVertex(newVertex);
       }
@@ -360,6 +497,7 @@ export class MeshOperations {
 
     // Fourth: create chamfer/bevel faces for each beveled edge
     // For multi-segment bevels, we interpolate intermediate vertices along a circular arc
+    let chamferEdgeIdx = 0;
     for (const edge of edges) {
       const faceLeft = edge.faceLeft;
       const faceRight = edge.faceRight;
@@ -391,27 +529,58 @@ export class MeshOperations {
 
         const chamferColor = mesh.faces[faceLeft].color || mesh.faces[faceRight].color;
 
+        // Get positions for the chamfer quad corners
+        const posAL = result.vertices[vAL].position;
+        const posAR = result.vertices[vAR].position;
+        const posBL = result.vertices[vBL].position;
+        const posBR = result.vertices[vBR].position;
+
+        // Calculate chamfer face normal for box projection
+        // Use cross product of the two diagonal edges
+        const edge1 = posBL.sub(posAL);
+        const edge2 = posAR.sub(posAL);
+        const chamferNormal = edge1.cross(edge2).normalize();
+
+        // Duplicate boundary vertices for chamfer faces so they don't share
+        // indices with the inset faces (which would contaminate flat normals).
+        // For segments=1, each chamfer quad gets its own unique smoothGroup
+        // so it stays flat. For segments>1, all arc strips share
+        // CHAMFER_SMOOTH_GROUP so the rounded edge is smooth.
+        chamferEdgeIdx++;
+        const chamferSG = segments === 1
+          ? CHAMFER_SMOOTH_GROUP + chamferEdgeIdx  // unique per edge → flat
+          : CHAMFER_SMOOTH_GROUP;                  // shared → smooth arc
+        const dupVert = (srcIdx: number) => {
+          const v = result.vertices[srcIdx].clone();
+          v.attributes.smoothGroup = chamferSG;
+          v.attributes.uv = boxProjectUV(v.position, chamferNormal);
+          const idx = result.vertices.length;
+          result.addVertex(v);
+          return idx;
+        };
+        const cAL = dupVert(vAL);
+        const cAR = dupVert(vAR);
+        const cBL = dupVert(vBL);
+        const cBR = dupVert(vBR);
+
         if (segments === 1) {
-          // Single chamfer quad (original behavior)
+          // Single chamfer quad — flat
           if (leftGoesAtoB) {
-            result.addFace(new Face([vAL, vAR, vBR, vBL], chamferColor));
+            result.addFace(new Face([cAL, cAR, cBR, cBL], chamferColor));
           } else {
-            result.addFace(new Face([vBL, vBR, vAR, vAL], chamferColor));
+            result.addFace(new Face([cBL, cBR, cAR, cAL], chamferColor));
           }
         } else {
           // Multi-segment smooth bevel: create intermediate vertex rows along a circular arc
           // For vertex A: arc from posAL to posAR, bulging toward original vertex A position
           // For vertex B: arc from posBL to posBR, bulging toward original vertex B position
-          const posAL = result.vertices[vAL].position;
-          const posAR = result.vertices[vAR].position;
-          const posBL = result.vertices[vBL].position;
-          const posBR = result.vertices[vBR].position;
           const origA = mesh.vertices[edge.vertexA].position;
           const origB = mesh.vertices[edge.vertexB].position;
 
           // Build rows of vertex indices: row 0 = left side, row N = right side
+          // Use the duplicated chamfer vertices (cAL etc.) so normals stay separate
           const rows: [number, number][] = []; // [vertA_index, vertB_index] per row
-          rows.push([vAL, vBL]); // row 0: left face side
+          rows.push([cAL, cBL]); // row 0: left face side
 
           for (let s = 1; s < segments; s++) {
             const t = s / segments;
@@ -431,18 +600,28 @@ export class MeshOperations {
 
             const newVertA = result.vertices[vAL].clone();
             newVertA.position = interpA;
+            newVertA.attributes.smoothGroup = CHAMFER_SMOOTH_GROUP; // Smooth arc
+            // Use box projection for consistent checker patterns
+            if (newVertA.attributes.uv) {
+              newVertA.attributes.uv = boxProjectUV(interpA, chamferNormal);
+            }
             const idxA = result.vertices.length;
             result.addVertex(newVertA);
 
             const newVertB = result.vertices[vBL].clone();
             newVertB.position = interpB;
+            newVertB.attributes.smoothGroup = CHAMFER_SMOOTH_GROUP; // Smooth arc
+            // Use box projection for consistent checker patterns
+            if (newVertB.attributes.uv) {
+              newVertB.attributes.uv = boxProjectUV(interpB, chamferNormal);
+            }
             const idxB = result.vertices.length;
             result.addVertex(newVertB);
 
             rows.push([idxA, idxB]);
           }
 
-          rows.push([vAR, vBR]); // row N: right face side
+          rows.push([cAR, cBR]); // row N: right face side
 
           // Create quad strip between consecutive rows
           for (let s = 0; s < rows.length - 1; s++) {
@@ -475,15 +654,22 @@ export class MeshOperations {
 
       if (facesAtVertex.size < 3) continue; // Need at least 3 faces for a corner cap
 
-      // Get the per-face vertices for this corner and find a color from adjacent faces
+      // Get the per-face vertices for this corner and find a color from adjacent faces.
+      // Duplicate each vertex so corner faces don't share indices with inset faces
+      // (otherwise calculateNormals would blend the corner normal into the flat face).
+      // Use a range well above chamfer smoothGroups (which use CHAMFER_SMOOTH_GROUP + 1..N)
+      const cornerSG = CHAMFER_SMOOTH_GROUP + edges.length + 1 + vIdx; // unique per corner, no overlap
       const cornerVerts: number[] = [];
       let cornerColor: { r: number; g: number; b: number } | undefined;
       for (const faceIdx of facesAtVertex) {
         const key = `${vIdx}-${faceIdx}`;
         const vertIdx = faceVertexMap.get(key);
         if (vertIdx !== undefined) {
-          cornerVerts.push(vertIdx);
-          // Get color from first face that has one
+          const dup = result.vertices[vertIdx].clone();
+          dup.attributes.smoothGroup = cornerSG;
+          const newIdx = result.vertices.length;
+          result.addVertex(dup);
+          cornerVerts.push(newIdx);
           if (!cornerColor && mesh.faces[faceIdx].color) {
             cornerColor = mesh.faces[faceIdx].color;
           }
@@ -1349,4 +1535,229 @@ export class MeshOperations {
 
     return new EdgeLoop(rotated);
   }
+
+  // ==================== Morph Target Operations ====================
+
+  /**
+   * Apply morph targets to a base mesh.
+   *
+   * Blending formula: result[i] = base[i] + sum(targets[j][i] * weights[j])
+   *
+   * @param base The base mesh to blend from
+   * @param targetSet The morph target set
+   * @param weights Map of target name to blend weight (0 = base, 1 = fully morphed)
+   * @param options Optional blend parameters
+   * @returns A new mesh with blended vertex positions
+   */
+  static applyMorphTargets(
+    base: Mesh,
+    targetSet: MorphTargetSet,
+    weights: Map<string, number> | Record<string, number>,
+    options?: MorphApplyOptions
+  ): MorphBlendResult {
+    return applyMorphTargetsCore(base, targetSet, weights, options);
+  }
+
+  /**
+   * Create a morph target by computing the delta between two topology-matching meshes.
+   *
+   * @param base The base mesh
+   * @param variant The variant mesh (must have identical topology)
+   * @param name Name for the resulting morph target
+   * @param threshold Minimum offset magnitude to include. Default: 0.0001
+   * @returns A MorphTarget containing the position deltas
+   * @throws If meshes have different vertex counts or face connectivity
+   */
+  static createMorphTarget(
+    base: Mesh,
+    variant: Mesh,
+    name: string,
+    threshold?: number
+  ): MorphTarget {
+    return createMorphTargetCore(base, variant, name, threshold);
+  }
+
+  /**
+   * Create a morph target from inline offset data.
+   *
+   * @param name Target name
+   * @param offsets Array of { vertex: index, offset: {x, y, z} } objects
+   * @param baseVertexCount Number of vertices in the base mesh
+   * @returns A MorphTarget
+   */
+  static createMorphTargetFromOffsets(
+    name: string,
+    offsets: Array<{ vertex: number; offset: { x: number; y: number; z: number } }>,
+    baseVertexCount: number
+  ): MorphTarget {
+    return createMorphTargetFromOffsetsCore(name, offsets, baseVertexCount);
+  }
+
+  // ==========================================================================
+  // G1-001: Height Field Mesh Generation
+  // ==========================================================================
+
+  /**
+   * Terrain modification for flattening building pads
+   */
+  static terrainModification(options: {
+    type: 'flatten';
+    center: { x: number; z: number };
+    radius: number;
+    elevation: number;
+    falloff?: number;  // Distance over which to blend (default: 0 = hard edge)
+  }): TerrainModification {
+    return options;
+  }
+
+  /**
+   * Create a terrain mesh from a height function.
+   *
+   * G1-001: Generates a grid mesh with proper triangulation, UVs, and normals.
+   *
+   * @param options Configuration for terrain generation
+   * @returns A mesh representing the terrain
+   */
+  static createHeightFieldMesh(options: {
+    /** Width of terrain in world units (X axis) */
+    width: number;
+    /** Depth of terrain in world units (Z axis) */
+    depth: number;
+    /** Number of segments along X axis */
+    segmentsX: number;
+    /** Number of segments along Z axis */
+    segmentsZ: number;
+    /** Function that returns height (Y) for a given (X, Z) position */
+    heightFunction: (x: number, z: number) => number;
+    /** Optional modifications (building pads, etc.) */
+    modifications?: TerrainModification[];
+    /** Optional center offset (default: centered at origin) */
+    center?: { x: number; z: number };
+  }): Mesh {
+    const {
+      width,
+      depth,
+      segmentsX,
+      segmentsZ,
+      heightFunction,
+      modifications = [],
+      center = { x: 0, z: 0 }
+    } = options;
+
+    const mesh = new Mesh();
+    const vertexGrid: number[][] = [];
+
+    // Calculate starting position (centered at origin by default)
+    const startX = center.x - width / 2;
+    const startZ = center.z - depth / 2;
+    const stepX = width / segmentsX;
+    const stepZ = depth / segmentsZ;
+
+    // Create vertices in a grid
+    for (let zi = 0; zi <= segmentsZ; zi++) {
+      vertexGrid[zi] = [];
+      for (let xi = 0; xi <= segmentsX; xi++) {
+        const x = startX + xi * stepX;
+        const z = startZ + zi * stepZ;
+
+        // Get base height from function
+        let y = heightFunction(x, z);
+
+        // Apply modifications (building pads)
+        for (const mod of modifications) {
+          if (mod.type === 'flatten') {
+            const dx = x - mod.center.x;
+            const dz = z - mod.center.z;
+            const dist = Math.sqrt(dx * dx + dz * dz);
+
+            if (dist <= mod.radius) {
+              // Inside flatten zone
+              if (mod.falloff && mod.falloff > 0 && dist > mod.radius - mod.falloff) {
+                // In falloff zone - blend between terrain and flat
+                const blendDist = dist - (mod.radius - mod.falloff);
+                const t = blendDist / mod.falloff;
+                y = y * t + mod.elevation * (1 - t);
+              } else {
+                // Fully flattened
+                y = mod.elevation;
+              }
+            }
+          }
+        }
+
+        // Create vertex with UV coordinates
+        const vertex = new Vertex(new Vec3(x, y, z));
+        vertex.attributes.uv = [
+          (x - startX) / width,  // U: 0 to 1 across width
+          (z - startZ) / depth   // V: 0 to 1 across depth
+        ];
+
+        const index = mesh.vertices.length;
+        mesh.vertices.push(vertex);
+        vertexGrid[zi][xi] = index;
+      }
+    }
+
+    // Create faces (2 triangles per grid cell)
+    // Winding order: counter-clockwise when viewed from above (Y+) for Y-up normals
+    for (let zi = 0; zi < segmentsZ; zi++) {
+      for (let xi = 0; xi < segmentsX; xi++) {
+        const bl = vertexGrid[zi][xi];      // bottom-left
+        const br = vertexGrid[zi][xi + 1];  // bottom-right
+        const tl = vertexGrid[zi + 1][xi];  // top-left
+        const tr = vertexGrid[zi + 1][xi + 1]; // top-right
+
+        // Two triangles with CCW winding when viewed from above
+        mesh.faces.push(new Face([bl, tr, br]));  // First triangle
+        mesh.faces.push(new Face([bl, tl, tr]));  // Second triangle
+      }
+    }
+
+    // Compute smooth normals (average of adjacent face normals)
+    MeshOperations.computeSmoothNormals(mesh);
+
+    return mesh;
+  }
+
+  /**
+   * Compute smooth normals for a mesh by averaging adjacent face normals.
+   */
+  private static computeSmoothNormals(mesh: Mesh): void {
+    // Initialize normals
+    const normals: Vec3[] = mesh.vertices.map(() => new Vec3(0, 0, 0));
+
+    // Accumulate face normals
+    for (const face of mesh.faces) {
+      if (face.indices.length < 3) continue;
+
+      const v0 = mesh.vertices[face.indices[0]].position;
+      const v1 = mesh.vertices[face.indices[1]].position;
+      const v2 = mesh.vertices[face.indices[2]].position;
+
+      const edge1 = v1.sub(v0);
+      const edge2 = v2.sub(v0);
+      const faceNormal = edge1.cross(edge2);  // Not normalized - area-weighted
+
+      for (const idx of face.indices) {
+        normals[idx] = normals[idx].add(faceNormal);
+      }
+    }
+
+    // Normalize and store
+    for (let i = 0; i < mesh.vertices.length; i++) {
+      const normal = normals[i].normalize();
+      mesh.vertices[i].attributes.normal = normal;
+    }
+  }
+}
+
+/**
+ * Terrain modification definition (G1-001)
+ */
+export interface TerrainModification {
+  type: 'flatten';
+  center: { x: number; z: number };
+  radius: number;
+  elevation: number;
+  falloff?: number;
 }

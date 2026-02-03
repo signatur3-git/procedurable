@@ -43,6 +43,13 @@ export class BevelCommandHandler extends BaseGeometryCommandHandler {
       // Apply bevel
       const beveledMesh = MeshOperations.bevel(currentMesh, edgesToBevel, width, segments);
 
+      // Apply box projection UVs to ensure all vertices have UVs
+      // This is necessary because:
+      // 1. weldVertices() produces a mesh without UVs
+      // 2. Bevel only adds UVs to newly created vertices
+      // Box projection gives consistent UVs for all vertices
+      MeshOperations.applyBoxProjectUVs(beveledMesh);
+
       // Replace the mesh
       builder.replaceMesh(beveledMesh);
     }

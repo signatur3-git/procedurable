@@ -123,7 +123,9 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
     // Convert to Mesh format
     const meshVertices = extruded.vertices.map((v: any, i: number) => {
       const normal = extruded.normals?.[i];
-      return new Vertex(v, { normal });
+      const uv = extruded.uvs?.[i];
+      const smoothGroup = extruded.smoothGroups?.[i];
+      return new Vertex(v, { normal, uv, smoothGroup });
     });
 
     const meshFaces = extruded.faces.map((face: number[]) => new Face(face, color, materialSlotIndex));
@@ -326,7 +328,9 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
 
       const meshVertices = extrudedLetter.vertices.map((v: any, i: number) => {
         const normal = extrudedLetter.normals[i];
-        return new Vertex(v, { normal });
+        const uv = extrudedLetter.uvs?.[i];
+        const smoothGroup = extrudedLetter.smoothGroups?.[i];
+        return new Vertex(v, { normal, uv, smoothGroup });
       });
 
       const meshFaces = extrudedLetter.faces.map((face: number[]) => new Face(face, textColor, materialSlotIndex));
@@ -423,7 +427,9 @@ export class Extrude2DCommandHandler extends BaseGeometryCommandHandler {
 
       const meshVertices = extruded.vertices.map((v: any, i: number) => {
         const normal = extruded.normals[i];
-        return new Vertex(v, { normal });
+        const uv = extruded.uvs?.[i];
+        const smoothGroup = extruded.smoothGroups?.[i];
+        return new Vertex(v, { normal, uv, smoothGroup });
       });
 
       const meshFaces = extruded.faces.map((face: number[]) => new Face(face, boolColor, materialSlotIndex));

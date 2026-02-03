@@ -14,3 +14,4 @@ export * from './Extrude';
 export * from './Sweep';
 export * from './Subdivision';
 export * from './PolygonBoolean';
+export * from './MorphTarget';

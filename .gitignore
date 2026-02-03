@@ -24,3 +24,4 @@ test-tier2.mjs
 # Windows nul artifact
 nul
 
+/output/

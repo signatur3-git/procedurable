@@ -9,12 +9,13 @@
  */
 
 import { CommandNamespace, CommandHandler, CommandContext, CommandResult } from '../command-registry';
-import { ParsedCommand, getArg, getNumberArg } from '../command-parser';
+import { ParsedCommand, getArg, getNumberArg, getNumberOption } from '../command-parser';
 import { storage } from './storage';
 import { validateBuilder, evaluateQualityTier, testDecisionCoverage, compareSophisticationPlan } from '../../../generation/validation/ValidationAPI';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 import { parseYamlWithLibrary, parseAndExecuteBuilder } from '../../../generation/builder/YamlBuilderParser';
+import type { BakedTextureSet } from '../../../export';
 
 // TypeScript builders that can't be migrated to YAML yet
 // Person requires advanced geometry (subdivision, lathe) - Phase 2
@@ -323,6 +324,12 @@ const handlers: CommandHandler[] = [
 
       try {
         const result = await ctx.runBuilder(ctx.activeBuilder, seed, overrides, ctx.activeBuilderSource || undefined);
+
+        // Compute smoothGroup-aware normals immediately after build.
+        // This ensures the dashboard 3D view and any export gets correct normals
+        // that respect smooth/hard edge intent through UV unwrapping.
+        result.mesh.calculateNormals();
+
         ctx.lastRun = result;
         ctx.runHistory.push(result);
 
@@ -460,6 +467,216 @@ const handlers: CommandHandler[] = [
   },
 
   {
+    action: 'skeleton',
+    description: 'Get skeleton (joint hierarchy) from the last run',
+    usage: 'builder.skeleton',
+    execute: async (_cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const skeleton = ctx.lastRun.skeleton;
+      if (!skeleton) {
+        return {
+          success: true,
+          data: {
+            hasSkeleton: false,
+            message: 'This builder has no skeleton defined'
+          }
+        };
+      }
+
+      // Format joints for output
+      const joints = skeleton.joints.map((joint: { name: string; parent: string | null; position: { x: number; y: number; z: number }; orientation: { x: number; y: number; z: number }; worldPosition: { x: number; y: number; z: number }; constraints?: any }) => ({
+        name: joint.name,
+        parent: joint.parent,
+        position: { x: joint.position.x, y: joint.position.y, z: joint.position.z },
+        orientation: { x: joint.orientation.x, y: joint.orientation.y, z: joint.orientation.z },
+        worldPosition: { x: joint.worldPosition.x, y: joint.worldPosition.y, z: joint.worldPosition.z },
+        constraints: joint.constraints
+      }));
+
+      return {
+        success: true,
+        data: {
+          hasSkeleton: true,
+          jointCount: skeleton.joints.length,
+          roots: skeleton.roots,
+          joints
+        }
+      };
+    }
+  },
+
+  {
+    action: 'weights',
+    description: 'Get vertex weight statistics from the last run',
+    usage: 'builder.weights',
+    execute: async (_cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const weights = ctx.lastRun.vertexWeights;
+      if (!weights) {
+        return {
+          success: true,
+          data: {
+            hasWeights: false,
+            message: 'This builder has no vertex weights defined'
+          }
+        };
+      }
+
+      // Compute per-joint statistics
+      const jointInfluenceCounts = new Map<number, number>();
+      for (const vw of weights.weights.values()) {
+        for (const w of vw) {
+          jointInfluenceCounts.set(w.jointIndex, (jointInfluenceCounts.get(w.jointIndex) ?? 0) + 1);
+        }
+      }
+
+      // Get joint names from skeleton
+      const skeleton = ctx.lastRun.skeleton;
+      const jointStats = skeleton ? Array.from(jointInfluenceCounts.entries()).map(([idx, count]) => ({
+        joint: skeleton.joints[idx]?.name ?? `joint_${idx}`,
+        vertexCount: count
+      })).sort((a, b) => b.vertexCount - a.vertexCount) : [];
+
+      return {
+        success: true,
+        data: {
+          hasWeights: true,
+          maxInfluences: weights.maxInfluences,
+          stats: weights.stats,
+          jointStats
+        }
+      };
+    }
+  },
+
+  {
+    action: 'show_weights',
+    description: 'Get per-vertex weight data for a specific joint (for visualization)',
+    usage: 'builder.show_weights <joint_name>',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const jointName = getArg(cmd, 0, 'joint_name');
+      if (!jointName) {
+        return { success: false, error: 'Joint name required. Usage: builder.show_weights <joint_name>' };
+      }
+
+      const weights = ctx.lastRun.vertexWeights;
+      const skeleton = ctx.lastRun.skeleton;
+
+      if (!weights || !skeleton) {
+        return {
+          success: false,
+          error: 'No weights or skeleton defined for this builder'
+        };
+      }
+
+      // Find joint index
+      const jointIndex = skeleton.joints.findIndex((j: { name: string }) => j.name === jointName);
+      if (jointIndex === -1) {
+        return {
+          success: false,
+          error: `Joint '${jointName}' not found. Available joints: ${skeleton.joints.map((j: { name: string }) => j.name).join(', ')}`
+        };
+      }
+
+      // Build per-vertex weight array for this joint
+      // Format: array of { vertexIndex, weight } for vertices influenced by this joint
+      // Also provide a flat array for heat map visualization
+      const vertexCount = ctx.lastRun.mesh.vertices.length;
+      const heatMap: number[] = new Array(vertexCount).fill(0);
+      const influenced: Array<{ vertexIndex: number; weight: number }> = [];
+      const unweighted: number[] = [];
+
+      for (let vi = 0; vi < vertexCount; vi++) {
+        const vw = weights.weights.get(vi);
+        if (!vw || vw.length === 0) {
+          unweighted.push(vi);
+          continue;
+        }
+
+        const jointWeight = vw.find((w: { jointIndex: number; weight: number }) => w.jointIndex === jointIndex);
+        if (jointWeight) {
+          heatMap[vi] = jointWeight.weight;
+          influenced.push({ vertexIndex: vi, weight: jointWeight.weight });
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          jointName,
+          jointIndex,
+          vertexCount,
+          influencedCount: influenced.length,
+          unweightedCount: unweighted.length,
+          heatMap,  // Array of weights [0-1] for each vertex (0 = no influence)
+          influenced,  // Sparse list of vertices with non-zero weights
+          unweighted: unweighted.slice(0, 100)  // First 100 unweighted vertices (for debugging)
+        }
+      };
+    }
+  },
+
+  {
+    action: 'morph_targets',
+    description: 'List available morph targets from the last run (E3-002)',
+    usage: 'builder.morph_targets',
+    execute: async (_cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const morphTargets = ctx.lastRun.morphTargets;
+
+      if (!morphTargets || morphTargets.targets.length === 0) {
+        return {
+          success: true,
+          data: {
+            hasTargets: false,
+            message: 'No morph targets defined for this builder',
+            targetCount: 0,
+            targets: []
+          }
+        };
+      }
+
+      interface MorphTarget {
+        name: string;
+        offsets: unknown[];
+        defaultWeight: number;
+        description?: string;
+      }
+
+      const targetDetails = morphTargets.targets.map((target: MorphTarget) => ({
+        name: target.name,
+        offsetCount: target.offsets.length,
+        defaultWeight: target.defaultWeight,
+        description: target.description
+      }));
+
+      return {
+        success: true,
+        data: {
+          hasTargets: true,
+          baseVertexCount: morphTargets.baseVertexCount,
+          targetCount: morphTargets.targets.length,
+          targets: targetDetails,
+          targetNames: morphTargets.targets.map((t: MorphTarget) => t.name)
+        }
+      };
+    }
+  },
+
+  {
     action: 'traces',
     description: 'List trace keys from the last run',
     usage: 'builder.traces [filter=<prefix>]',
@@ -533,6 +750,7 @@ const handlers: CommandHandler[] = [
       const normals: number[] = [];
       const colors: number[] = [];
       const uvs: number[] = [];
+      const materialIndices: number[] = [];  // per-triangle material slot index
       let hasColors = false;
       let hasUVs = false;
 
@@ -566,19 +784,30 @@ const handlers: CommandHandler[] = [
         const v1 = vert1.position;
         const v2 = vert2.position;
 
-        // Calculate face normal
-        const edge1 = v1.sub(v0);
-        const edge2 = v2.sub(v0);
-        const faceNormal = edge1.cross(edge2).normalize();
-
-        // Add each vertex with the face normal (for flat shading)
+        // Add vertex positions
         vertices.push(v0.x, v0.y, v0.z);
         vertices.push(v1.x, v1.y, v1.z);
         vertices.push(v2.x, v2.y, v2.z);
 
-        normals.push(faceNormal.x, faceNormal.y, faceNormal.z);
-        normals.push(faceNormal.x, faceNormal.y, faceNormal.z);
-        normals.push(faceNormal.x, faceNormal.y, faceNormal.z);
+        // Use pre-computed vertex normals (smoothGroup-aware) when available,
+        // otherwise fall back to flat face normals
+        const n0 = vert0.attributes.normal;
+        const n1 = vert1.attributes.normal;
+        const n2 = vert2.attributes.normal;
+
+        if (n0 && n1 && n2) {
+          normals.push(n0.x, n0.y, n0.z);
+          normals.push(n1.x, n1.y, n1.z);
+          normals.push(n2.x, n2.y, n2.z);
+        } else {
+          // Flat shading fallback
+          const edge1 = v1.sub(v0);
+          const edge2 = v2.sub(v0);
+          const faceNormal = edge1.cross(edge2).normalize();
+          normals.push(faceNormal.x, faceNormal.y, faceNormal.z);
+          normals.push(faceNormal.x, faceNormal.y, faceNormal.z);
+          normals.push(faceNormal.x, faceNormal.y, faceNormal.z);
+        }
 
         // C3-002: Resolve color from material slots or vertex colors
         const { color, hasColor } = resolveFaceColor(face);
@@ -598,7 +827,18 @@ const handlers: CommandHandler[] = [
         uvs.push(uv0[0], uv0[1]);
         uvs.push(uv1[0], uv1[1]);
         uvs.push(uv2[0], uv2[1]);
+
+        // Track per-triangle material slot index for multi-material rendering
+        materialIndices.push(face.materialSlotIndex ?? 0);
       }
+
+      // Build material slot info for the dashboard
+      const materialSlots = triangulated.materialSlots?.map((s: { name: string; color: { r: number; g: number; b: number }; roughness: number; metalness: number }) => ({
+        name: s.name,
+        color: s.color,
+        roughness: s.roughness,
+        metalness: s.metalness
+      })) ?? [];
 
       return {
         success: true,
@@ -607,6 +847,8 @@ const handlers: CommandHandler[] = [
           normals,
           colors: hasColors ? colors : undefined,  // Only include if custom colors used
           uvs: hasUVs ? uvs : undefined,  // C4-002: Only include if UVs present
+          materialIndices: materialSlots.length > 1 ? materialIndices : undefined,
+          materialSlots: materialSlots.length > 0 ? materialSlots : undefined,
           vertexCount: vertices.length / 3,
           triangleCount: vertices.length / 9,
           bounds: ctx.lastRun.validation.bounds,
@@ -1042,6 +1284,9 @@ const handlers: CommandHandler[] = [
         return { success: false, error: 'No mesh in last run' };
       }
 
+      // Compute smoothGroup-aware normals before export
+      mesh.calculateNormals();
+
       const { exportGLB } = await import('../../../export/GLTFExporter');
       const name = getArg(cmd, 0) || ctx.lastRun.builderName || 'export';
       const result = exportGLB(mesh, name);
@@ -1134,6 +1379,623 @@ const handlers: CommandHandler[] = [
           summary: `Exported scene: ${result.stats.nodeCount} nodes, ${result.stats.meshCount} meshes, ${result.stats.instanceCount} instances, ${result.stats.triangleCount} triangles → ${outputPath} (${(result.stats.byteSize / 1024).toFixed(1)} KB)`
         }
       };
+    }
+  },
+
+  {
+    action: 'export_rigged_gltf',
+    description: 'Export last builder run as rigged GLB with skeleton and vertex weights (E4-001)',
+    usage: 'builder.export_rigged_gltf [filename]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      if (!ctx.lastRun.skeleton) {
+        return { success: false, error: 'No skeleton defined in last run. This builder has no rigging data.' };
+      }
+
+      if (!ctx.lastRun.vertexWeights) {
+        return { success: false, error: 'No vertex weights defined in last run. Use weight rules to assign weights to vertices.' };
+      }
+
+      const { exportRiggedGLB } = await import('../../../export/GLTFExporter');
+      const name = getArg(cmd, 0) || ctx.lastRun.builderName || 'rigged';
+
+      try {
+        const result = exportRiggedGLB(ctx.lastRun, name);
+
+        // Write to output directory
+        const { writeFile, mkdir } = await import('fs/promises');
+        const path = await import('path');
+        const outputDir = path.resolve('output');
+        await mkdir(outputDir, { recursive: true });
+
+        const filename = name.endsWith('.glb') ? name : `${name}_rigged.glb`;
+        const outputPath = path.join(outputDir, filename);
+        await writeFile(outputPath, result.glb);
+
+        return {
+          success: true,
+          data: {
+            path: outputPath,
+            ...result.stats,
+            summary: `Exported rigged model: ${result.stats.jointCount} joints, ${result.stats.skinnedVertexCount}/${result.stats.vertexCount} skinned vertices, ${result.stats.triangleCount} triangles → ${outputPath} (${(result.stats.byteSize / 1024).toFixed(1)} KB)`
+          }
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          success: false,
+          error: `Failed to export rigged model: ${message}`
+        };
+      }
+    }
+  },
+
+  // G6-002: Export textured glTF with baked textures
+  {
+    action: 'export_textured_gltf',
+    description: 'Export last builder run as GLB with baked textures embedded (G6-002)',
+    usage: 'builder.export_textured_gltf [filename] [resolution=<n>]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const { exportTexturedGLB } = await import('../../../export/GLTFExporter');
+      const { bakeTextures } = await import('../../../platform/materials/TextureBaker');
+      const name = getArg(cmd, 0) || ctx.lastRun.builderName || 'textured';
+      const resolution = getNumberOption(cmd, 'resolution') ?? 256;
+
+      try {
+        const mesh = ctx.lastRun.mesh;
+
+        // Compute smoothGroup-aware normals before export
+        mesh.calculateNormals();
+
+        // Check if mesh has UVs
+        const hasUVs = mesh.vertices.some((v: { attributes: { uv?: unknown } }) => v.attributes.uv !== undefined);
+        if (!hasUVs) {
+          return {
+            success: false,
+            error: 'Mesh has no UVs. Run UV unwrapping first with builder.unwrap'
+          };
+        }
+
+        // Create a basic material stack for baking
+        // For now, use a simple wood grain material as default
+        const materialDef = {
+          layers: [
+            {
+              generator: 'wood_grain',
+              params: { species: 'oak' },
+              blendMode: 'normal' as const,
+              opacity: 1.0
+            }
+          ]
+        };
+
+        // Bake textures
+        const bakeResult = bakeTextures(mesh, materialDef, {
+          resolution,
+          channels: ['albedo', 'roughness', 'metallic', 'normal', 'ao'],
+          seed: ctx.lastRun.seed ?? 42
+        });
+
+        // Convert BakeResult to BakedTextureSet
+        const textureSet: BakedTextureSet = {
+          albedo: bakeResult.textures.get('albedo'),
+          roughness: bakeResult.textures.get('roughness'),
+          metallic: bakeResult.textures.get('metallic'),
+          normal: bakeResult.textures.get('normal'),
+          ao: bakeResult.textures.get('ao'),
+          resolution
+        };
+
+        // Export to glTF with textures
+        const result = exportTexturedGLB(mesh, textureSet, name);
+
+        // Write to output directory
+        const { writeFile, mkdir } = await import('fs/promises');
+        const path = await import('path');
+        const outputDir = path.resolve('output');
+        await mkdir(outputDir, { recursive: true });
+
+        const filename = name.endsWith('.glb') ? name : `${name}_textured.glb`;
+        const outputPath = path.join(outputDir, filename);
+        await writeFile(outputPath, result.glb);
+
+        return {
+          success: true,
+          data: {
+            path: outputPath,
+            ...result.stats,
+            bakeTimeMs: bakeResult.bakeTimeMs,
+            bakeCoverage: (bakeResult.stats.coverage * 100).toFixed(1) + '%',
+            summary: `Exported textured model: ${result.stats.textureCount} textures at ${resolution}x${resolution}, ${result.stats.vertexCount} vertices, ${result.stats.triangleCount} triangles → ${outputPath} (${(result.stats.byteSize / 1024).toFixed(1)} KB)`
+          }
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          success: false,
+          error: `Failed to export textured model: ${message}`
+        };
+      }
+    }
+  },
+
+  // G6-003: Bake textures to disk (for dashboard preview)
+  {
+    action: 'bake_textures',
+    description: 'Bake procedural textures to disk for dashboard preview (G6-003)',
+    usage: 'builder.bake_textures [resolution=<n>] [material=<type>]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const { bakeTextures } = await import('../../../platform/materials/TextureBaker');
+      const materialType = cmd.options['material']; // Optional override for all materials
+
+      try {
+        const mesh = ctx.lastRun.mesh;
+        const builderName = ctx.lastRun.builderName || 'unknown';
+
+        // G3-004: Auto-detect resolution for composed scenes when not explicitly set
+        let resolution = getNumberOption(cmd, 'resolution');
+        if (resolution === undefined) {
+          const { computeAtlasResolution } = await import('../../../platform/geometry/UVUnwrapper');
+          resolution = computeAtlasResolution(mesh);
+        }
+
+        // Compute smoothGroup-aware normals before baking — ensures correct normals
+        // for both the texture baker and the GLTFExporter
+        mesh.calculateNormals();
+
+        // Check if mesh has UVs
+        const hasUVs = mesh.vertices.some((v: { attributes: { uv?: unknown } }) => v.attributes.uv !== undefined);
+        if (!hasUVs) {
+          return {
+            success: false,
+            error: 'Mesh has no UVs. Run UV unwrapping first with builder.unwrap'
+          };
+        }
+
+        // Import generators to ensure they're registered
+        await import('../../../platform/materials/generators');
+
+        // Resolve which texture generator to use for a material slot.
+        //
+        // Priority:
+        //   1. Explicit CLI override via material=<type>
+        //   2. Auto-detect from slot name (e.g. "wood" → wood_grain, "metal_steel" → metal_brushed)
+        //   3. Default: solid_color with the slot's exact PBR properties
+        const getGeneratorForSlot = (slotName: string, color: { r: number; g: number; b: number }, roughness: number, metalness: number) => {
+          // 1. Explicit CLI override
+          if (materialType) {
+            if (materialType === 'wood' || materialType === 'wood_grain') {
+              return {
+                generator: 'wood_grain',
+                params: { species: 'oak', scale: 10, ringFrequency: 40, ringContrast: 0.7, noiseAmount: 0.4 }
+              };
+            } else if (materialType === 'stone') {
+              return {
+                generator: 'stone',
+                params: { stoneColor: color, scale: 5, mortarWidth: 0.08, colorVariation: 0.15 }
+              };
+            } else if (materialType === 'metal' || materialType === 'metal_brushed') {
+              return {
+                generator: 'metal_brushed',
+                params: { metalColor: color, brushDirection: 0, roughness }
+              };
+            }
+          }
+
+          // 2. Auto-detect from slot name
+          const nameLower = slotName.toLowerCase();
+          if (nameLower.includes('wood')) {
+            // Infer species from name first, then from colour brightness
+            let species = 'oak';
+            if (nameLower.includes('walnut')) species = 'walnut';
+            else if (nameLower.includes('pine')) species = 'pine';
+            else if (nameLower.includes('maple')) species = 'maple';
+            else if (nameLower.includes('cherry')) species = 'cherry';
+            else if (nameLower.includes('ebony')) species = 'walnut';
+            else {
+              // Pick species by slot color brightness
+              const brightness = (color.r + color.g + color.b) / 3;
+              if (brightness > 0.7) species = 'maple';       // very light
+              else if (brightness > 0.55) species = 'pine';  // medium-light
+              else if (brightness > 0.4) species = 'oak';    // medium
+              else if (brightness > 0.25) species = 'walnut'; // medium-dark
+              else species = 'walnut';                        // dark
+            }
+            return {
+              generator: 'wood_grain',
+              params: { species, scale: 10, ringFrequency: 40, ringContrast: 0.7, noiseAmount: 0.4 }
+            };
+          }
+          if (nameLower.includes('metal') || metalness > 0.5) {
+            return {
+              generator: 'metal_brushed',
+              params: { metalColor: color, brushDirection: 0, roughness }
+            };
+          }
+          if (nameLower.includes('stone') || nameLower.includes('marble') || nameLower.includes('granite')) {
+            return {
+              generator: 'stone',
+              params: { stoneColor: color, scale: 5, mortarWidth: 0.08, colorVariation: 0.15 }
+            };
+          }
+
+          // 3. Default: solid_color with the slot's exact PBR properties
+          return {
+            generator: 'solid_color',
+            params: { color, roughness, metalness, variation: 0.005, scale: 10 }
+          };
+        };
+
+        // Build per-slot material definitions
+        type MaterialStackDef = { layers: Array<{ generator: string; params: Record<string, unknown>; blendMode: 'normal'; opacity: number }> };
+        const materialDefs = new Map<number, MaterialStackDef>();
+        const generatorsUsed = new Set<string>();
+
+        if (mesh.materialSlots && mesh.materialSlots.length > 0) {
+          // Create material definition for each slot
+          for (let i = 0; i < mesh.materialSlots.length; i++) {
+            const slot = mesh.materialSlots[i];
+            const { generator, params } = getGeneratorForSlot(
+              slot.name,
+              slot.color,
+              slot.roughness ?? 0.5,
+              slot.metalness ?? 0.0
+            );
+            generatorsUsed.add(generator);
+            materialDefs.set(i, {
+              layers: [{ generator, params, blendMode: 'normal' as const, opacity: 1.0 }]
+            });
+          }
+        } else {
+          // Single default material
+          const defaultColor = mesh.faces.length > 0 && mesh.faces[0].color
+            ? mesh.faces[0].color
+            : { r: 0.6, g: 0.4, b: 0.2 };
+          const { generator, params } = getGeneratorForSlot('default', defaultColor, 0.5, 0.0);
+          generatorsUsed.add(generator);
+          materialDefs.set(0, {
+            layers: [{ generator, params, blendMode: 'normal' as const, opacity: 1.0 }]
+          });
+        }
+
+        // Use per-material baking for multi-material meshes
+        // This creates separate textures per material slot (1x1 for solid colors)
+        const usePerMaterial = materialDefs.size > 1;
+        let bakeResult: any;
+        let perMaterialResults: Map<number, any> | undefined;
+
+        if (usePerMaterial) {
+          const { bakeTexturesPerMaterial } = await import('../../../platform/materials/TextureBaker');
+          const perMatResult = bakeTexturesPerMaterial(mesh, materialDefs, {
+            resolution,
+            channels: ['albedo', 'roughness', 'normal', 'ao'],
+            seed: ctx.lastRun.seed ?? 42
+          });
+
+          // Convert to format expected by exportMultiMaterialTexturedGLB
+          perMaterialResults = new Map();
+          for (const [slotIdx, matResult] of perMatResult.materials) {
+            perMaterialResults.set(slotIdx, {
+              albedo: matResult.bakeResult.textures.get('albedo'),
+              roughness: matResult.bakeResult.textures.get('roughness'),
+              normal: matResult.bakeResult.textures.get('normal'),
+              ao: matResult.bakeResult.textures.get('ao'),
+              resolution: matResult.bakeResult.resolution,
+              uvBounds: matResult.uvBounds  // pass through for dashboard UV normalisation
+            });
+          }
+
+          // For backwards compatibility, also set bakeResult to first material
+          const firstMat = perMatResult.materials.values().next().value;
+          bakeResult = firstMat ? firstMat.bakeResult : { textures: new Map(), stats: { coverage: 0 }, bakeTimeMs: perMatResult.totalBakeTimeMs };
+          bakeResult.bakeTimeMs = perMatResult.totalBakeTimeMs;
+        } else {
+          bakeResult = bakeTextures(mesh, materialDefs.get(0) ?? materialDefs.values().next().value, {
+            resolution,
+            channels: ['albedo', 'roughness', 'normal', 'ao'],
+            seed: ctx.lastRun.seed ?? 42
+          });
+        }
+
+        // Write textures to output/textures/ directory
+        const { writeFile, mkdir } = await import('fs/promises');
+        const path = await import('path');
+        const textureDir = path.resolve('output/textures');
+        await mkdir(textureDir, { recursive: true });
+
+        const savedFiles: string[] = [];
+        const channels: Array<'albedo' | 'roughness' | 'normal' | 'ao'> = ['albedo', 'roughness', 'normal', 'ao'];
+
+        if (perMaterialResults) {
+          // Save per-material textures + UV bounds sidecar
+          const uvBoundsMap: Record<string, { uMin: number; uMax: number; vMin: number; vMax: number }> = {};
+          for (const [slotIdx, textures] of perMaterialResults) {
+            const slotName = mesh.materialSlots?.[slotIdx]?.name ?? `mat${slotIdx}`;
+            if (textures.uvBounds) {
+              uvBoundsMap[slotName] = textures.uvBounds;
+            }
+            for (const channel of channels) {
+              const textureData = textures[channel];
+              if (textureData) {
+                const { encodeTextureToPNG } = await import('../../../export/GLTFExporter');
+                const isRGBA = channel === 'albedo' || channel === 'normal';
+                const res = textures.resolution;
+                const png = encodeTextureToPNG(textureData, res, res, isRGBA ? 4 : 1);
+
+                const filename = `${builderName.replace(/\//g, '_')}_${slotName}_${channel}.png`;
+                const filePath = path.join(textureDir, filename);
+                await writeFile(filePath, png);
+                savedFiles.push(filename);
+              }
+            }
+          }
+          // Write UV bounds sidecar so the dashboard can normalise UVs per slot
+          if (Object.keys(uvBoundsMap).length > 0) {
+            const sidecarName = `${builderName.replace(/\//g, '_')}_uv_bounds.json`;
+            await writeFile(path.join(textureDir, sidecarName), JSON.stringify(uvBoundsMap));
+            savedFiles.push(sidecarName);
+          }
+        } else {
+          // Save single texture set
+          for (const channel of channels) {
+            const textureData = bakeResult.textures.get(channel);
+            if (textureData) {
+              const { encodeTextureToPNG } = await import('../../../export/GLTFExporter');
+              const isRGBA = channel === 'albedo' || channel === 'normal';
+              const png = encodeTextureToPNG(textureData, resolution, resolution, isRGBA ? 4 : 1);
+
+              const filename = `${builderName.replace(/\//g, '_')}_${channel}.png`;
+              const filePath = path.join(textureDir, filename);
+              await writeFile(filePath, png);
+              savedFiles.push(filename);
+            }
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            builderName,
+            resolution,
+            materialSlots: mesh.materialSlots?.length ?? 0,
+            generators: Array.from(generatorsUsed),
+            files: savedFiles,
+            directory: textureDir,
+            bakeTimeMs: bakeResult.bakeTimeMs,
+            coverage: (bakeResult.stats.coverage * 100).toFixed(1) + '%',
+            summary: `Baked ${savedFiles.length} textures using ${Array.from(generatorsUsed).join(', ')} at ${resolution}x${resolution}`
+          }
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          success: false,
+          error: `Failed to bake textures: ${message}`
+        };
+      }
+    }
+  },
+
+  // UV Debug Texture - visualize UV triangles for debugging
+  {
+    action: 'uv_debug',
+    description: 'Generate UV debug texture showing all UV triangles with distinct colors',
+    usage: 'builder.uv_debug [resolution=<n>]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const { generateUVDebugTexture } = await import('../../../platform/materials/TextureBaker');
+      const resolution = getNumberOption(cmd, 'resolution') ?? 512;
+
+      try {
+        const mesh = ctx.lastRun.mesh;
+        const builderName = ctx.lastRun.builderName || 'unknown';
+
+        // Check if mesh has UVs
+        const hasUVs = mesh.vertices.some((v: { attributes: { uv?: unknown } }) => v.attributes.uv !== undefined);
+        if (!hasUVs) {
+          return {
+            success: false,
+            error: 'Mesh has no UVs. Run UV unwrapping first with builder.unwrap'
+          };
+        }
+
+        // Generate UV debug texture
+        const result = generateUVDebugTexture(mesh, resolution);
+
+        // Write to output/textures/ directory
+        const { writeFile, mkdir } = await import('fs/promises');
+        const path = await import('path');
+        const textureDir = path.resolve('output/textures');
+        await mkdir(textureDir, { recursive: true });
+
+        // Encode as PNG
+        const { encodeTextureToPNG } = await import('../../../export/GLTFExporter');
+        const png = encodeTextureToPNG(result.buffer, resolution, resolution, 4);
+
+        // Save to disk: {builderName}_uv_debug.png
+        const filename = `${builderName.replace(/\//g, '_')}_uv_debug.png`;
+        const filePath = path.join(textureDir, filename);
+        await writeFile(filePath, png);
+
+        return {
+          success: true,
+          data: {
+            builderName,
+            resolution,
+            filename,
+            directory: textureDir,
+            triangleCount: result.triangleCount,
+            totalArea: (result.stats.totalArea * 100).toFixed(2) + '%',
+            degenerateCount: result.stats.degenerateCount,
+            minArea: result.stats.minArea.toExponential(3),
+            maxArea: result.stats.maxArea.toExponential(3),
+            summary: `Generated UV debug texture: ${filename} (${result.triangleCount} triangles, ${result.stats.degenerateCount} degenerate)`
+          }
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          success: false,
+          error: `Failed to generate UV debug texture: ${message}`
+        };
+      }
+    }
+  },
+
+  // UV Compare - diagnostic to identify triangles missed by baker
+  {
+    action: 'uv_compare',
+    description: 'Compare UV debug coverage with baked texture coverage to find missing triangles',
+    usage: 'builder.uv_compare [resolution=<n>]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const resolution = getNumberOption(cmd, 'resolution') ?? 256;
+
+      try {
+        const mesh = ctx.lastRun.mesh;
+
+        // Check if mesh has UVs
+        const hasUVs = mesh.vertices.some((v: { attributes: { uv?: unknown } }) => v.attributes.uv !== undefined);
+        if (!hasUVs) {
+          return { success: false, error: 'Mesh has no UVs. Run builder.unwrap first.' };
+        }
+
+        // Extract triangles and their UVs
+        const triangles: Array<{
+          index: number;
+          uvs: [[number, number], [number, number], [number, number]];
+          vRange: [number, number];
+          area: number;
+        }> = [];
+
+        for (let fi = 0; fi < mesh.faces.length; fi++) {
+          const face = mesh.faces[fi];
+          if (face.indices.length < 3) continue;
+
+          for (let i = 1; i < face.indices.length - 1; i++) {
+            const v0 = mesh.vertices[face.indices[0]];
+            const v1 = mesh.vertices[face.indices[i]];
+            const v2 = mesh.vertices[face.indices[i + 1]];
+
+            const uv0 = v0.attributes.uv ?? [0, 0];
+            const uv1 = v1.attributes.uv ?? [0, 0];
+            const uv2 = v2.attributes.uv ?? [0, 0];
+
+            const uvs: [[number, number], [number, number], [number, number]] = [
+              [uv0[0], uv0[1]],
+              [uv1[0], uv1[1]],
+              [uv2[0], uv2[1]]
+            ];
+
+            const vMin = Math.min(uv0[1], uv1[1], uv2[1]);
+            const vMax = Math.max(uv0[1], uv1[1], uv2[1]);
+
+            // Calculate area
+            const area = Math.abs(
+              (uv1[0] - uv0[0]) * (uv2[1] - uv0[1]) -
+              (uv2[0] - uv0[0]) * (uv1[1] - uv0[1])
+            ) * 0.5;
+
+            triangles.push({
+              index: triangles.length,
+              uvs,
+              vRange: [vMin, vMax],
+              area
+            });
+          }
+        }
+
+        // Find triangles in the "top row" (V > 0.9)
+        const topRowTriangles = triangles.filter(t => t.vRange[0] > 0.9 || t.vRange[1] > 0.9);
+
+        // For each top-row triangle, simulate what the baker would do
+        const triangleStatus: Array<{
+          index: number;
+          uvs: string;
+          vRange: string;
+          area: string;
+          pixelBounds: string;
+          pixelsInBounds: number;
+          pixelsInside: number;
+        }> = [];
+
+        for (const tri of topRowTriangles) {
+          const [uv0, uv1, uv2] = tri.uvs;
+
+          // Pixel bounds
+          const px0 = uv0[0] * resolution, py0 = uv0[1] * resolution;
+          const px1 = uv1[0] * resolution, py1 = uv1[1] * resolution;
+          const px2 = uv2[0] * resolution, py2 = uv2[1] * resolution;
+
+          const minPx = Math.max(0, Math.floor(Math.min(px0, px1, px2)));
+          const maxPx = Math.min(resolution - 1, Math.ceil(Math.max(px0, px1, px2)));
+          const minPy = Math.max(0, Math.floor(Math.min(py0, py1, py2)));
+          const maxPy = Math.min(resolution - 1, Math.ceil(Math.max(py0, py1, py2)));
+
+          const pixelsInBounds = (maxPx - minPx + 1) * (maxPy - minPy + 1);
+
+          // Count pixels that pass barycentric test
+          let pixelsInside = 0;
+          for (let py = minPy; py <= maxPy; py++) {
+            for (let px = minPx; px <= maxPx; px++) {
+              const u = (px + 0.5) / resolution;
+              const v = (py + 0.5) / resolution;
+
+              // Barycentric test - using the standard formula that works for any winding
+              const denom = (uv1[1] - uv2[1]) * (uv0[0] - uv2[0]) + (uv2[0] - uv1[0]) * (uv0[1] - uv2[1]);
+              if (Math.abs(denom) < 1e-10) continue;
+
+              const a = ((uv1[1] - uv2[1]) * (u - uv2[0]) + (uv2[0] - uv1[0]) * (v - uv2[1])) / denom;
+              const b = ((uv2[1] - uv0[1]) * (u - uv2[0]) + (uv0[0] - uv2[0]) * (v - uv2[1])) / denom;
+              const c = 1 - a - b;
+
+              if (a >= -0.001 && b >= -0.001 && c >= -0.001) {
+                pixelsInside++;
+              }
+            }
+          }
+
+          triangleStatus.push({
+            index: tri.index,
+            uvs: `(${uv0[0].toFixed(3)},${uv0[1].toFixed(3)}) (${uv1[0].toFixed(3)},${uv1[1].toFixed(3)}) (${uv2[0].toFixed(3)},${uv2[1].toFixed(3)})`,
+            vRange: `${tri.vRange[0].toFixed(3)}-${tri.vRange[1].toFixed(3)}`,
+            area: tri.area.toExponential(2),
+            pixelBounds: `(${minPx},${minPy})-(${maxPx},${maxPy})`,
+            pixelsInBounds,
+            pixelsInside
+          });
+        }
+
+        return {
+          success: true,
+          data: {
+            totalTriangles: triangles.length,
+            topRowTriangles: topRowTriangles.length,
+            resolution,
+            details: triangleStatus
+          }
+        };
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : String(err);
+        return { success: false, error: `UV compare failed: ${message}` };
+      }
     }
   },
 
@@ -1409,6 +2271,310 @@ const handlers: CommandHandler[] = [
       } catch (err) {
         return { success: false, error: (err as Error).message };
       }
+    }
+  },
+
+  // ==========================================================================
+  // F3-001: Role-based builder management
+  // ==========================================================================
+
+  {
+    action: 'register_role',
+    description: 'Register a builder for a role (F3-001)',
+    usage: 'builder.register_role <builder_name> role=<role> [style=<style>] [priority=<n>]',
+    execute: async (cmd: ParsedCommand, _ctx: CommandContext): Promise<CommandResult> => {
+      const builderName = getArg(cmd, 0);
+      const role = cmd.options['role'] as string;
+      const style = cmd.options['style'] as string | undefined;
+      const priorityStr = cmd.options['priority'] as string | undefined;
+      const priority = priorityStr ? parseInt(priorityStr, 10) : 0;
+
+      if (!builderName) {
+        return { success: false, error: 'Missing builder name. Usage: builder.register_role <builder_name> role=<role>' };
+      }
+      if (!role) {
+        return { success: false, error: 'Missing role. Usage: builder.register_role <builder_name> role=<role>' };
+      }
+
+      const { registerBuilderForRole } = await import('../../../generation/builder/BuilderRoleRegistry');
+
+      registerBuilderForRole(role, builderName, {
+        styles: style ? [style] : undefined,
+        priority
+      });
+
+      return {
+        success: true,
+        data: {
+          builder: builderName,
+          role,
+          style: style || '(any)',
+          priority,
+          message: `Registered '${builderName}' for role '${role}'${style ? ` (style: ${style})` : ''}`
+        }
+      };
+    }
+  },
+
+  {
+    action: 'unregister_role',
+    description: 'Unregister a builder from a role (F3-001)',
+    usage: 'builder.unregister_role <builder_name> role=<role>',
+    execute: async (cmd: ParsedCommand, _ctx: CommandContext): Promise<CommandResult> => {
+      const builderName = getArg(cmd, 0);
+      const role = cmd.options['role'] as string;
+
+      if (!builderName || !role) {
+        return { success: false, error: 'Usage: builder.unregister_role <builder_name> role=<role>' };
+      }
+
+      const { unregisterBuilderFromRole } = await import('../../../generation/builder/BuilderRoleRegistry');
+
+      const removed = unregisterBuilderFromRole(role, builderName);
+
+      return {
+        success: removed,
+        data: removed ? {
+          builder: builderName,
+          role,
+          message: `Unregistered '${builderName}' from role '${role}'`
+        } : undefined,
+        error: removed ? undefined : `Builder '${builderName}' was not registered for role '${role}'`
+      };
+    }
+  },
+
+  {
+    action: 'list_roles',
+    description: 'List all roles and their registered builders (F3-001)',
+    usage: 'builder.list_roles',
+    execute: async (_cmd: ParsedCommand, _ctx: CommandContext): Promise<CommandResult> => {
+      const { listAllRoles, getRoleInfo } = await import('../../../generation/builder/BuilderRoleRegistry');
+
+      const roleNames = await listAllRoles();
+      const roles: Array<{
+        role: string;
+        candidates: number;
+        builders: string[];
+        source: string;
+      }> = [];
+
+      for (const name of roleNames) {
+        const info = await getRoleInfo(name);
+        if (info) {
+          roles.push({
+            role: name,
+            candidates: info.candidates.length,
+            builders: info.candidates.map(c => c.builder),
+            source: info.source
+          });
+        }
+      }
+
+      return {
+        success: true,
+        data: {
+          count: roles.length,
+          roles,
+          message: `${roles.length} role(s) defined`
+        }
+      };
+    }
+  },
+
+  {
+    action: 'resolve_role',
+    description: 'Resolve a role to a builder name (F3-001)',
+    usage: 'builder.resolve_role <role> [style=<style>]',
+    execute: async (cmd: ParsedCommand, _ctx: CommandContext): Promise<CommandResult> => {
+      const role = getArg(cmd, 0);
+      const style = cmd.options['style'] as string | undefined;
+
+      if (!role) {
+        return { success: false, error: 'Usage: builder.resolve_role <role> [style=<style>]' };
+      }
+
+      const { resolveRole } = await import('../../../generation/builder/BuilderRoleRegistry');
+
+      const resolution = await resolveRole(role, style);
+
+      if (!resolution) {
+        return {
+          success: false,
+          error: `No builder found for role '${role}'${style ? ` with style '${style}'` : ''}`
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          role,
+          style: style || '(any)',
+          builder: resolution.builder,
+          source: resolution.source,
+          message: `Role '${role}' resolves to builder '${resolution.builder}' (${resolution.source})`
+        }
+      };
+    }
+  },
+
+  {
+    action: 'role_info',
+    description: 'Get detailed info about a role (F3-001)',
+    usage: 'builder.role_info <role>',
+    execute: async (cmd: ParsedCommand, _ctx: CommandContext): Promise<CommandResult> => {
+      const role = getArg(cmd, 0);
+
+      if (!role) {
+        return { success: false, error: 'Usage: builder.role_info <role>' };
+      }
+
+      const { getRoleInfo } = await import('../../../generation/builder/BuilderRoleRegistry');
+
+      const info = await getRoleInfo(role);
+
+      if (!info) {
+        return {
+          success: false,
+          error: `Role '${role}' not found`
+        };
+      }
+
+      return {
+        success: true,
+        data: info
+      };
+    }
+  },
+
+  // G3-002: UV Unwrapping
+  {
+    action: 'unwrap',
+    description: 'Smart UV unwrap the current mesh (G3-002)',
+    usage: 'builder.unwrap [angle=<threshold>] [margin=<value>]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun?.mesh) {
+        return {
+          success: false,
+          error: 'No builder has been run yet. Use builder.run first.'
+        };
+      }
+
+      const { unwrapMesh } = await import('../../../platform/geometry/UVUnwrapper');
+
+      const angleThreshold = getNumberArg(cmd, 0, 'angle') ?? 45;
+      const margin = getNumberArg(cmd, 1, 'margin') ?? 0.02;
+
+      // Auto-detect if mesh already has UVs from geometry primitives (lathe, box, etc.)
+      // If so, re-pack existing UVs instead of re-projecting — preserves quality cylindrical/planar UVs
+      const hasExistingUVs = ctx.lastRun.mesh.vertices.some(
+        (v: { attributes: { uv?: unknown } }) => v.attributes.uv !== undefined
+      );
+      // Allow explicit override: builder.unwrap reproject=true forces re-projection
+      const forceReproject = cmd.options['reproject'] === 'true' || cmd.options['reproject'] === true;
+      const preserveExistingUVs = hasExistingUVs && !forceReproject;
+
+      const result = unwrapMesh(ctx.lastRun.mesh, {
+        angleThreshold,
+        margin,
+        normalize: true,
+        preserveExistingUVs
+      });
+
+      // Update the mesh in context
+      ctx.lastRun.mesh = result.mesh;
+
+      return {
+        success: true,
+        data: {
+          islands: result.islands.length,
+          utilization: Math.round(result.utilization * 10) / 10,
+          maxStretch: Math.round(result.maxStretch * 100) / 100,
+          vertices: result.mesh.vertices.length,
+          faces: result.mesh.faces.length,
+          preservedExistingUVs: preserveExistingUVs,
+          options: { angleThreshold, margin }
+        }
+      };
+    }
+  },
+
+  // G3-004: UV Atlas Repack for Composed Scenes
+  {
+    action: 'atlas_uvs',
+    description: 'Repack overlapping UV islands into a texture atlas (G3-004)',
+    usage: 'builder.atlas_uvs [margin=<value>]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun?.mesh) {
+        return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
+      }
+
+      const { detectUVOverlap, computeAtlasResolution, repackExistingUVs } =
+        await import('../../../platform/geometry/UVUnwrapper');
+
+      const margin = getNumberArg(cmd, 0, 'margin') ?? 0.02;
+      const mesh = ctx.lastRun.mesh;
+
+      const overlap = detectUVOverlap(mesh);
+      if (!overlap.hasOverlap) {
+        return {
+          success: true,
+          data: {
+            message: 'No UV overlap detected — atlas repack not needed',
+            islands: overlap.islandCount,
+            uniqueIslands: overlap.uniqueIslandCount
+          }
+        };
+      }
+
+      const result = repackExistingUVs(mesh, margin);
+      ctx.lastRun.mesh = result.mesh;
+      const autoRes = computeAtlasResolution(result.mesh);
+
+      return {
+        success: true,
+        data: {
+          atlased: true,
+          islands: result.islands.length,
+          utilization: Math.round(result.utilization * 10) / 10,
+          vertices: result.mesh.vertices.length,
+          faces: result.mesh.faces.length,
+          suggestedResolution: autoRes,
+          deduplicatedIslands: overlap.islandCount - overlap.uniqueIslandCount
+        }
+      };
+    }
+  },
+
+  // G3-003: UV Quality Assessment
+  {
+    action: 'uv_quality',
+    description: 'Assess UV quality for the current builder (G3-003)',
+    usage: 'builder.uv_quality [tier=<target_tier>]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun?.mesh) {
+        return {
+          success: false,
+          error: 'No builder has been run yet. Use builder.run first.'
+        };
+      }
+
+      const { assessUVQuality, formatUVQualityResult } = await import('../../../generation/validation/UVQualityGates');
+
+      const targetTier = getNumberArg(cmd, 0, 'tier') ?? 3;
+      const result = assessUVQuality(ctx.lastRun.mesh, targetTier);
+
+      return {
+        success: true,
+        data: {
+          metrics: result.metrics,
+          passed: result.passed,
+          achievedTier: result.achievedTier,
+          targetTier,
+          suggestions: result.suggestions,
+          summary: formatUVQualityResult(result)
+        }
+      };
     }
   }
 ];

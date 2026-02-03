@@ -72,7 +72,7 @@ function makeTestScene(): PSDScene {
           indices: [0, 1, 2, 0, 2, 3]
         },
         materialSlots: [0, 0],  // 2 triangles, both wood
-        skeleton: null,
+        skeleton: undefined,
         jointWeights: []
       } as PSDMeshPrim,
       '/Root/table/legs': {
@@ -102,7 +102,7 @@ function makeTestScene(): PSDScene {
           indices: [0, 1, 2]
         },
         materialSlots: [1],  // 1 triangle, metal
-        skeleton: null,
+        skeleton: undefined,
         jointWeights: []
       } as PSDMeshPrim
     }

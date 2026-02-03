@@ -1,0 +1,175 @@
+# StyledRoom.yaml
+# H2-001: Styled Room Demo
+#
+# Demonstrates style cascading and role-based composition.
+# Change the `style` decision to completely transform all furniture.
+#
+# Supported styles:
+#   - mid_century_modern: tapered round legs, walnut tones, organic curves
+#   - industrial:         square steel legs, dark angular forms, raw textures
+#
+# Vision Examples #9 and #10: Same room template, completely different output.
+
+version: "1.0"
+name: StyledRoom
+description: "Role-based styled room — change style decision to transform all furniture"
+
+# The style decision is the key feature of this demo.
+# Changing it cascades through the entire composition:
+# mid_century_modern → tapered round legs, walnut, warm cream
+# industrial         → square steel legs, reclaimed wood, dark metal
+decisions:
+  style:
+    type: choice
+    options: [mid_century_modern, industrial]
+    default: mid_century_modern
+
+# Measurements for room layout
+measurements:
+  room_width:
+    value: 5.0
+    source: "Living room width"
+  room_depth:
+    value: 4.5
+    source: "Living room depth"
+  room_height:
+    value: 2.8
+    source: "Standard ceiling height"
+  floor_thickness:
+    value: 0.05
+    source: "Floor slab thickness"
+  wall_thickness:
+    value: 0.15
+    source: "Wall thickness"
+  chair_offset:
+    value: 0.65
+    source: "Distance from table center to front/back chair"
+  side_chair_offset:
+    value: 0.55
+    source: "Side chair x-offset from table center"
+  vase_height:
+    value: 0.75
+    source: "Table surface height for centerpiece"
+
+derived:
+  half_width: "room_width / 2"
+  half_depth: "room_depth / 2"
+
+# Style-aware materials for the room shell
+# mid_century_modern → warm wood-tone floor, cream walls
+# industrial         → concrete-grey floor, dark raw walls
+materials:
+  floor_mcm:
+    color: { r: 0.76, g: 0.60, b: 0.42 }    # natural oak planks
+  floor_ind:
+    color: { r: 0.50, g: 0.50, b: 0.50 }    # polished concrete
+  wall_mcm:
+    color: { r: 0.96, g: 0.94, b: 0.90 }    # warm cream
+  wall_ind:
+    color: { r: 0.36, g: 0.36, b: 0.38 }    # raw concrete / dark
+
+# Room envelope — walls and floor change color with style
+geometry:
+  # Floor — warm oak for mid-century, concrete for industrial
+  - if: style == "mid_century_modern"
+    then:
+      - box:
+          name: floor
+          center: { x: 0, y: "-floor_thickness / 2", z: 0 }
+          size: { x: room_width, y: floor_thickness, z: room_depth }
+          color: $floor_mcm
+    else:
+      - box:
+          name: floor
+          center: { x: 0, y: "-floor_thickness / 2", z: 0 }
+          size: { x: room_width, y: floor_thickness, z: room_depth }
+          color: $floor_ind
+
+  # Back wall
+  - if: style == "mid_century_modern"
+    then:
+      - box:
+          name: wall_back
+          center: { x: 0, y: "room_height / 2", z: "-half_depth" }
+          size: { x: room_width, y: room_height, z: wall_thickness }
+          color: $wall_mcm
+    else:
+      - box:
+          name: wall_back
+          center: { x: 0, y: "room_height / 2", z: "-half_depth" }
+          size: { x: room_width, y: room_height, z: wall_thickness }
+          color: $wall_ind
+
+  # Left wall
+  - if: style == "mid_century_modern"
+    then:
+      - box:
+          name: wall_left
+          center: { x: "-half_width", y: "room_height / 2", z: 0 }
+          size: { x: wall_thickness, y: room_height, z: room_depth }
+          color: $wall_mcm
+    else:
+      - box:
+          name: wall_left
+          center: { x: "-half_width", y: "room_height / 2", z: 0 }
+          size: { x: wall_thickness, y: room_height, z: room_depth }
+          color: $wall_ind
+
+  # Right wall
+  - if: style == "mid_century_modern"
+    then:
+      - box:
+          name: wall_right
+          center: { x: "half_width", y: "room_height / 2", z: 0 }
+          size: { x: wall_thickness, y: room_height, z: room_depth }
+          color: $wall_mcm
+    else:
+      - box:
+          name: wall_right
+          center: { x: "half_width", y: "room_height / 2", z: 0 }
+          size: { x: wall_thickness, y: room_height, z: room_depth }
+          color: $wall_ind
+
+# Furniture — resolved by role + style
+# NO hardcoded builder names — all resolved from roles.
+# The style decision cascades to ALL composed children automatically.
+compose:
+  # Central dining table — resolved from 'table' role
+  dining_table:
+    role: table
+    offset: { x: 0, y: 0, z: 0 }
+    overrides:
+      table_length: 1.4
+      table_width: 0.85
+      table_height: 0.75
+
+  # Four chairs — resolved from 'seating' role, all inherit scene style
+  chair_north:
+    role: seating
+    offset: { x: 0, y: 0, z: "-chair_offset" }
+    rotation: { x: 0, y: 0, z: 0 }
+
+  chair_south:
+    role: seating
+    offset: { x: 0, y: 0, z: "chair_offset" }
+    rotation: { x: 0, y: 3.14159, z: 0 }
+
+  chair_east:
+    role: seating
+    offset: { x: "side_chair_offset", y: 0, z: 0 }
+    rotation: { x: 0, y: "-1.5708", z: 0 }
+
+  chair_west:
+    role: seating
+    offset: { x: "-side_chair_offset", y: 0, z: 0 }
+    rotation: { x: 0, y: 1.5708, z: 0 }
+
+  # Centerpiece decoration on table — resolved from 'decoration' role
+  centerpiece:
+    role: decoration
+    offset: { x: 0, y: "vase_height", z: 0 }
+    scale: 0.7
+
+tags:
+  type: styled_room
+  style: "$style"

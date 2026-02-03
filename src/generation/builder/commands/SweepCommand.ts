@@ -10,8 +10,8 @@ import { sweep as sweepGeometry } from '../../../platform/geometry/Sweep';
 
 interface SweepCommandDef {
   sweep: string;
-  profile: string;
-  path: string;
+  profile: string | YamlProfile;  // Can be profile name or inline definition
+  path: string | YamlSpline;      // Can be spline name or inline definition
   segments?: number | string;
   twist?: number | string;
   scaleStart?: number | string;
@@ -28,15 +28,30 @@ export class SweepCommandHandler extends BaseGeometryCommandHandler {
 
     const sweepName = sweepCmd.sweep;
 
-    // Get profile and spline from builder's stored definitions
-    const profileDef = (builder as any)._yamlProfiles?.get(sweepCmd.profile) as YamlProfile | undefined;
-    const splineDef = (builder as any)._yamlSplines?.get(sweepCmd.path) as YamlSpline | undefined;
-
-    if (!profileDef) {
-      throw new Error(`Profile '${sweepCmd.profile}' not found for sweep '${sweepName}'`);
+    // Support both inline profile and profile reference
+    let profileDef: YamlProfile | undefined;
+    if (typeof sweepCmd.profile === 'string') {
+      profileDef = (builder as any)._yamlProfiles?.get(sweepCmd.profile) as YamlProfile | undefined;
+      if (!profileDef) {
+        throw new Error(`Profile '${sweepCmd.profile}' not found for sweep '${sweepName}'`);
+      }
+    } else if (Array.isArray(sweepCmd.profile)) {
+      profileDef = sweepCmd.profile;
+    } else {
+      throw new Error(`Invalid profile for sweep '${sweepName}': expected string or array`);
     }
-    if (!splineDef) {
-      throw new Error(`Spline '${sweepCmd.path}' not found for sweep '${sweepName}'`);
+
+    // Support both inline spline and spline reference
+    let splineDef: YamlSpline | undefined;
+    if (typeof sweepCmd.path === 'string') {
+      splineDef = (builder as any)._yamlSplines?.get(sweepCmd.path) as YamlSpline | undefined;
+      if (!splineDef) {
+        throw new Error(`Spline '${sweepCmd.path}' not found for sweep '${sweepName}'`);
+      }
+    } else if (Array.isArray(sweepCmd.path)) {
+      splineDef = sweepCmd.path;
+    } else {
+      throw new Error(`Invalid path for sweep '${sweepName}': expected string or array`);
     }
 
     const profile = resolveProfile(profileDef, evaluateExpression);

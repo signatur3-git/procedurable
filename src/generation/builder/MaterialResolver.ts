@@ -1,7 +1,8 @@
 /**
  * MaterialResolver - Resolve YAML material definitions to runtime colors
  *
- * Handles conditional materials, named colors, and hex color parsing.
+ * Handles conditional materials, named colors, hex color parsing,
+ * and F2-003 role-based resolution from style palettes.
  */
 
 import { NAMED_COLORS, hexToRgb, RGBColor, MaterialSlot } from '../../platform/materials/MaterialLibrary';
@@ -11,6 +12,7 @@ import type {
   YamlColorValue,
   YamlConditionalValue
 } from './YamlBuilderTypes';
+import type { StyleDefinition, StyleMaterialDef } from './StyleResolver';
 
 /**
  * Resolve a color value to RGB using the MaterialLibrary
@@ -27,6 +29,32 @@ export function resolveColor(color: YamlColorValue): RGBColor {
 
   // Named color from library
   return NAMED_COLORS[color] || NAMED_COLORS.wood_oak;
+}
+
+/**
+ * F2-003: Resolve a material from the style's palette by role name
+ * Returns the palette entry if found, undefined otherwise
+ */
+export function resolveFromStylePalette(
+  role: string,
+  style: StyleDefinition | null | undefined
+): StyleMaterialDef | undefined {
+  if (!style?.material_palette) return undefined;
+  return style.material_palette[role];
+}
+
+/**
+ * F2-003: Convert a StyleMaterialDef to RGB color
+ */
+export function styleMaterialToColor(mat: StyleMaterialDef): RGBColor {
+  if (mat.rgb) {
+    return { r: mat.rgb[0], g: mat.rgb[1], b: mat.rgb[2] };
+  }
+  if (mat.color) {
+    return resolveColor(mat.color);
+  }
+  // Default fallback
+  return { r: 0.5, g: 0.5, b: 0.5 };
 }
 
 /**
@@ -98,19 +126,45 @@ export function resolveConditionalValue<T>(
 /**
  * Resolve all materials based on decision values
  * Returns a map of material name -> resolved RGB color
+ * F2-003: Now accepts optional style for role-based resolution
  */
 export function resolveMaterials(
   yamlMaterials: Record<string, YamlMaterial> | undefined,
-  decisionValues: Map<string, any>
+  decisionValues: Map<string, any>,
+  style?: StyleDefinition | null
 ): Map<string, RGBColor> {
   const resolved = new Map<string, RGBColor>();
 
   if (!yamlMaterials) return resolved;
 
   for (const [name, material] of Object.entries(yamlMaterials)) {
-    // Resolve the color (may be conditional)
-    const colorValue = resolveConditionalValue(material.color, decisionValues);
-    const color = resolveColor(colorValue);
+    let color: RGBColor;
+
+    // F2-003: Check for role-based resolution first
+    if (material.role) {
+      const paletteMat = resolveFromStylePalette(material.role, style);
+      if (paletteMat) {
+        color = styleMaterialToColor(paletteMat);
+      } else if (material.fallback_color) {
+        // Role not found, use fallback
+        color = resolveColor(material.fallback_color);
+      } else if (material.color) {
+        // Role not found, use explicit color
+        const colorValue = resolveConditionalValue(material.color, decisionValues);
+        color = resolveColor(colorValue);
+      } else {
+        // No fallback, use default grey
+        color = { r: 0.5, g: 0.5, b: 0.5 };
+      }
+    } else if (material.color) {
+      // Traditional color resolution
+      const colorValue = resolveConditionalValue(material.color, decisionValues);
+      color = resolveColor(colorValue);
+    } else {
+      // No color or role specified
+      color = { r: 0.5, g: 0.5, b: 0.5 };
+    }
+
     resolved.set(name, color);
   }
 
@@ -120,22 +174,67 @@ export function resolveMaterials(
 /**
  * Resolve all materials to full MaterialSlot objects (PBR-ready).
  * Returns a map of material name -> MaterialSlot.
+ * F2-003: Now accepts optional style for role-based resolution
  */
 export function resolveMaterialSlots(
   yamlMaterials: Record<string, YamlMaterial> | undefined,
-  decisionValues: Map<string, any>
+  decisionValues: Map<string, any>,
+  style?: StyleDefinition | null
 ): Map<string, MaterialSlot> {
   const resolved = new Map<string, MaterialSlot>();
 
   if (!yamlMaterials) return resolved;
 
   for (const [name, material] of Object.entries(yamlMaterials)) {
-    const colorValue = resolveConditionalValue(material.color, decisionValues);
-    const color = resolveColor(colorValue);
-    const roughness = material.roughness !== undefined
-      ? resolveConditionalValue(material.roughness, decisionValues) : 0.5;
-    const metalness = material.metalness !== undefined
-      ? resolveConditionalValue(material.metalness, decisionValues) : 0.0;
+    let color: RGBColor;
+    let roughness: number;
+    let metalness: number;
+
+    // F2-003: Check for role-based resolution first
+    if (material.role) {
+      const paletteMat = resolveFromStylePalette(material.role, style);
+      if (paletteMat) {
+        color = styleMaterialToColor(paletteMat);
+        // Use palette's PBR properties if available, otherwise fall back to material definition or defaults
+        roughness = paletteMat.roughness ?? (material.roughness !== undefined
+          ? resolveConditionalValue(material.roughness, decisionValues) : 0.5);
+        metalness = paletteMat.metalness ?? (material.metalness !== undefined
+          ? resolveConditionalValue(material.metalness, decisionValues) : 0.0);
+      } else if (material.fallback_color) {
+        // Role not found, use fallback
+        color = resolveColor(material.fallback_color);
+        roughness = material.roughness !== undefined
+          ? resolveConditionalValue(material.roughness, decisionValues) : 0.5;
+        metalness = material.metalness !== undefined
+          ? resolveConditionalValue(material.metalness, decisionValues) : 0.0;
+      } else if (material.color) {
+        // Role not found, use explicit color
+        const colorValue = resolveConditionalValue(material.color, decisionValues);
+        color = resolveColor(colorValue);
+        roughness = material.roughness !== undefined
+          ? resolveConditionalValue(material.roughness, decisionValues) : 0.5;
+        metalness = material.metalness !== undefined
+          ? resolveConditionalValue(material.metalness, decisionValues) : 0.0;
+      } else {
+        // No fallback, use defaults
+        color = { r: 0.5, g: 0.5, b: 0.5 };
+        roughness = 0.5;
+        metalness = 0.0;
+      }
+    } else if (material.color) {
+      // Traditional color resolution
+      const colorValue = resolveConditionalValue(material.color, decisionValues);
+      color = resolveColor(colorValue);
+      roughness = material.roughness !== undefined
+        ? resolveConditionalValue(material.roughness, decisionValues) : 0.5;
+      metalness = material.metalness !== undefined
+        ? resolveConditionalValue(material.metalness, decisionValues) : 0.0;
+    } else {
+      // No color or role specified
+      color = { r: 0.5, g: 0.5, b: 0.5 };
+      roughness = 0.5;
+      metalness = 0.0;
+    }
 
     resolved.set(name, { name, color, roughness, metalness });
   }

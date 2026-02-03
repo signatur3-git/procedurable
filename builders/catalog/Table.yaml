@@ -159,43 +159,26 @@ derived:
 # =============================================================================
 # GEOMETRY
 # =============================================================================
+materials:
+  tabletop_wood:
+    role: primary_wood               # F2-003: resolved from style palette when style is active
+    color: { r: 0.72, g: 0.52, b: 0.32 }   # fallback: warm oak
+    fallback_color: { r: 0.72, g: 0.52, b: 0.32 }
+  tabletop_wood_dark:
+    role: secondary_wood             # F2-003: resolved from style palette when style is active
+    color: { r: 0.48, g: 0.32, b: 0.18 }   # fallback: walnut / dark oak
+    fallback_color: { r: 0.48, g: 0.32, b: 0.18 }
+
 geometry:
-  # Rectangular tabletop
+  # Rectangular tabletop - use box for proper world_scale UVs
   - if: table_style == "rectangular"
     then:
-      # Top vertices
-      - vertex: top_fl
-        position: { x: "-half_width", y: "table_height", z: "half_depth" }
-      - vertex: top_fr
-        position: { x: "half_width", y: "table_height", z: "half_depth" }
-      - vertex: top_br
-        position: { x: "half_width", y: "table_height", z: "-half_depth" }
-      - vertex: top_bl
-        position: { x: "-half_width", y: "table_height", z: "-half_depth" }
-
-      # Bottom vertices
-      - vertex: bot_fl
-        position: { x: "-half_width", y: "leg_height", z: "half_depth" }
-      - vertex: bot_fr
-        position: { x: "half_width", y: "leg_height", z: "half_depth" }
-      - vertex: bot_br
-        position: { x: "half_width", y: "leg_height", z: "-half_depth" }
-      - vertex: bot_bl
-        position: { x: "-half_width", y: "leg_height", z: "-half_depth" }
-
-      # Faces
-      - face: top_face
-        vertices: [top_fl, top_fr, top_br, top_bl]
-      - face: bottom_face
-        vertices: [bot_bl, bot_br, bot_fr, bot_fl]
-      - face: front_face
-        vertices: [top_fl, bot_fl, bot_fr, top_fr]
-      - face: right_face
-        vertices: [top_fr, bot_fr, bot_br, top_br]
-      - face: back_face
-        vertices: [top_br, bot_br, bot_bl, top_bl]
-      - face: left_face
-        vertices: [top_bl, bot_bl, bot_fl, top_fl]
+      - box:
+          name: tabletop
+          center: { x: 0, y: "table_height - top_thickness/2", z: 0 }
+          size: { x: table_width, y: top_thickness, z: table_depth }
+          color: $tabletop_wood
+          uv_mode: world_scale
 
     else:
       # Round tabletop using circle loops and loft
@@ -216,14 +199,17 @@ geometry:
       - loft: top_rim
         from: bottom_edge
         to: top_edge
+        color: $tabletop_wood
 
       - cap: top_cap
         loop: top_edge
-        flip: false
+        flip: true
+        color: $tabletop_wood
 
       - cap: bottom_cap
         loop: bottom_edge
-        flip: true
+        flip: false
+        color: $tabletop_wood_dark
 
 # =============================================================================
 # COMPOSITION - Four legs using Leg sub-builder

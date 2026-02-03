@@ -149,12 +149,56 @@ export class Mesh {
 
   calculateNormals(): void {
     const normals = this.vertices.map(() => Vec3.zero());
-    for (const face of this.faces) {
-      const faceNormal = this.getFaceNormal(face);
-      for (const idx of face.indices) {
-        normals[idx] = normals[idx].add(faceNormal);
+
+    // Build smoothGroup lookup: group vertices that should share normals
+    // by mapping each smoothGroup ID to the set of vertex indices in it
+    const hasSmoothGroups = this.vertices.some(v => v.attributes.smoothGroup !== undefined);
+
+    if (hasSmoothGroups) {
+      // Group vertices by (smoothGroup, position) for normal sharing
+      // Vertices with the same smoothGroup and same position share accumulated normals
+      const groupMap = new Map<string, number[]>(); // "sg-px-py-pz" -> vertex indices
+      for (let i = 0; i < this.vertices.length; i++) {
+        const v = this.vertices[i];
+        const sg = v.attributes.smoothGroup;
+        if (sg !== undefined) {
+          // Round position to avoid floating-point mismatches
+          const p = v.position;
+          const key = `${sg}-${p.x.toFixed(6)}-${p.y.toFixed(6)}-${p.z.toFixed(6)}`;
+          if (!groupMap.has(key)) groupMap.set(key, []);
+          groupMap.get(key)!.push(i);
+        }
+      }
+
+      // Accumulate face normals to vertices
+      for (const face of this.faces) {
+        const faceNormal = this.getFaceNormal(face);
+        for (const idx of face.indices) {
+          normals[idx] = normals[idx].add(faceNormal);
+        }
+      }
+
+      // Share accumulated normals across smoothGroup members at same position
+      for (const indices of groupMap.values()) {
+        if (indices.length <= 1) continue;
+        let shared = Vec3.zero();
+        for (const idx of indices) {
+          shared = shared.add(normals[idx]);
+        }
+        for (const idx of indices) {
+          normals[idx] = shared;
+        }
+      }
+    } else {
+      // Legacy path: index-based normal averaging (no smoothGroup metadata)
+      for (const face of this.faces) {
+        const faceNormal = this.getFaceNormal(face);
+        for (const idx of face.indices) {
+          normals[idx] = normals[idx].add(faceNormal);
+        }
       }
     }
+
     for (let i = 0; i < this.vertices.length; i++) {
       this.vertices[i].attributes.normal = normals[i].normalize();
     }

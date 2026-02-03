@@ -11,20 +11,21 @@ describe('Extrude', () => {
       const shape = Shape2D.rect(1, 1);
       const result = extrude2D(shape, { depth: 2, caps: 'both' });
 
-      // 4 points × 2 (front + back) = 8 vertices
-      expect(result.vertices.length).toBe(8);
-      expect(result.normals.length).toBe(8);
+      // 4 points × 2 (front + back sides) + 4 × 2 (front + back cap vertices) = 16 vertices
+      // G3-001: Caps now have separate vertices with planar UVs
+      expect(result.vertices.length).toBe(16);
+      expect(result.normals.length).toBe(16);
 
       // 4 side quads (2 tris each) + 2 caps (2 tris each) = 12 triangles
       expect(result.faces.length).toBe(12);
 
-      // Check front face vertices are at Y=0
+      // Check front side vertices are at Y=0
       expect(result.vertices[0].y).toBe(0);
       expect(result.vertices[1].y).toBe(0);
       expect(result.vertices[2].y).toBe(0);
       expect(result.vertices[3].y).toBe(0);
 
-      // Check back face vertices are at Y=2
+      // Check back side vertices are at Y=2
       expect(result.vertices[4].y).toBe(2);
       expect(result.vertices[5].y).toBe(2);
       expect(result.vertices[6].y).toBe(2);
@@ -35,8 +36,9 @@ describe('Extrude', () => {
       const shape = Shape2D.circle(1, 8); // 8-sided circle approximation
       const result = extrude2D(shape, { depth: 1, caps: 'both' });
 
-      // 8 points × 2 = 16 vertices
-      expect(result.vertices.length).toBe(16);
+      // 8 points × 2 (sides) + 8 × 2 (cap vertices) = 32 vertices
+      // G3-001: Caps now have separate vertices with planar UVs
+      expect(result.vertices.length).toBe(32);
 
       // 8 side quads (16 tris) + 2 caps (6 tris each) = 28 triangles
       expect(result.faces.length).toBe(28);
@@ -51,9 +53,9 @@ describe('Extrude', () => {
       const shape = Shape2D.rect(1, 1);
       const result = extrude2D(shape, { depth: 1, offset: 5, caps: 'both' });
 
-      // Front face should be at Y=5
+      // Front side face should be at Y=5
       expect(result.vertices[0].y).toBe(5);
-      // Back face should be at Y=6
+      // Back side face should be at Y=6
       expect(result.vertices[4].y).toBe(6);
     });
   });
@@ -176,21 +178,24 @@ describe('Extrude', () => {
     it('should extrude rect from parameters', () => {
       const result = extrudeShape({ type: 'rect', width: 2, height: 1 }, { depth: 1, caps: 'both' });
 
-      expect(result.vertices.length).toBe(8);
+      // 4 × 2 (sides) + 4 × 2 (caps) = 16 vertices (G3-001)
+      expect(result.vertices.length).toBe(16);
       expect(result.faces.length).toBe(12);
     });
 
     it('should extrude circle from parameters', () => {
       const result = extrudeShape({ type: 'circle', radius: 1, segments: 12 }, { depth: 2, caps: 'both' });
 
-      expect(result.vertices.length).toBe(24); // 12 × 2
+      // 12 × 2 (sides) + 12 × 2 (caps) = 48 vertices (G3-001)
+      expect(result.vertices.length).toBe(48);
       expect(result.faces.length).toBeGreaterThan(20); // sides + caps
     });
 
     it('should extrude ellipse from parameters', () => {
       const result = extrudeShape({ type: 'ellipse', radiusX: 2, radiusZ: 1, segments: 8 }, { depth: 1 });
 
-      expect(result.vertices.length).toBe(16); // 8 × 2
+      // 8 × 2 (sides) + 8 × 2 (caps) = 32 vertices (G3-001)
+      expect(result.vertices.length).toBe(32);
     });
 
     it('should extrude polygon from points', () => {
@@ -201,7 +206,8 @@ describe('Extrude', () => {
       ];
       const result = extrudeShape({ type: 'polygon', points }, { depth: 1, caps: 'both' });
 
-      expect(result.vertices.length).toBe(6); // 3 × 2
+      // 3 × 2 (sides) + 3 × 2 (caps) = 12 vertices (G3-001)
+      expect(result.vertices.length).toBe(12);
       expect(result.faces.length).toBe(8); // 3 side quads (6 tris) + 2 caps (1 tri each)
     });
 
@@ -221,7 +227,8 @@ describe('Extrude', () => {
       const result = extrude2D(shape, { depth: 1, caps: 'both' });
 
       // Should still create valid geometry
-      expect(result.vertices.length).toBe(8);
+      // 4 × 2 (sides) + 4 × 2 (caps) = 16 vertices (G3-001)
+      expect(result.vertices.length).toBe(16);
       expect(result.faces.length).toBe(12);
 
       // Vertices should be transformed
@@ -245,7 +252,8 @@ describe('Extrude', () => {
       const shape = Shape2D.circle(1, 64); // High detail circle
       const result = extrude2D(shape, { depth: 1, caps: 'both' });
 
-      expect(result.vertices.length).toBe(128); // 64 × 2
+      // 64 × 2 (sides) + 64 × 2 (caps) = 256 vertices (G3-001)
+      expect(result.vertices.length).toBe(256);
       expect(result.faces.length).toBeGreaterThan(100);
 
       // All normals should still be valid
@@ -260,10 +268,11 @@ describe('Extrude', () => {
   describe('Bevel & Chamfer (P2M3-003)', () => {
     it('should add chamfer with segments=1', () => {
       const shape = Shape2D.rect(2, 1);
-      const plain = extrude2D(shape, { depth: 1, caps: 'both' });
+      // Compare with caps='none' to avoid cap vertex count differences
+      const plain = extrude2D(shape, { depth: 1, caps: 'none' });
       const chamfered = extrude2D(shape, {
         depth: 1,
-        caps: 'both',
+        caps: 'none',
         bevel: { size: 0.1, segments: 1 }
       });
 

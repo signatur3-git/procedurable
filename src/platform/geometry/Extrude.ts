@@ -42,9 +42,10 @@ export interface ExtrudeParams {
  */
 export interface ExtrudedGeometry {
   vertices: Vec3[];
-  faces: number[][];  // Indices into vertices array
-  normals: Vec3[];    // Per-vertex normals
-  uvs?: [number, number][];  // Per-vertex UV coordinates
+  faces: number[][];       // Indices into vertices array
+  normals: Vec3[];         // Per-vertex normals
+  uvs?: [number, number][];       // Per-vertex UV coordinates
+  smoothGroups?: number[];  // Per-vertex smooth group ID (for Mesh.calculateNormals)
 }
 
 /**
@@ -118,15 +119,52 @@ export function extrude2D(shape: Shape2D, params: ExtrudeParams): ExtrudedGeomet
     faces.push([i1, i4, i2]);
   }
 
-  // Generate caps (UVs for caps use XZ projection, normalized to [0,1])
+  // Calculate bounding box for planar UV normalization
+  const minX = Math.min(...shape.points.map(p => p.x));
+  const maxX = Math.max(...shape.points.map(p => p.x));
+  const minZ = Math.min(...shape.points.map(p => p.z));
+  const maxZ = Math.max(...shape.points.map(p => p.z));
+  const rangeX = maxX - minX || 1;
+  const rangeZ = maxZ - minZ || 1;
+
+  // Generate caps with NEW vertices that have planar UVs
+  // This ensures caps have proper planar projection UVs while sides keep perimeter-based UVs
   if (caps === 'front' || caps === 'both') {
-    const frontFace = triangulatePolygon(shape, true);
+    const capStartIdx = vertices.length;
+
+    // Create new vertices for front cap with planar UVs
+    for (let i = 0; i < pointCount; i++) {
+      const p = shape.points[i];
+      vertices.push(new Vec3(p.x, yFront, p.z));
+      // Planar UV: map XZ to [0,1] based on bounding box
+      const uvU = (p.x - minX) / rangeX;
+      const uvV = (p.z - minZ) / rangeZ;
+      uvs.push([uvU, uvV]);
+    }
+
+    // Triangulate front cap using new vertices
+    const frontFace = triangulatePolygon(shape, true).map(face =>
+      face.map(idx => idx + capStartIdx)
+    );
     faces.push(...frontFace);
   }
 
   if (caps === 'back' || caps === 'both') {
+    const capStartIdx = vertices.length;
+
+    // Create new vertices for back cap with planar UVs
+    for (let i = 0; i < pointCount; i++) {
+      const p = shape.points[i];
+      vertices.push(new Vec3(p.x, yBack, p.z));
+      // Planar UV: map XZ to [0,1] based on bounding box
+      const uvU = (p.x - minX) / rangeX;
+      const uvV = (p.z - minZ) / rangeZ;
+      uvs.push([uvU, uvV]);
+    }
+
+    // Triangulate back cap using new vertices
     const backFace = triangulatePolygon(shape, false).map(face =>
-      face.map(idx => idx + pointCount)
+      face.map(idx => idx + capStartIdx)
     );
     faces.push(...backFace);
   }
@@ -150,6 +188,8 @@ function extrude2DWithBevel(
   const vertices: Vec3[] = [];
   const faces: number[][] = [];
   const normals: Vec3[] = [];
+  const uvs: [number, number][] = [];
+  const smoothGroups: number[] = []; // 1=side/bevel, 2=front cap, 3=back cap
 
   const pointCount = shape.points.length;
   const { size: bevelSize, segments: bevelSegments } = bevel;
@@ -167,18 +207,46 @@ function extrude2DWithBevel(
   // Inset amount for beveled vertices (0 for chamfer)
   const insetFactor = bevelSegments === 1 ? actualBevelSize : actualBevelSize * 0.7071; // cos(45°) for rounded
 
-  // Layer 0: Front cap face
-  for (const p of shape.points) {
-    vertices.push(new Vec3(p.x, yFront, p.z));
+  // Compute perimeter UV coordinates (U = normalised arc length along contour)
+  const perimeterUVs: number[] = [];
+  {
+    const pts = shape.points;
+    let total = 0;
+    const dists = [0];
+    for (let i = 0; i < pts.length; i++) {
+      const p1 = pts[i], p2 = pts[(i + 1) % pts.length];
+      total += Math.sqrt((p2.x - p1.x) ** 2 + (p2.z - p1.z) ** 2);
+      if (i < pts.length - 1) dists.push(total);
+    }
+    for (const d of dists) perimeterUVs.push(total > 0 ? d / total : 0);
   }
 
-  // Layer 1: Front bevel inner edge (inset)
-  for (const p of shape.points) {
+  // Bounding box for planar cap UV mapping
+  const minX = Math.min(...shape.points.map(p => p.x));
+  const maxX = Math.max(...shape.points.map(p => p.x));
+  const minZ = Math.min(...shape.points.map(p => p.z));
+  const maxZ = Math.max(...shape.points.map(p => p.z));
+  const rangeX = maxX - minX || 1;
+  const rangeZ = maxZ - minZ || 1;
+
+  // Layer 0: Front cap face — smoothGroup 2 (front cap, hard edge vs bevel)
+  for (let i = 0; i < pointCount; i++) {
+    const p = shape.points[i];
+    vertices.push(new Vec3(p.x, yFront, p.z));
+    uvs.push([(p.x - minX) / rangeX, (p.z - minZ) / rangeZ]);
+    smoothGroups.push(2);
+  }
+
+  // Layer 1: Front bevel inner edge (inset) — smoothGroup 1 (side/bevel), V=0
+  for (let i = 0; i < pointCount; i++) {
+    const p = shape.points[i];
     const inset = calculateInset(shape, p, insetFactor);
     vertices.push(new Vec3(p.x - inset.x, yFrontBevel, p.z - inset.z));
+    uvs.push([perimeterUVs[i], 0]);
+    smoothGroups.push(1);
   }
 
-  // Additional bevel segments if segments > 1 (rounded bevel)
+  // Additional bevel segments if segments > 1 (rounded bevel) — smoothGroup 1
   if (bevelSegments > 1) {
     for (let seg = 1; seg < bevelSegments; seg++) {
       const t = seg / bevelSegments;
@@ -186,22 +254,31 @@ function extrude2DWithBevel(
       const y = yFrontBevel + (yBackBevel - yFrontBevel) * t;
       const insetAmount = actualBevelSize * (1 - Math.cos(angle));
 
-      for (const p of shape.points) {
+      for (let i = 0; i < pointCount; i++) {
+        const p = shape.points[i];
         const inset = calculateInset(shape, p, insetAmount);
         vertices.push(new Vec3(p.x - inset.x, y, p.z - inset.z));
+        uvs.push([perimeterUVs[i], t]);
+        smoothGroups.push(1);
       }
     }
   }
 
-  // Layer N-2: Back bevel inner edge (inset)
-  for (const p of shape.points) {
+  // Layer N-2: Back bevel inner edge (inset) — smoothGroup 1, V=1
+  for (let i = 0; i < pointCount; i++) {
+    const p = shape.points[i];
     const inset = calculateInset(shape, p, insetFactor);
     vertices.push(new Vec3(p.x - inset.x, yBackBevel, p.z - inset.z));
+    uvs.push([perimeterUVs[i], 1]);
+    smoothGroups.push(1);
   }
 
-  // Layer N-1: Back cap face
-  for (const p of shape.points) {
+  // Layer N-1: Back cap face — smoothGroup 3 (back cap, hard edge vs bevel)
+  for (let i = 0; i < pointCount; i++) {
+    const p = shape.points[i];
     vertices.push(new Vec3(p.x, yBack, p.z));
+    uvs.push([(p.x - minX) / rangeX, (p.z - minZ) / rangeZ]);
+    smoothGroups.push(3);
   }
 
   // Generate side faces connecting all layers
@@ -241,7 +318,7 @@ function extrude2DWithBevel(
   // Calculate normals for all vertices
   calculateNormals(vertices, faces, normals);
 
-  return { vertices, faces, normals };
+  return { vertices, faces, normals, uvs, smoothGroups };
 }
 
 /**
@@ -303,6 +380,8 @@ export function extrude2DWithHoles(
   const vertices: Vec3[] = [];
   const faces: number[][] = [];
   const normals: Vec3[] = [];
+  const uvs: [number, number][] = [];
+  const smoothGroups: number[] = [];  // 1=side, 2=front cap, 3=back cap
 
   const yFront = offset;
   const yBack = offset + depth;
@@ -319,28 +398,83 @@ export function extrude2DWithHoles(
   const totalPoints = allPoints.length;
   const outerPointCount = outerContour.length;
 
-  // Create front face vertices (at Y = offset)
-  for (const p of allPoints) {
+  // Calculate bounding box for planar UV normalization (used for caps)
+  const minX = Math.min(...allPoints.map(p => p.x));
+  const maxX = Math.max(...allPoints.map(p => p.x));
+  const minZ = Math.min(...allPoints.map(p => p.z));
+  const maxZ = Math.max(...allPoints.map(p => p.z));
+  const rangeX = maxX - minX || 1;
+  const rangeZ = maxZ - minZ || 1;
+
+  // Calculate perimeters for UV mapping (sides: U = perimeter_t, V = 0/1)
+  const calcPerimeter = (pts: { x: number; z: number }[]): number[] => {
+    const dists = [0];
+    let total = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const p1 = pts[i];
+      const p2 = pts[(i + 1) % pts.length];
+      total += Math.sqrt((p2.x - p1.x) ** 2 + (p2.z - p1.z) ** 2);
+      if (i < pts.length - 1) dists.push(total);
+    }
+    return dists.map(d => total > 0 ? d / total : 0);
+  };
+
+  const outerPerimeterUVs = calcPerimeter(outerContour);
+  const holePerimeterUVs = holes.map(h => calcPerimeter(h));
+
+  // Create front face side vertices (at Y = yFront) with perimeter UVs — smoothGroup 1 (side)
+  for (let i = 0; i < outerPointCount; i++) {
+    const p = outerContour[i];
     vertices.push(new Vec3(p.x, yFront, p.z));
+    uvs.push([outerPerimeterUVs[i], 0]);
+    smoothGroups.push(1);
+  }
+  for (let hi = 0; hi < holes.length; hi++) {
+    const hole = holes[hi];
+    const holeUVs = holePerimeterUVs[hi];
+    for (let i = 0; i < hole.length; i++) {
+      const p = hole[i];
+      vertices.push(new Vec3(p.x, yFront, p.z));
+      uvs.push([holeUVs[i], 0]);
+      smoothGroups.push(1);
+    }
   }
 
-  // Create back face vertices (at Y = offset + depth)
-  for (const p of allPoints) {
+  // Create back face side vertices (at Y = yBack) with perimeter UVs — smoothGroup 1 (side)
+  for (let i = 0; i < outerPointCount; i++) {
+    const p = outerContour[i];
     vertices.push(new Vec3(p.x, yBack, p.z));
+    uvs.push([outerPerimeterUVs[i], 1]);
+    smoothGroups.push(1);
+  }
+  for (let hi = 0; hi < holes.length; hi++) {
+    const hole = holes[hi];
+    const holeUVs = holePerimeterUVs[hi];
+    for (let i = 0; i < hole.length; i++) {
+      const p = hole[i];
+      vertices.push(new Vec3(p.x, yBack, p.z));
+      uvs.push([holeUVs[i], 1]);
+      smoothGroups.push(1);
+    }
   }
 
-  // Generate side faces for outer contour
+  // Generate side faces for outer contour.
+  // Outer contour is CCW (ensureCCW in PolygonBoolean). For CCW contours the winding
+  // [i1, i4, i2] produces normals pointing outward (away from the shape interior).
   for (let i = 0; i < outerPointCount; i++) {
     const i1 = i;
     const i2 = (i + 1) % outerPointCount;
     const i3 = i1 + totalPoints;
     const i4 = i2 + totalPoints;
 
-    faces.push([i1, i2, i4]);
-    faces.push([i1, i4, i3]);
+    faces.push([i1, i4, i2]);
+    faces.push([i1, i3, i4]);
   }
 
-  // Generate side faces for each hole (wound in opposite direction)
+  // Generate side faces for each hole.
+  // Holes from boolean subtract are CW (ensureCW in PolygonBoolean).
+  // For CW hole contours the reversed winding [i1, i4, i2] produces normals pointing
+  // inward (toward hole center = into the empty hole space). This is correct.
   let holeStart = outerPointCount;
   for (const hole of holes) {
     const holeLen = hole.length;
@@ -350,30 +484,53 @@ export function extrude2DWithHoles(
       const i3 = i1 + totalPoints;
       const i4 = i2 + totalPoints;
 
-      // Reverse winding for holes (inside faces outward)
       faces.push([i1, i4, i2]);
       faces.push([i1, i3, i4]);
     }
     holeStart += holeLen;
   }
 
-  // Generate caps with holes using earcut
+  // Generate caps with NEW vertices that have planar UVs.
+  // Critical: do NOT reuse the side vertices — separate cap vertices prevent
+  // side normals and cap normals from averaging together in calculateNormals().
+  // smoothGroup 2 = front cap, smoothGroup 3 = back cap.
   if (caps === 'front' || caps === 'both') {
-    const frontFaces = triangulateWithHoles(allPoints, holeIndices, true);
+    const capStartIdx = vertices.length;
+
+    // New vertices for front cap with planar UVs — smoothGroup 2
+    for (const p of allPoints) {
+      vertices.push(new Vec3(p.x, yFront, p.z));
+      uvs.push([(p.x - minX) / rangeX, (p.z - minZ) / rangeZ]);
+      smoothGroups.push(2);
+    }
+
+    const frontFaces = triangulateWithHoles(allPoints, holeIndices, true).map(face =>
+      face.map(idx => idx + capStartIdx)
+    );
     faces.push(...frontFaces);
   }
 
   if (caps === 'back' || caps === 'both') {
+    const capStartIdx = vertices.length;
+
+    // New vertices for back cap with planar UVs — smoothGroup 3
+    for (const p of allPoints) {
+      vertices.push(new Vec3(p.x, yBack, p.z));
+      uvs.push([(p.x - minX) / rangeX, (p.z - minZ) / rangeZ]);
+      smoothGroups.push(3);
+    }
+
     const backFaces = triangulateWithHoles(allPoints, holeIndices, false).map(face =>
-      face.map(idx => idx + totalPoints)
+      face.map(idx => idx + capStartIdx)
     );
     faces.push(...backFaces);
   }
 
-  // Calculate normals
+  // Calculate normals — cap vertices are now separate from side vertices so
+  // normals accumulate correctly per region (no cross-contamination).
   calculateNormals(vertices, faces, normals);
 
-  return { vertices, faces, normals };
+  return { vertices, faces, normals, uvs, smoothGroups };
 }
 
 /**

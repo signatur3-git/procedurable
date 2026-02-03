@@ -34,6 +34,7 @@ export interface ParseOptions {
   seed?: number;
   overrides?: Record<string, any>;
   builderResolver?: (name: string) => ((seed: number, overrides?: Record<string, any>) => TracedOutput | Promise<TracedOutput>) | null;
+  constraintResolver?: (key: string) => import('../validation/ConstraintEvaluator').ConstraintSchema | null;  // F1-002
   sharedContext?: SharedContext;  // Scene-level shared state (P2-M2d-003)
 }
 

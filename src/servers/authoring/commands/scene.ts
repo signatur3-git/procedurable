@@ -498,7 +498,7 @@ const handlers: CommandHandler[] = [
     action: 'get_ports',
     description: 'Get attachment ports from the last builder run (B5-001)',
     usage: 'scene.get_ports [prim_path]',
-    execute: async (cmd: ParsedCommand, context: any): Promise<CommandResult> => {
+    execute: async (_cmd: ParsedCommand, context: any): Promise<CommandResult> => {
       if (!context.lastRun) {
         return { success: false, error: 'No builder has been run yet. Use builder.run first.' };
       }
@@ -528,6 +528,102 @@ const handlers: CommandHandler[] = [
           ports
         }
       };
+    }
+  },
+
+  // G2-001: Generate scene at specific LOD tier
+  {
+    action: 'generate_at_lod',
+    description: 'Re-generate the current scene at a specific LOD tier (G2-001)',
+    usage: 'scene.generate_at_lod <tier> [seed=<n>]',
+    execute: async (cmd: ParsedCommand, context: any): Promise<CommandResult> => {
+      if (!context.activeBuilder) {
+        return { success: false, error: 'No builder is open. Use builder.open <name> first.' };
+      }
+
+      const tierArg = getArg(cmd, 0);
+      if (!tierArg) {
+        return { success: false, error: 'Usage: scene.generate_at_lod <tier> [seed=<n>]. Tier is 0-4.' };
+      }
+
+      const tier = parseInt(tierArg, 10);
+      if (isNaN(tier) || tier < 0 || tier > 4) {
+        return { success: false, error: 'Tier must be a number from 0 to 4.' };
+      }
+
+      // Get seed from options or use last run seed or current time
+      let seed = getNumberOption(cmd, 'seed');
+      if (seed === undefined) {
+        seed = context.lastRun?.seed ?? Date.now();
+      }
+
+      try {
+        // Run builder with LOD budget override
+        const overrides: Record<string, any> = {
+          __lod_budget__: tier
+        };
+
+        const result = await context.runBuilder(
+          context.activeBuilder,
+          seed,
+          overrides,
+          context.activeBuilderSource || undefined
+        );
+
+        context.lastRun = result;
+        context.runHistory.push(result);
+
+        // Keep history limited
+        if (context.runHistory.length > 20) {
+          context.runHistory.shift();
+        }
+
+        // Broadcast update
+        context.broadcast({
+          type: 'builder_run',
+          builder: context.activeBuilder,
+          seed,
+          lodBudget: tier,
+          summary: {
+            vertices: result.validation.vertexCount,
+            faces: result.validation.faceCount,
+            issues: result.validation.issues.length
+          }
+        });
+
+        // Count skipped compositions
+        let skippedCount = 0;
+        for (const [key] of result.measurements) {
+          if (key.startsWith('__lod_skipped__')) {
+            skippedCount++;
+          }
+        }
+
+        return {
+          success: true,
+          data: {
+            builder: context.activeBuilder,
+            seed,
+            lodBudget: tier,
+            vertices: result.validation.vertexCount,
+            faces: result.validation.faceCount,
+            bounds: {
+              width: result.validation.bounds.size.x.toFixed(3) + 'm',
+              height: result.validation.bounds.size.y.toFixed(3) + 'm',
+              depth: result.validation.bounds.size.z.toFixed(3) + 'm'
+            },
+            skippedCompositions: skippedCount,
+            message: skippedCount > 0
+              ? `Generated at LOD ${tier}. ${skippedCount} composition(s) skipped due to lod_min constraint.`
+              : `Generated at LOD ${tier}.`
+          }
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          error: `Generation failed: ${err.message}`
+        };
+      }
     }
   }
 ];

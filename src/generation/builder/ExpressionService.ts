@@ -16,6 +16,7 @@
 import { evaluate as mathEvaluate } from '../../platform/math/MathService';
 import { TracedBuilder } from './TracedBuilder';
 import type { SpatialOffer } from './SharedContext';
+import type { StyleDefinition } from './StyleResolver';
 
 /**
  * Evaluation context containing all available values
@@ -29,6 +30,8 @@ export interface EvaluationContext {
   constraints: Record<string, any>;
   /** Offers from SharedContext (B5-002) */
   offers?: Map<string, SpatialOffer>;
+  /** Active style (F2-001) */
+  style?: StyleDefinition;
 }
 
 /**
@@ -37,13 +40,15 @@ export interface EvaluationContext {
 export function buildEvaluationContext(
   builder: TracedBuilder,
   decisionValues: Map<string, any>,
-  offers?: Map<string, SpatialOffer>
+  offers?: Map<string, SpatialOffer>,
+  style?: StyleDefinition
 ): EvaluationContext {
   return {
     decisions: decisionValues,
     measurements: builder.context.toObject(),
     constraints: builder.getConstraints(),
-    offers
+    offers,
+    style
   };
 }
 
@@ -117,6 +122,53 @@ export function buildVariables(ctx: EvaluationContext): Record<string, any> {
     }
   }
 
+  // F2-001: Add style data with __style_ prefix (accessible as $style.<property>)
+  if (ctx.style) {
+    // Add decision defaults
+    if (ctx.style.decision_defaults) {
+      for (const [name, value] of Object.entries(ctx.style.decision_defaults)) {
+        if (typeof value === 'number') {
+          variables[`__style_decision_${name}`] = value;
+        } else if (typeof value === 'boolean') {
+          variables[`__style_decision_${name}`] = value ? 1 : 0;
+        } else if (typeof value === 'string') {
+          variables[`__style_decision_${name}`] = value;
+        }
+      }
+    }
+
+    // Add material palette properties (accessible as $style.palette.<role>.<property>)
+    if (ctx.style.material_palette) {
+      for (const [role, mat] of Object.entries(ctx.style.material_palette)) {
+        if (mat.roughness !== undefined) {
+          variables[`__style_palette_${role}_roughness`] = mat.roughness;
+        }
+        if (mat.metalness !== undefined) {
+          variables[`__style_palette_${role}_metalness`] = mat.metalness;
+        }
+        if (mat.rgb) {
+          variables[`__style_palette_${role}_r`] = mat.rgb[0];
+          variables[`__style_palette_${role}_g`] = mat.rgb[1];
+          variables[`__style_palette_${role}_b`] = mat.rgb[2];
+        }
+      }
+    }
+
+    // Add pattern preferences
+    if (ctx.style.pattern_preferences) {
+      const prefs = ctx.style.pattern_preferences;
+      if (prefs.symmetry) {
+        variables['__style_symmetry'] = prefs.symmetry;
+      }
+      if (prefs.repetition) {
+        variables['__style_repetition'] = prefs.repetition;
+      }
+      if (prefs.ornamentation) {
+        variables['__style_ornamentation'] = prefs.ornamentation;
+      }
+    }
+  }
+
   return variables;
 }
 
@@ -134,6 +186,12 @@ export function evaluateNumeric(expr: string, ctx: EvaluationContext): number {
   let transformedExpr = expr.replace(/@(\w+)/g, '__constraint_$1');
   // Transform $offer.reqId.field to __offer_reqId_field
   transformedExpr = transformedExpr.replace(/\$offer\.(\w+)\.(\w+)/g, '__offer_$1_$2');
+  // F2-001: Transform $style.palette.role.prop to __style_palette_role_prop
+  transformedExpr = transformedExpr.replace(/\$style\.palette\.(\w+)\.(\w+)/g, '__style_palette_$1_$2');
+  // Transform $style.decision.name to __style_decision_name
+  transformedExpr = transformedExpr.replace(/\$style\.decision\.(\w+)/g, '__style_decision_$1');
+  // Transform $style.symmetry etc. to __style_symmetry
+  transformedExpr = transformedExpr.replace(/\$style\.(symmetry|repetition|ornamentation)/g, '__style_$1');
 
   try {
     const result = mathEvaluate(transformedExpr, variables);
@@ -180,7 +238,15 @@ export function evaluateCondition(condition: string, ctx: EvaluationContext): bo
 
   // 2. Try to evaluate with MathService first (handles eq(), if(), complex expressions)
   // Transform @ prefix
-  const transformedCondition = cleanCondition.replace(/@(\w+)/g, '__constraint_$1');
+  let transformedCondition = cleanCondition.replace(/@(\w+)/g, '__constraint_$1');
+  // Transform $offer.reqId.field to __offer_reqId_field
+  transformedCondition = transformedCondition.replace(/\$offer\.(\w+)\.(\w+)/g, '__offer_$1_$2');
+  // F2-001: Transform $style.palette.role.prop to __style_palette_role_prop
+  transformedCondition = transformedCondition.replace(/\$style\.palette\.(\w+)\.(\w+)/g, '__style_palette_$1_$2');
+  // Transform $style.decision.name to __style_decision_name
+  transformedCondition = transformedCondition.replace(/\$style\.decision\.(\w+)/g, '__style_decision_$1');
+  // Transform $style.symmetry etc. to __style_symmetry
+  transformedCondition = transformedCondition.replace(/\$style\.(symmetry|repetition|ornamentation)/g, '__style_$1');
 
   try {
     const result = mathEvaluate(transformedCondition, variables);

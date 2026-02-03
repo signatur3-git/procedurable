@@ -1,0 +1,108 @@
+# ChessPiece.yaml
+# H3-001: Parameterized chess piece component using lathe profiles
+
+name: ChessPiece
+description: A chess piece with lathe profile
+
+decisions:
+  piece_type:
+    type: choice
+    options: [pawn, rook, knight, bishop, queen, king]
+    default: pawn
+  piece_color:
+    type: choice
+    options: [white, black]
+    default: white
+  square:
+    type: choice
+    options: [a1, a2, a3, a4, a5, a6, a7, a8, b1, b2, b3, b4, b5, b6, b7, b8, c1, c2, c3, c4, c5, c6, c7, c8, d1, d2, d3, d4, d5, d6, d7, d8, e1, e2, e3, e4, e5, e6, e7, e8, f1, f2, f3, f4, f5, f6, f7, f8, g1, g2, g3, g4, g5, g6, g7, g8, h1, h2, h3, h4, h5, h6, h7, h8]
+    default: a1
+
+measurements:
+  base_radius:
+    value: 0.015
+    source: "Piece base radius"
+  base_height:
+    value: 0.005
+    source: "Piece base height"
+  # Can be overridden per piece type from parent builder
+  piece_height:
+    value: 0.04
+    source: "Piece total height"
+
+derived:
+  body_radius: "base_radius * 0.7"
+  neck_radius: "base_radius * 0.4"
+  top_radius: "base_radius * 0.5"
+  h_base: "base_height"
+  h_body: "piece_height * 0.5"
+  h_neck: "piece_height * 0.65"
+  h_top: "piece_height * 0.8"
+  h_peak: "piece_height"
+
+profiles:
+  piece_base_profile:
+    type: polygon
+    closed: false
+    points:
+      - { x: 0, y: 0 }
+      - { x: "base_radius", y: 0 }
+      - { x: "base_radius", y: "base_height" }
+      - { x: "base_radius * 0.9", y: "base_height * 1.2" }
+      - { x: 0, y: "base_height * 1.2" }
+
+  piece_body_profile:
+    type: polygon
+    closed: false
+    points:
+      - { x: 0, y: "h_base" }
+      - { x: "body_radius", y: "h_base * 2" }
+      - { x: "body_radius * 0.8", y: "h_body" }
+      - { x: "neck_radius", y: "h_neck" }
+      - { x: "top_radius", y: "h_top" }
+      - { x: "top_radius * 0.7", y: "h_peak" }
+      - { x: 0, y: "h_peak" }
+
+materials:
+  # Ivory/cream for white pieces
+  white_piece:
+    color: "#FFFFF0"
+    roughness: 0.2
+    metalness: 0.0
+  # Dark ebony for black pieces
+  black_piece:
+    color: "#1C1C1C"
+    roughness: 0.2
+    metalness: 0.0
+
+geometry:
+  # Base - conditional color based on piece_color
+  - if: piece_color == "white"
+    then:
+      - lathe: piece_base
+        profile: piece_base_profile
+        segments: 16
+        color: $white_piece
+    else:
+      - lathe: piece_base
+        profile: piece_base_profile
+        segments: 16
+        color: $black_piece
+
+  # Body - conditional color based on piece_color
+  - if: piece_color == "white"
+    then:
+      - lathe: piece_body
+        profile: piece_body_profile
+        segments: 16
+        color: $white_piece
+    else:
+      - lathe: piece_body
+        profile: piece_body_profile
+        segments: 16
+        color: $black_piece
+
+tags:
+  piece: "$piece_type"
+  color: "$piece_color"
+  square: "$square"

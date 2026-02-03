@@ -1,0 +1,258 @@
+# HorseBody.yaml - Horse-like body component for HybridCreature
+# H1-001: Rigged Creature Demo
+#
+# A simplified, stylized horse torso with spine skeleton.
+# Designed for composition with wings and tail.
+
+version: "1.0"
+name: HorseBody
+description: "Stylized horse-like body with spine skeleton and shoulder/hip attachment points"
+
+measurements:
+  # Body proportions
+  body_length:
+    value: 0.8
+  body_width:
+    value: 0.25
+  body_height:
+    value: 0.3
+
+  # Chest (front, larger)
+  chest_width:
+    value: 0.28
+  chest_height:
+    value: 0.35
+
+  # Hip (rear, slightly smaller)
+  hip_width:
+    value: 0.24
+  hip_height:
+    value: 0.28
+
+  # Neck
+  neck_length:
+    value: 0.25
+  neck_width:
+    value: 0.12
+  neck_angle:
+    value: 45
+
+  # Head (simplified)
+  head_length:
+    value: 0.2
+  head_width:
+    value: 0.1
+  head_height:
+    value: 0.12
+
+derived:
+  half_body_length: "body_length / 2"
+  half_body_width: "body_width / 2"
+  quarter_body_length: "body_length / 4"
+  neck_rise: "neck_length * 0.707"  # sin(45)
+  neck_forward: "neck_length * 0.707"  # cos(45)
+
+decisions:
+  body_style:
+    type: choice
+    options: [athletic, stocky, lean]
+    default: athletic
+    description: "Overall body build"
+
+  neck_curve:
+    type: choice
+    options: [straight, arched, swan]
+    default: arched
+    description: "Neck posture"
+
+colors:
+  body_color: [0.6, 0.5, 0.4]  # Warm brown
+  belly_color: [0.7, 0.6, 0.5]  # Lighter underside
+
+skeleton:
+  - name: spine_root
+    parent: null
+    position: { x: 0, y: 0.15, z: 0 }
+    constraints:
+      type: fixed
+
+  - name: spine_mid
+    parent: spine_root
+    position: { x: 0, y: 0.02, z: 0.2 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-15, 15]
+        yaw: [-10, 10]
+
+  - name: spine_chest
+    parent: spine_mid
+    position: { x: 0, y: 0.03, z: 0.15 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-10, 10]
+        yaw: [-5, 5]
+
+  - name: neck_base
+    parent: spine_chest
+    position: { x: 0, y: 0.05, z: 0.1 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-30, 45]
+        yaw: [-20, 20]
+
+  - name: neck_mid
+    parent: neck_base
+    position: { x: 0, y: 0.08, z: 0.06 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-20, 30]
+        yaw: [-15, 15]
+
+  - name: head
+    parent: neck_mid
+    position: { x: 0, y: 0.06, z: 0.04 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-45, 45]
+        yaw: [-30, 30]
+
+  - name: spine_hip
+    parent: spine_root
+    position: { x: 0, y: 0, z: -0.2 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-10, 10]
+        yaw: [-5, 5]
+
+  # Shoulder joints (for wing attachment)
+  - name: shoulder_L
+    parent: spine_chest
+    position: { x: -0.15, y: 0.05, z: 0 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-30, 90]
+        yaw: [-45, 45]
+        roll: [-30, 30]
+
+  - name: shoulder_R
+    parent: spine_chest
+    position: { x: 0.15, y: 0.05, z: 0 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-30, 90]
+        yaw: [-45, 45]
+        roll: [-30, 30]
+
+  # Hip joints (for tail attachment)
+  - name: tail_base
+    parent: spine_hip
+    position: { x: 0, y: 0, z: -0.05 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-45, 60]
+        yaw: [-30, 30]
+
+ports:
+  # Wing attachment points
+  wing_attach_L:
+    position: { x: "-half_body_width - 0.02", y: "0.2", z: "quarter_body_length" }
+    normal: { x: -1, y: 0.3, z: 0 }
+
+  wing_attach_R:
+    position: { x: "half_body_width + 0.02", y: "0.2", z: "quarter_body_length" }
+    normal: { x: 1, y: 0.3, z: 0 }
+
+  # Tail attachment point
+  tail_attach:
+    position: { x: 0, y: "0.12", z: "-half_body_length - 0.02" }
+    normal: { x: 0, y: 0, z: -1 }
+
+geometry:
+  # Main body - simplified as tapered box (chest to hip)
+  - box:
+      name: body_main
+      center: { x: "0", y: "body_height / 2 + 0.05", z: "0" }
+      size: { x: "body_width", y: "body_height", z: "body_length" }
+      color: body_color
+
+  # Chest bulge
+  - box:
+      name: chest
+      center: { x: "0", y: "chest_height / 2 + 0.08", z: "quarter_body_length" }
+      size: { x: "chest_width", y: "chest_height", z: "body_length * 0.35" }
+      color: body_color
+
+  # Hip area
+  - box:
+      name: hip
+      center: { x: "0", y: "hip_height / 2 + 0.05", z: "-quarter_body_length" }
+      size: { x: "hip_width", y: "hip_height", z: "body_length * 0.35" }
+      color: body_color
+
+  # Neck (angled cylinder approximation using boxes)
+  - box:
+      name: neck_lower
+      center: { x: "0", y: "body_height + 0.08", z: "half_body_length + 0.05" }
+      size: { x: "neck_width", y: "0.12", z: "neck_width" }
+      color: body_color
+
+  - box:
+      name: neck_upper
+      center: { x: "0", y: "body_height + 0.18", z: "half_body_length + 0.1" }
+      size: { x: "neck_width * 0.9", y: "0.1", z: "neck_width * 0.9" }
+      color: body_color
+
+  # Head (simplified elongated box)
+  - box:
+      name: head_main
+      center: { x: "0", y: "body_height + 0.26", z: "half_body_length + 0.18" }
+      size: { x: "head_width", y: "head_height", z: "head_length" }
+      color: body_color
+
+weights:
+  # Spine controls the main body
+  - type: gradient
+    joint_a: spine_hip
+    joint_b: spine_chest
+    axis: z
+
+  # Neck joints control neck geometry
+  - type: proximity
+    joint: neck_base
+    radius: 0.15
+    falloff: smooth
+
+  - type: proximity
+    joint: neck_mid
+    radius: 0.12
+    falloff: smooth
+
+  # Head joint controls head
+  - type: proximity
+    joint: head
+    radius: 0.15
+    falloff: smooth
+
+  # Shoulders influence sides of body
+  - type: proximity
+    joint: shoulder_L
+    radius: 0.12
+    falloff: linear
+
+  - type: proximity
+    joint: shoulder_R
+    radius: 0.12
+    falloff: linear
+
+quality:
+  target_tier: 2
+  current_tier: 2

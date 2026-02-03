@@ -10,7 +10,7 @@ import { lathe as latheGeometry } from '../../../platform/geometry/Sweep';
 
 interface LatheCommandDef {
   lathe: string;
-  profile: string;
+  profile: string | YamlProfile;  // Can be profile name or inline definition
   segments?: number | string;
   angle?: number | string;
   axis?: 'y' | 'x' | 'z';
@@ -26,10 +26,19 @@ export class LatheCommandHandler extends BaseGeometryCommandHandler {
 
     const latheName = latheCmd.lathe;
 
-    // Get profile from builder's stored profiles
-    const profileDef = (builder as any)._yamlProfiles?.get(latheCmd.profile) as YamlProfile | undefined;
-    if (!profileDef) {
-      throw new Error(`Profile '${latheCmd.profile}' not found for lathe '${latheName}'`);
+    // Support both inline profile and profile reference
+    let profileDef: YamlProfile | undefined;
+    if (typeof latheCmd.profile === 'string') {
+      // Profile reference - look up by name
+      profileDef = (builder as any)._yamlProfiles?.get(latheCmd.profile) as YamlProfile | undefined;
+      if (!profileDef) {
+        throw new Error(`Profile '${latheCmd.profile}' not found for lathe '${latheName}'`);
+      }
+    } else if (Array.isArray(latheCmd.profile)) {
+      // Inline profile - use directly
+      profileDef = latheCmd.profile;
+    } else {
+      throw new Error(`Invalid profile for lathe '${latheName}': expected string or array`);
     }
 
     const profile = resolveProfile(profileDef, evaluateExpression);

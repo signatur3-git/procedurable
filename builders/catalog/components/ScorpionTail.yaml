@@ -1,0 +1,170 @@
+# ScorpionTail.yaml - Scorpion-like tail component
+# H1-001: Rigged Creature Demo
+
+version: "1.0"
+name: ScorpionTail
+description: "Articulated scorpion tail with stinger"
+
+measurements:
+  tail_length:
+    value: 0.5
+  segment_count:
+    value: 5
+  base_width:
+    value: 0.08
+  tip_width:
+    value: 0.03
+  stinger_length:
+    value: 0.08
+
+derived:
+  segment_length: "tail_length / segment_count"
+  width_taper: "(base_width - tip_width) / segment_count"
+
+decisions:
+  tail_pose:
+    type: choice
+    options: [relaxed, raised, striking]
+    default: raised
+
+  stinger_style:
+    type: choice
+    options: [curved, straight, barbed]
+    default: curved
+
+colors:
+  tail_base: [0.3, 0.25, 0.2]
+  stinger_color: [0.15, 0.1, 0.08]
+
+skeleton:
+  - name: tail_root
+    parent: null
+    position: { x: 0, y: 0, z: 0 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-30, 90]
+        yaw: [-45, 45]
+
+  - name: tail_seg1
+    parent: tail_root
+    position: { x: 0, y: 0.02, z: -0.1 }
+    constraints:
+      type: hinge
+      axis: x
+      limits: { min: -20, max: 45 }
+
+  - name: tail_seg2
+    parent: tail_seg1
+    position: { x: 0, y: 0.03, z: -0.1 }
+    constraints:
+      type: hinge
+      axis: x
+      limits: { min: -20, max: 45 }
+
+  - name: tail_seg3
+    parent: tail_seg2
+    position: { x: 0, y: 0.04, z: -0.1 }
+    constraints:
+      type: hinge
+      axis: x
+      limits: { min: -20, max: 50 }
+
+  - name: tail_seg4
+    parent: tail_seg3
+    position: { x: 0, y: 0.05, z: -0.1 }
+    constraints:
+      type: hinge
+      axis: x
+      limits: { min: -15, max: 55 }
+
+  - name: stinger
+    parent: tail_seg4
+    position: { x: 0, y: 0.02, z: -0.08 }
+    constraints:
+      type: hinge
+      axis: x
+      limits: { min: -30, max: 30 }
+
+ports:
+  body_attach:
+    position: { x: 0, y: 0, z: 0 }
+    normal: { x: 0, y: 0, z: 1 }
+
+geometry:
+  # Segment 1 (base, widest)
+  - box:
+      name: seg1
+      center: { x: 0, y: 0.01, z: "-segment_length / 2" }
+      size: { x: "base_width", y: "base_width * 0.6", z: "segment_length" }
+      color: tail_base
+
+  # Segment 2
+  - box:
+      name: seg2
+      center: { x: 0, y: 0.025, z: "-segment_length * 1.5" }
+      size: { x: "base_width - width_taper", y: "base_width * 0.55", z: "segment_length" }
+      color: tail_base
+
+  # Segment 3
+  - box:
+      name: seg3
+      center: { x: 0, y: 0.045, z: "-segment_length * 2.5" }
+      size: { x: "base_width - width_taper * 2", y: "base_width * 0.5", z: "segment_length" }
+      color: tail_base
+
+  # Segment 4
+  - box:
+      name: seg4
+      center: { x: 0, y: 0.07, z: "-segment_length * 3.5" }
+      size: { x: "base_width - width_taper * 3", y: "base_width * 0.45", z: "segment_length" }
+      color: tail_base
+
+  # Segment 5 (tip before stinger)
+  - box:
+      name: seg5
+      center: { x: 0, y: 0.1, z: "-segment_length * 4.5" }
+      size: { x: "tip_width", y: "tip_width * 0.8", z: "segment_length" }
+      color: tail_base
+
+  # Stinger
+  - box:
+      name: stinger_geo
+      center: { x: 0, y: 0.12, z: "-tail_length - stinger_length / 2" }
+      size: { x: "tip_width * 0.5", y: "tip_width * 0.5", z: "stinger_length" }
+      color: stinger_color
+
+weights:
+  - type: proximity
+    joint: tail_root
+    radius: 0.12
+    falloff: smooth
+
+  - type: proximity
+    joint: tail_seg1
+    radius: 0.11
+    falloff: smooth
+
+  - type: proximity
+    joint: tail_seg2
+    radius: 0.10
+    falloff: smooth
+
+  - type: proximity
+    joint: tail_seg3
+    radius: 0.10
+    falloff: smooth
+
+  - type: proximity
+    joint: tail_seg4
+    radius: 0.09
+    falloff: smooth
+
+  - type: proximity
+    joint: stinger
+    radius: 0.08
+    falloff: smooth
+
+quality:
+  target_tier: 2
+  current_tier: 2

@@ -349,6 +349,133 @@ const handlers: CommandHandler[] = [
         }
       };
     }
+  },
+
+  // ==========================================================================
+  // F4-001: Cross-Builder Proportion Rules
+  // ==========================================================================
+
+  {
+    action: 'check_proportions',
+    description: 'Evaluate cross-builder proportion rules from the active style (F4-001)',
+    usage: 'psd.check_proportions [style=<name>]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      if (!ctx.lastRun) {
+        return { success: false, error: 'No builder run available. Use builder.run first.' };
+      }
+
+      if (!ctx.lastRun.subBuilders || ctx.lastRun.subBuilders.size === 0) {
+        return {
+          success: false,
+          error: 'No composed builders found. Proportion rules require a composition with multiple children.'
+        };
+      }
+
+      // Get style (from option, lastRun metadata, or default)
+      const styleName = cmd.options['style'] as string | undefined;
+      let proportionRules: string[] = [];
+
+      if (styleName) {
+        // Load specified style
+        const { loadStyle } = await import('../../../generation/builder/StyleResolver');
+        const style = await loadStyle(styleName);
+        if (!style) {
+          return { success: false, error: `Style '${styleName}' not found` };
+        }
+        proportionRules = style.proportion_rules || [];
+      } else {
+        // Try to get from lastRun's decisions if style was used
+        // For now, just inform user to specify a style
+        return {
+          success: false,
+          error: 'Please specify a style: psd.check_proportions style=modern'
+        };
+      }
+
+      if (proportionRules.length === 0) {
+        return {
+          success: true,
+          data: {
+            style: styleName,
+            rules: 0,
+            message: 'No proportion rules defined for this style'
+          }
+        };
+      }
+
+      // Collect measurements from composed children
+      const {
+        evaluateProportionRules,
+        collectCrossBuilderMeasurements
+      } = await import('../../../generation/validation/ProportionRuleEvaluator');
+
+      const measurements = collectCrossBuilderMeasurements(ctx.lastRun.subBuilders);
+      const result = evaluateProportionRules(proportionRules, measurements);
+
+      return {
+        success: true,
+        data: {
+          style: styleName,
+          passed: result.passed,
+          total: result.total,
+          passedCount: result.passedCount,
+          failedCount: result.failedCount,
+          availableMeasurements: Object.keys(measurements),
+          results: result.results.map(r => ({
+            rule: r.rule,
+            passed: r.passed,
+            value: r.value !== undefined ? parseFloat(r.value.toFixed(4)) : undefined,
+            expected: r.expected,
+            error: r.error,
+            severity: r.severity
+          })),
+          message: result.passed
+            ? `All ${result.total} proportion rules passed`
+            : `${result.failedCount} of ${result.total} proportion rules failed`
+        }
+      };
+    }
+  },
+
+  // ==========================================================================
+  // F4-002: Assembly Connections
+  // ==========================================================================
+
+  {
+    action: 'connections',
+    description: 'List assembly connections from the PSD scene (F4-002)',
+    usage: 'psd.connections [type=<type>]',
+    execute: async (cmd: ParsedCommand, ctx: CommandContext): Promise<CommandResult> => {
+      const scene = await getOrCreatePSDScene(ctx);
+      if (!scene) {
+        return { success: false, error: 'No builder run available. Use builder.run first.' };
+      }
+
+      const typeFilter = cmd.options['type'] as string | undefined;
+      let connections = scene.connections || [];
+
+      // Filter by type if specified
+      if (typeFilter) {
+        connections = connections.filter(c => c.type === typeFilter);
+      }
+
+      return {
+        success: true,
+        data: {
+          count: connections.length,
+          connections: connections.map(c => ({
+            type: c.type,
+            from: c.from,
+            to: c.to,
+            data: c.data,
+            description: c.description
+          })),
+          message: connections.length > 0
+            ? `${connections.length} connection(s)${typeFilter ? ` of type '${typeFilter}'` : ''}`
+            : 'No connections defined'
+        }
+      };
+    }
   }
 ];
 

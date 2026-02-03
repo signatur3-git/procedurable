@@ -15,6 +15,7 @@ interface BoxCommandDef {
     center: YamlPosition;
     size: YamlPosition;
     color?: string;
+    uv_mode?: 'normalized' | 'world_scale';
   };
 }
 
@@ -39,8 +40,11 @@ export class BoxCommandHandler extends BaseGeometryCommandHandler {
     // Resolve color and material slot
     const { color, materialSlotIndex } = resolveGeometryMaterial(boxDef.color, materials, materialSlots, builder.mesh);
 
+    // Get UV mode (default to normalized for backwards compatibility)
+    const uvMode = boxDef.uv_mode || 'normalized';
+
     // Create box with UVs at origin, then translate to center
-    let boxMesh = MeshOperations.createBox(sx, sy, sz);
+    let boxMesh = MeshOperations.createBox(sx, sy, sz, uvMode);
 
     // Translate to center
     if (cx !== 0 || cy !== 0 || cz !== 0) {

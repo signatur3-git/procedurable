@@ -678,7 +678,48 @@ compose:
         facing: center
         angle_tolerance: 15
       required_tags: [seating, stable]
+    
+    # LOD-Conditional Composition (G2-001)
+    lod_min: 2          # Only include when scene lod_budget >= 2
+    lod_tier: 1         # Force sub-builder to generate at Tier 1
 ```
+
+#### LOD-Conditional Composition (G2-001)
+
+Control which compositions appear at different LOD levels:
+
+```yaml
+# Scene builder with LOD budget
+version: "1.0"
+name: DetailedRoom
+lod_budget: 2            # Scene-level LOD budget (0-4)
+
+compose:
+  # Always included (no lod_min)
+  table:
+    builder: Table
+    
+  # Only at LOD 2+
+  vase:
+    builder: Vase
+    lod_min: 2           # Skip when lod_budget < 2
+    
+  # Only at LOD 3+ with forced Tier 1
+  intricate_decoration:
+    builder: Decoration
+    lod_min: 3           # Skip when lod_budget < 3
+    lod_tier: 1          # Generate at Tier 1 even if budget is higher
+```
+
+**Fields:**
+- **`lod_min`**: Minimum LOD budget required to include this composition
+- **`lod_tier`**: Force sub-builder to generate at specific quality tier
+- **`lod_budget`** (top-level): Scene-wide LOD budget passed to compositions
+
+**Use Cases:**
+- Distance-based LOD: faraway scenes use lower `lod_budget`
+- Performance scaling: reduce detail for mobile/VR
+- Progressive loading: start at LOD 0, upgrade as resources allow
 
 Use `$parent_decision` to reference parent builder's decisions in both `overrides` and `constraints`.
 
@@ -769,6 +810,46 @@ builders/
 ```
 
 Builders can reference each other via `compose`.
+
+---
+
+## Terrain Generation (G1-001)
+
+The `terrain` command generates height field meshes from noise functions:
+
+```yaml
+geometry:
+  - terrain:
+      name: ground
+      width: 100           # Width in world units (X axis)
+      depth: 100           # Depth in world units (Z axis)
+      segments_x: 64       # Grid resolution X (default: width * 4)
+      segments_z: 64       # Grid resolution Z (default: depth * 4)
+      noise_scale: 0.05    # Noise frequency (smaller = smoother)
+      noise_amplitude: 5.0 # Height variation from noise
+      base_height: 0       # Baseline height before noise
+      octaves: 4           # FBM octaves (detail layers)
+      seed: 42             # Random seed for determinism
+      center: { x: 0, z: 0 }  # Center offset (default: origin)
+      color: $terrain_material
+      flatten:             # Building pads (optional)
+        - center: { x: 10, z: 20 }
+          radius: 5
+          elevation: 2.0
+          falloff: 2.0     # Blend distance (optional)
+```
+
+**Generated mesh features:**
+- Proper UV coordinates (0-1 across terrain)
+- Smooth vertex normals (area-weighted face averaging)
+- CCW winding for Y-up normals
+- Deterministic with same seed
+
+**Flatten zones** create flat building pads:
+- `center`: World-space position of pad center
+- `radius`: Radius of flat area
+- `elevation`: Target height
+- `falloff`: Blend distance (0 = hard edge)
 
 ---
 

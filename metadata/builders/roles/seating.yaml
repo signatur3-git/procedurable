@@ -1,0 +1,38 @@
+# Role Definition: seating
+# F3-001: Builders that provide seating furniture
+
+key: builders/roles/seating
+createdAt: "2026-02-05T00:00:00.000Z"
+modifiedAt: "2026-02-22T00:00:00.000Z"
+description: Seating furniture - chairs, stools, benches
+tags:
+  - role
+  - furniture
+  - seating
+
+value:
+  name: seating
+  description: Furniture designed for sitting - chairs, stools, benches
+
+  candidates:
+    # Default for any style
+    - builder: DiningChair
+      priority: 10
+      description: Standard dining chair, versatile
+
+    # Style-specific choices
+    - builder: DiningChair
+      styles: [modern, industrial]
+      priority: 20
+      description: Modern/industrial dining chair
+
+    - builder: DiningChair
+      styles: [rustic]
+      priority: 20
+      description: Rustic dining chair variant
+
+    # H2-001: Mid-century modern — tapered round legs are the signature
+    - builder: DiningChair
+      styles: [mid_century_modern]
+      priority: 20
+      description: Mid-century modern dining chair with tapered legs and organic back

@@ -1,0 +1,21 @@
+# UVTest.yaml - Simple geometry to test UV unwrapping and texture baking
+version: "1.0"
+name: UVTest
+description: Minimal test case for UV mapping - a simple box
+
+measurements:
+  box_size:
+    value: 0.5
+    source: "Box dimensions"
+
+materials:
+  wood:
+    color: { r: 0.545, g: 0.353, b: 0.169 }
+
+geometry:
+  # Simple box - simplest case for UV testing
+  - box:
+      name: test_box
+      center: { x: 0, y: 0.25, z: 0 }
+      size: { x: 0.5, y: 0.5, z: 0.5 }
+      color: $wood

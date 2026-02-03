@@ -1,0 +1,79 @@
+# DiningRoom Template (F3-002)
+#
+# A role-based scene template demonstrating style-independent composition.
+# Set `style:` at the scene level to change all furniture at once.
+#
+# Usage:
+#   - style: modern   → Modern furniture throughout
+#   - style: rustic   → Rustic/farmhouse furniture
+#   - style: industrial → Industrial/loft furniture
+
+version: "1.0"
+name: DiningRoomTemplate
+description: "Role-based dining room - furniture resolved by role + style"
+
+# Scene-level style - cascades to all composed children
+# Change this one value to completely transform the room
+style: modern
+
+# Measurements for room layout
+measurements:
+  room_width:
+    value: 4.0
+    source: "Dining room width"
+  room_depth:
+    value: 3.5
+    source: "Dining room depth"
+  table_center_x:
+    value: 0
+    source: "Table centered in room"
+  table_center_z:
+    value: 0
+    source: "Table centered in room"
+  chair_offset:
+    value: 0.6
+    source: "Distance from table center to chair"
+  vase_height:
+    value: 0.75
+    source: "Table surface height for centerpiece"
+
+# No hardcoded builder names - only roles!
+compose:
+  # The dining table - resolved from 'table' role
+  dining_table:
+    role: table
+    offset: { x: "$table_center_x", y: 0, z: "$table_center_z" }
+    overrides:
+      table_length: 1.6
+      table_width: 0.9
+      table_height: 0.75
+
+  # Four chairs around the table - all resolved from 'seating' role
+  chair_north:
+    role: seating
+    offset: { x: "$table_center_x", y: 0, z: "$table_center_z - chair_offset" }
+    rotation: { x: 0, y: 0, z: 0 }
+
+  chair_south:
+    role: seating
+    offset: { x: "$table_center_x", y: 0, z: "$table_center_z + chair_offset" }
+    rotation: { x: 0, y: 3.14159, z: 0 }
+
+  chair_east:
+    role: seating
+    offset: { x: "$table_center_x + chair_offset", y: 0, z: "$table_center_z" }
+    rotation: { x: 0, y: "-1.5708", z: 0 }
+
+  chair_west:
+    role: seating
+    offset: { x: "$table_center_x - chair_offset", y: 0, z: "$table_center_z" }
+    rotation: { x: 0, y: 1.5708, z: 0 }
+
+  # Centerpiece on the table - resolved from 'decoration' role
+  centerpiece:
+    role: decoration
+    offset: { x: "$table_center_x", y: "$vase_height", z: "$table_center_z" }
+    scale: 0.8
+
+# Empty geometry - this is a composition-only template
+geometry: []

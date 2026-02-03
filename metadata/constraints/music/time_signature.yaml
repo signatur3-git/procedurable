@@ -1,0 +1,65 @@
+# Time Signature Constraint
+# Validates musical time signature rules
+
+key: constraints/music/time_signature
+createdAt: "2026-02-05T00:00:00.000Z"
+modifiedAt: "2026-02-05T00:00:00.000Z"
+description: |
+  Validates musical time signature constraints:
+  - Beats per bar within valid range
+  - Note durations sum correctly within a bar
+  - Beat unit is a valid power of 2
+
+  Usage Example:
+    constraints:
+      - schema: constraints/music/time_signature
+        bindings:
+          beats_per_bar: 4
+          beat_unit: 4        # 4 = quarter note, 8 = eighth note
+          bar_duration: 1.0   # Total duration of notes in the bar
+
+  Common time signatures:
+    - 4/4 (common time): beats_per_bar=4, beat_unit=4
+    - 3/4 (waltz): beats_per_bar=3, beat_unit=4
+    - 6/8 (compound duple): beats_per_bar=6, beat_unit=8
+tags:
+  - constraint
+  - music
+  - rhythm
+
+value:
+  name: time_signature
+  description: Validates musical time signature rules
+
+  variables:
+    beats_per_bar:
+      type: number
+      description: Number of beats in one bar (numerator)
+    beat_unit:
+      type: number
+      description: Note value that gets one beat (denominator) - must be power of 2
+    bar_duration:
+      type: number
+      description: Total duration of notes in the bar (as fraction of whole note)
+
+  rules:
+    - type: range
+      description: Beats per bar must be between 1 and 16
+      target: beats_per_bar
+      min: 1
+      max: 16
+
+    - type: reference
+      description: Beat unit must be a valid note value (power of 2)
+      target: beat_unit
+      allowed:
+        - 1   # whole note
+        - 2   # half note
+        - 4   # quarter note
+        - 8   # eighth note
+        - 16  # sixteenth note
+        - 32  # thirty-second note
+
+    - type: expression
+      description: Bar duration must equal beats_per_bar divided by beat_unit
+      expression: "abs(bar_duration - (beats_per_bar / beat_unit)) < 0.001"

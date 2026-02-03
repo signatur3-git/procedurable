@@ -1,0 +1,122 @@
+# EagleWing.yaml - Eagle-like wing component
+# H1-001: Rigged Creature Demo
+
+version: "1.0"
+name: EagleWing
+description: "Stylized eagle wing with articulated skeleton"
+
+measurements:
+  wing_span:
+    value: 0.6
+  wing_width:
+    value: 0.15
+  upper_arm_length:
+    value: 0.18
+  forearm_length:
+    value: 0.22
+  hand_length:
+    value: 0.20
+  primary_length:
+    value: 0.25
+  secondary_length:
+    value: 0.18
+
+derived:
+  elbow_pos: "upper_arm_length"
+  wrist_pos: "upper_arm_length + forearm_length"
+
+decisions:
+  wing_pose:
+    type: choice
+    options: [folded, extended, soaring]
+    default: extended
+
+colors:
+  wing_base: [0.35, 0.28, 0.22]
+  feather_tip: [0.25, 0.2, 0.15]
+
+skeleton:
+  - name: wing_root
+    parent: null
+    position: { x: 0, y: 0, z: 0 }
+    constraints:
+      type: ball_and_socket
+      limits:
+        pitch: [-30, 120]
+        yaw: [-60, 60]
+
+  - name: elbow
+    parent: wing_root
+    position: { x: -0.18, y: -0.02, z: 0 }
+    constraints:
+      type: hinge
+      axis: y
+      limits: { min: 0, max: 135 }
+
+  - name: wrist
+    parent: elbow
+    position: { x: -0.22, y: 0, z: 0 }
+    constraints:
+      type: hinge
+      axis: y
+      limits: { min: -30, max: 90 }
+
+  - name: wing_tip
+    parent: wrist
+    position: { x: -0.20, y: 0, z: 0 }
+    constraints:
+      type: fixed
+
+ports:
+  body_attach:
+    position: { x: 0, y: 0, z: 0 }
+    normal: { x: 1, y: 0, z: 0 }
+
+geometry:
+  - box:
+      name: upper_arm
+      center: { x: "-upper_arm_length / 2", y: 0, z: 0 }
+      size: { x: "upper_arm_length", y: 0.04, z: 0.06 }
+      color: wing_base
+
+  - box:
+      name: forearm
+      center: { x: "-elbow_pos - forearm_length / 2", y: 0, z: 0.01 }
+      size: { x: "forearm_length", y: 0.035, z: 0.05 }
+      color: wing_base
+
+  - box:
+      name: secondaries
+      center: { x: "-elbow_pos - forearm_length / 2", y: -0.01, z: "-secondary_length / 2" }
+      size: { x: "forearm_length * 0.9", y: 0.01, z: "secondary_length" }
+      color: wing_base
+
+  - box:
+      name: hand
+      center: { x: "-wrist_pos - hand_length / 2", y: 0, z: 0.02 }
+      size: { x: "hand_length", y: 0.03, z: 0.04 }
+      color: wing_base
+
+  - box:
+      name: primaries
+      center: { x: "-wrist_pos - hand_length / 2", y: -0.005, z: "-primary_length / 2" }
+      size: { x: "hand_length", y: 0.008, z: "primary_length" }
+      color: feather_tip
+
+weights:
+  - type: gradient
+    joint_a: wing_root
+    joint_b: elbow
+    axis: x
+  - type: gradient
+    joint_a: elbow
+    joint_b: wrist
+    axis: x
+  - type: gradient
+    joint_a: wrist
+    joint_b: wing_tip
+    axis: x
+
+quality:
+  target_tier: 2
+  current_tier: 2

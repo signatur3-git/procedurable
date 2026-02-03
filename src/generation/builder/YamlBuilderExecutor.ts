@@ -26,6 +26,9 @@ import {
 // Import resolution helpers
 import { resolveMaterials, resolveMaterialSlots } from './MaterialResolver';
 
+// F2-001: Style resolution
+import { loadStyle, StyleDefinition } from './StyleResolver';
+
 // Import command registry
 import { createStandardRegistry } from './commands';
 import type { GeometryCommandContext } from './GeometryCommandHandler';
@@ -48,7 +51,14 @@ export interface ExecuteOptions {
   seed?: number;
   overrides?: Record<string, any>;
   builderResolver?: (name: string) => ((seed: number, overrides?: Record<string, any>) => TracedOutput | Promise<TracedOutput>) | null;
+  constraintResolver?: (key: string) => import('../validation/ConstraintEvaluator').ConstraintSchema | null;  // F1-002
   sharedContext?: SharedContext;
+  /**
+   * LOD budget for this execution (G2-001)
+   * Sub-builders with lod_min > lodBudget are replaced with bounding box placeholders
+   * Defaults to Infinity (no LOD filtering)
+   */
+  lodBudget?: number;
 }
 
 // ============================================================================
@@ -106,6 +116,66 @@ export async function executeBuilder(
   const sceneGraph = new SceneGraph();
 
   // ==========================================================================
+  // PHASE 0.5: Load and Apply Style (F2-001, F2-002)
+  // ==========================================================================
+
+  let activeStyle: StyleDefinition | null = null;
+
+  // F2-002: Determine effective style (explicit YAML > inherited via overrides > SharedContext)
+  // Also peek at a `style` choice decision if present — allows the dashboard to expose
+  // style as a selectable option (PHASE 1.5 approach is too late because style defaults
+  // must be set before decisions run in PHASE 1).
+  let effectiveStyleName = yaml.style;
+  if (!effectiveStyleName && overrides.__style__) {
+    // Style passed from parent via composition
+    effectiveStyleName = overrides.__style__;
+  }
+  if (!effectiveStyleName && yaml.decisions?.style?.type === 'choice') {
+    // Pre-peek: if a 'style' choice decision exists, resolve its value now
+    // Priority: explicit override > decision default
+    if (overrides['style']) {
+      effectiveStyleName = String(overrides['style']);
+    } else if (yaml.decisions.style.default) {
+      effectiveStyleName = String(yaml.decisions.style.default);
+    } else if (yaml.decisions.style.options?.length > 0) {
+      effectiveStyleName = String(yaml.decisions.style.options[0]);
+    }
+  }
+  if (!effectiveStyleName && sharedContext) {
+    effectiveStyleName = sharedContext.getStyle();
+  }
+
+  if (effectiveStyleName) {
+    try {
+      activeStyle = await loadStyle(effectiveStyleName);
+      if (activeStyle && activeStyle.decision_defaults) {
+        builder.setStyleDefaults(activeStyle.decision_defaults);
+      }
+      // F2-002: Propagate style to SharedContext for children
+      if (sharedContext) {
+        sharedContext.setStyle(effectiveStyleName);
+      }
+    } catch (err) {
+      // Style loading failed, continue without style defaults
+      console.warn(`[YamlBuilderExecutor] Failed to load style '${effectiveStyleName}': ${(err as Error).message}`);
+    }
+  }
+
+  // ==========================================================================
+  // PHASE 0.75: Determine LOD Budget (G2-001)
+  // ==========================================================================
+
+  // LOD budget: explicit options > YAML definition > inherited via overrides > Infinity (no filtering)
+  let effectiveLodBudget: number = Infinity;
+  if (options?.lodBudget !== undefined) {
+    effectiveLodBudget = options.lodBudget;
+  } else if (yaml.lod_budget !== undefined) {
+    effectiveLodBudget = yaml.lod_budget;
+  } else if (overrides.__lod_budget__ !== undefined) {
+    effectiveLodBudget = overrides.__lod_budget__;
+  }
+
+  // ==========================================================================
   // PHASE 1: Process Decisions
   // ==========================================================================
 
@@ -155,6 +225,20 @@ export async function executeBuilder(
         throw ctx.wrapError(err);
       } finally {
         ctx.pop();
+      }
+    }
+  }
+
+  // After PHASE 1: if a 'style' decision was processed (randomly chosen, no override),
+  // reconcile effectiveStyleName so child composition cascades the correct style.
+  // The style defaults were already applied in PHASE 0.5 using the pre-peeked value,
+  // so this only matters for propagating to children if the random pick differed.
+  if (decisionValues.has('style')) {
+    const decidedStyle = String(decisionValues.get('style'));
+    if (decidedStyle !== effectiveStyleName) {
+      effectiveStyleName = decidedStyle;
+      if (sharedContext) {
+        sharedContext.setStyle(effectiveStyleName);
       }
     }
   }
@@ -210,11 +294,11 @@ export async function executeBuilder(
   }
 
   // ==========================================================================
-  // PHASE 2.5: Process Materials
+  // PHASE 2.5: Process Materials (F2-003: Style-driven material theming)
   // ==========================================================================
 
-  const materials = resolveMaterials(yaml.materials, decisionValues);
-  const materialSlots = resolveMaterialSlots(yaml.materials, decisionValues);
+  const materials = resolveMaterials(yaml.materials, decisionValues, activeStyle);
+  const materialSlots = resolveMaterialSlots(yaml.materials, decisionValues, activeStyle);
 
   // Register material slots on the mesh
   for (const slot of materialSlots.values()) {
@@ -255,6 +339,24 @@ export async function executeBuilder(
   }
 
   // ==========================================================================
+  // PHASE 3.5: Process Builder Tags (H3-001: Semantic tags for PSD querying)
+  // ==========================================================================
+
+  let evaluatedTags: Record<string, string> | undefined;
+  if (yaml.tags && !Array.isArray(yaml.tags)) {
+    evaluatedTags = {};
+    for (const [key, value] of Object.entries(yaml.tags)) {
+      if (typeof value === 'string' && value.startsWith('$')) {
+        const varName = value.slice(1);
+        const resolved = decisionValues.get(varName) ?? overrides[varName];
+        evaluatedTags[key] = resolved !== undefined ? String(resolved) : value;
+      } else {
+        evaluatedTags[key] = String(value);
+      }
+    }
+  }
+
+  // ==========================================================================
   // PHASE 4: Process Geometry (using command registry)
   // ==========================================================================
 
@@ -286,6 +388,21 @@ export async function executeBuilder(
           }
         }
 
+        // G2-001: Check LOD condition - skip or replace with placeholder if below minimum
+        const lodMin = composition.lod_min;
+        if (lodMin !== undefined && effectiveLodBudget < lodMin) {
+          // LOD budget is below minimum - skip this composition
+          // Track this skip using a measurement-like entry
+          builder.measurements.set(`__lod_skipped__${instanceName}`, {
+            value: 1,
+            source: `LOD budget ${effectiveLodBudget} < lod_min ${lodMin}`
+          });
+          continue;
+        }
+
+        // G2-001: Prepare LOD tier override if specified
+        const lodTierOverride = composition.lod_tier;
+
         // Handle repeat
         if (composition.repeat) {
           const repeatCount = typeof composition.repeat.count === 'number'
@@ -303,7 +420,10 @@ export async function executeBuilder(
               builder,
               decisionValues,
               options.builderResolver,
-              seed
+              seed,
+              effectiveStyleName,  // F2-002: Pass parent style
+              effectiveLodBudget,  // G2-001: Pass LOD budget
+              lodTierOverride      // G2-001: Pass LOD tier override
             );
           }
         } else {
@@ -313,7 +433,10 @@ export async function executeBuilder(
             builder,
             decisionValues,
             options.builderResolver,
-            seed
+            seed,
+            effectiveStyleName,  // F2-002: Pass parent style
+            effectiveLodBudget,  // G2-001: Pass LOD budget
+            lodTierOverride      // G2-001: Pass LOD tier override
           );
         }
       } catch (err: any) {
@@ -321,6 +444,22 @@ export async function executeBuilder(
       } finally {
         ctx.pop();
       }
+    }
+  }
+
+  // ==========================================================================
+  // PHASE 5.5: Process Connections (F4-002: Assembly Metadata)
+  // ==========================================================================
+
+  if (yaml.connections) {
+    for (const conn of yaml.connections) {
+      builder.addConnection({
+        type: conn.type,
+        from: conn.from,
+        to: conn.to,
+        data: conn.data,
+        description: conn.description
+      });
     }
   }
 
@@ -400,6 +539,169 @@ export async function executeBuilder(
       } finally {
         ctx.pop();
       }
+    }
+  }
+
+  // ==========================================================================
+  // PHASE 6.5: Process Skeleton (E1-001: Skeleton Declaration)
+  // ==========================================================================
+
+  if (yaml.skeleton && yaml.skeleton.length > 0) {
+    try {
+      ctx.push('skeleton');
+
+      const evalCtx = createContext(builder, decisionValues);
+      const joints: Array<{
+        name: string;
+        parent: string | null;
+        position: Vec3;
+        orientation: Vec3;
+        constraints?: import('./TracedBuilder').JointConstraint;
+      }> = [];
+
+      for (const jointDef of yaml.skeleton) {
+        ctx.push(`joint.${jointDef.name}`);
+        try {
+          // Evaluate position expressions
+          const posX = typeof jointDef.position.x === 'number'
+            ? jointDef.position.x
+            : exprEvalNumeric(String(jointDef.position.x), evalCtx);
+          const posY = typeof jointDef.position.y === 'number'
+            ? jointDef.position.y
+            : exprEvalNumeric(String(jointDef.position.y), evalCtx);
+          const posZ = typeof jointDef.position.z === 'number'
+            ? jointDef.position.z
+            : exprEvalNumeric(String(jointDef.position.z), evalCtx);
+
+          // Evaluate orientation (default 0,0,0) - convert degrees to radians
+          let orientX = 0, orientY = 0, orientZ = 0;
+          if (jointDef.orientation) {
+            if (jointDef.orientation.x !== undefined) {
+              const degrees = typeof jointDef.orientation.x === 'number'
+                ? jointDef.orientation.x
+                : exprEvalNumeric(String(jointDef.orientation.x), evalCtx);
+              orientX = degrees * Math.PI / 180;
+            }
+            if (jointDef.orientation.y !== undefined) {
+              const degrees = typeof jointDef.orientation.y === 'number'
+                ? jointDef.orientation.y
+                : exprEvalNumeric(String(jointDef.orientation.y), evalCtx);
+              orientY = degrees * Math.PI / 180;
+            }
+            if (jointDef.orientation.z !== undefined) {
+              const degrees = typeof jointDef.orientation.z === 'number'
+                ? jointDef.orientation.z
+                : exprEvalNumeric(String(jointDef.orientation.z), evalCtx);
+              orientZ = degrees * Math.PI / 180;
+            }
+          }
+
+          // Convert constraints
+          let constraints: import('./TracedBuilder').JointConstraint | undefined;
+          if (jointDef.constraints) {
+            constraints = {
+              type: jointDef.constraints.type,
+              axis: jointDef.constraints.axis,
+              limits: jointDef.constraints.limits
+            };
+          }
+
+          joints.push({
+            name: jointDef.name,
+            parent: jointDef.parent ?? null,
+            position: new Vec3(posX, posY, posZ),
+            orientation: new Vec3(orientX, orientY, orientZ),
+            constraints
+          });
+        } finally {
+          ctx.pop();
+        }
+      }
+
+      // Register skeleton on builder
+      builder.registerSkeleton(joints);
+
+    } catch (err: any) {
+      throw ctx.wrapError(err);
+    } finally {
+      ctx.pop();
+    }
+  }
+
+  // ==========================================================================
+  // PHASE 6.6: Process Vertex Weights (E2-001: Weight Rules)
+  // ==========================================================================
+
+  if (yaml.weights && yaml.weights.length > 0 && builder.getSkeleton()) {
+    try {
+      ctx.push('weights');
+
+      const evalCtx = createContext(builder, decisionValues);
+      const rules: Array<{
+        type: 'proximity' | 'region' | 'gradient';
+        joint?: string;
+        joint_a?: string;
+        joint_b?: string;
+        radius?: number;
+        falloff?: 'linear' | 'smooth' | 'sharp';
+        min?: Vec3;
+        max?: Vec3;
+        weight?: number;
+        axis?: 'x' | 'y' | 'z';
+      }> = [];
+
+      for (const ruleDef of yaml.weights) {
+        ctx.push(`rule.${ruleDef.type}`);
+        try {
+          if (ruleDef.type === 'proximity') {
+            const radius = typeof ruleDef.radius === 'number'
+              ? ruleDef.radius
+              : exprEvalNumeric(String(ruleDef.radius), evalCtx);
+
+            rules.push({
+              type: 'proximity',
+              joint: ruleDef.joint,
+              radius,
+              falloff: ruleDef.falloff
+            });
+          } else if (ruleDef.type === 'region') {
+            const minX = typeof ruleDef.min.x === 'number' ? ruleDef.min.x : exprEvalNumeric(String(ruleDef.min.x), evalCtx);
+            const minY = typeof ruleDef.min.y === 'number' ? ruleDef.min.y : exprEvalNumeric(String(ruleDef.min.y), evalCtx);
+            const minZ = typeof ruleDef.min.z === 'number' ? ruleDef.min.z : exprEvalNumeric(String(ruleDef.min.z), evalCtx);
+            const maxX = typeof ruleDef.max.x === 'number' ? ruleDef.max.x : exprEvalNumeric(String(ruleDef.max.x), evalCtx);
+            const maxY = typeof ruleDef.max.y === 'number' ? ruleDef.max.y : exprEvalNumeric(String(ruleDef.max.y), evalCtx);
+            const maxZ = typeof ruleDef.max.z === 'number' ? ruleDef.max.z : exprEvalNumeric(String(ruleDef.max.z), evalCtx);
+            const weight = ruleDef.weight !== undefined
+              ? (typeof ruleDef.weight === 'number' ? ruleDef.weight : exprEvalNumeric(String(ruleDef.weight), evalCtx))
+              : 1;
+
+            rules.push({
+              type: 'region',
+              joint: ruleDef.joint,
+              min: new Vec3(minX, minY, minZ),
+              max: new Vec3(maxX, maxY, maxZ),
+              weight
+            });
+          } else if (ruleDef.type === 'gradient') {
+            rules.push({
+              type: 'gradient',
+              joint_a: ruleDef.joint_a,
+              joint_b: ruleDef.joint_b,
+              axis: ruleDef.axis
+            });
+          }
+        } finally {
+          ctx.pop();
+        }
+      }
+
+      // Compute weights
+      builder.computeWeights(rules);
+
+    } catch (err: any) {
+      throw ctx.wrapError(err);
+    } finally {
+      ctx.pop();
     }
   }
 
@@ -539,11 +841,191 @@ export async function executeBuilder(
   }
 
   // ==========================================================================
+  // PHASE 7: Constraint Evaluation (F1-002)
+  // ==========================================================================
+
+  const constraintResults: Array<{
+    schema: string;
+    passed: boolean;
+    severity: 'error' | 'warning';
+    results: Array<{ type: string; passed: boolean; message: string }>;
+  }> = [];
+
+  if (yaml.constraints && yaml.constraints.length > 0 && options?.constraintResolver) {
+    ctx.push('constraints');
+    try {
+      const { ConstraintEvaluator } = await import('../validation/ConstraintEvaluator');
+
+      for (const constraintRef of yaml.constraints) {
+        ctx.push(constraintRef.schema);
+        try {
+          // Resolve the constraint schema
+          const schema = options.constraintResolver(constraintRef.schema);
+          if (!schema) {
+            builder.addValidationIssue({
+              severity: constraintRef.severity || 'error',
+              message: `Constraint schema '${constraintRef.schema}' not found`,
+              suggestion: 'Define the constraint schema using constraint.define command'
+            });
+            continue;
+          }
+
+          // Build bindings from builder context
+          const bindings: Record<string, any> = {};
+          for (const [varName, expr] of Object.entries(constraintRef.bindings)) {
+            // Try to get from measurements first
+            const measurement = builder.context.get(expr);
+            if (measurement !== undefined) {
+              bindings[varName] = measurement;
+            } else if (decisionValues.has(expr)) {
+              // Try decisions
+              bindings[varName] = decisionValues.get(expr);
+            } else {
+              // Try to evaluate as expression
+              try {
+                const evalCtx = createContext(builder, decisionValues);
+                bindings[varName] = exprEvalNumeric(String(expr), evalCtx);
+              } catch {
+                bindings[varName] = expr; // Use as-is if evaluation fails
+              }
+            }
+          }
+
+          // Evaluate the constraint
+          const result = ConstraintEvaluator.evaluate(schema, bindings);
+          const severity = constraintRef.severity || 'error';
+
+          constraintResults.push({
+            schema: constraintRef.schema,
+            passed: result.passed,
+            severity,
+            results: result.results.map(r => ({
+              type: r.rule.type,
+              passed: r.passed,
+              message: r.message
+            }))
+          });
+
+          // Add validation issues for failed constraints
+          if (!result.passed) {
+            for (const ruleResult of result.results) {
+              if (!ruleResult.passed) {
+                builder.addValidationIssue({
+                  severity,
+                  message: `Constraint '${constraintRef.schema}' failed: ${ruleResult.message}`,
+                  suggestion: constraintRef.description || `Check ${constraintRef.schema} constraint rules`
+                });
+              }
+            }
+          }
+
+          // Trace the constraint result
+          builder.trace(`constraint:${constraintRef.schema}`, {
+            passed: result.passed,
+            severity,
+            bindings,
+            results: result.results.length
+          });
+
+        } catch (err: any) {
+          builder.addValidationIssue({
+            severity: constraintRef.severity || 'error',
+            message: `Error evaluating constraint '${constraintRef.schema}': ${err.message}`
+          });
+        } finally {
+          ctx.pop();
+        }
+      }
+    } finally {
+      ctx.pop();
+    }
+  }
+
+  // ==========================================================================
   // Build Output
   // ==========================================================================
 
+  // F4-001: Evaluate cross-builder proportion rules from style
+  if (activeStyle?.proportion_rules && builder.subBuilders.size > 0) {
+    try {
+      const {
+        evaluateProportionRules,
+        collectCrossBuilderMeasurements
+      } = await import('../validation/ProportionRuleEvaluator');
+
+      const crossMeasurements = collectCrossBuilderMeasurements(builder.subBuilders);
+      const proportionResult = evaluateProportionRules(activeStyle.proportion_rules, crossMeasurements);
+
+      // Add proportion warnings/errors to validation issues
+      for (const warning of proportionResult.warnings) {
+        builder.addValidationIssue({
+          severity: 'warning',
+          message: `Proportion rule failed: ${warning.rule}`,
+          suggestion: warning.value !== undefined
+            ? `Value is ${warning.value.toFixed(3)}, expected ${warning.expected || 'truthy'}`
+            : warning.error
+        });
+      }
+
+      for (const error of proportionResult.errors) {
+        builder.addValidationIssue({
+          severity: 'error',
+          message: `Proportion rule error: ${error.rule}`,
+          suggestion: error.value !== undefined
+            ? `Value is ${error.value.toFixed(3)}, expected ${error.expected || 'truthy'}`
+            : error.error
+        });
+      }
+    } catch (err) {
+      // Don't fail build on proportion evaluation errors
+      builder.addValidationIssue({
+        severity: 'warning',
+        message: `Failed to evaluate proportion rules: ${(err as Error).message}`
+      });
+    }
+  }
+
   const output = builder.build();
+
+  // ==========================================================================
+  // POST-BUILD: UV Atlas Repack for Composed Scenes (G3-004)
+  // ==========================================================================
+  // When sub-builders are composed, their UV islands overlap (each uses [0,1]
+  // independently). Detect overlap and repack into a clean atlas.
+  const atlasUvsSetting = yaml.atlas_uvs ?? 'auto';
+  if (atlasUvsSetting !== false && output.subBuilders.size > 0) {
+    const hasExistingUVs = output.mesh.vertices.some(
+      (v: { attributes: { uv?: unknown } }) => v.attributes.uv !== undefined
+    );
+
+    if (hasExistingUVs) {
+      let shouldRepack = atlasUvsSetting === true;
+
+      if (atlasUvsSetting === 'auto') {
+        const { detectUVOverlap } = await import('../../platform/geometry/UVUnwrapper');
+        const overlap = detectUVOverlap(output.mesh);
+        shouldRepack = overlap.hasOverlap;
+      }
+
+      if (shouldRepack) {
+        const { unwrapMesh } = await import('../../platform/geometry/UVUnwrapper');
+        const result = unwrapMesh(output.mesh, {
+          margin: 0.02,
+          normalize: true,
+          preserveExistingUVs: true
+        });
+        output.mesh = result.mesh;
+        output.validation.vertexCount = result.mesh.vertices.length;
+        output.validation.faceCount = result.mesh.faces.length;
+      }
+    }
+  }
+
   output.sceneGraph = sceneGraph;
+  output.constraintResults = constraintResults;
+  if (evaluatedTags) {
+    output.tags = evaluatedTags;
+  }
 
   // A2-003: Run quality gates automatically when quality: section is present
   if (yaml.quality) {
@@ -681,11 +1163,30 @@ async function processComposition(
   builder: TracedBuilder,
   decisionValues: Map<string, any>,
   builderResolver: (name: string) => ((seed: number, overrides?: Record<string, any>) => TracedOutput | Promise<TracedOutput>) | null,
-  seed?: number
+  seed?: number,
+  parentStyle?: string,  // F2-002: Parent's style for inheritance
+  lodBudget?: number,    // G2-001: LOD budget for children
+  lodTierOverride?: number  // G2-001: Override child's target tier
 ): Promise<void> {
-  const childBuilderFn = builderResolver(composition.builder);
+  // F3-001: Resolve builder name from role if specified
+  let builderName = composition.builder;
+  if (!builderName && composition.role) {
+    const { resolveRole } = await import('./BuilderRoleRegistry');
+    const effectiveStyle = composition.style || parentStyle;
+    const resolution = await resolveRole(composition.role, effectiveStyle);
+    if (!resolution) {
+      throw new Error(`No builder found for role '${composition.role}'${effectiveStyle ? ` with style '${effectiveStyle}'` : ''}`);
+    }
+    builderName = resolution.builder;
+  }
+
+  if (!builderName) {
+    throw new Error(`Composition '${instanceName}' must specify either 'builder' or 'role'`);
+  }
+
+  const childBuilderFn = builderResolver(builderName);
   if (!childBuilderFn) {
-    throw new Error(`Builder '${composition.builder}' not found`);
+    throw new Error(`Builder '${builderName}' not found`);
   }
 
   // Prepare overrides - evaluate string expressions in parent context
@@ -716,6 +1217,22 @@ async function processComposition(
         childOverrides[key] = value;
       }
     }
+  }
+
+  // F2-002: Pass style to child (composition override > parent style)
+  const childStyle = composition.style || parentStyle;
+  if (childStyle) {
+    childOverrides.__style__ = childStyle;
+  }
+
+  // G2-001: Pass LOD budget to child
+  if (lodBudget !== undefined && lodBudget !== Infinity) {
+    childOverrides.__lod_budget__ = lodBudget;
+  }
+
+  // G2-001: Pass LOD tier override to child (affects target_tier in child builder)
+  if (lodTierOverride !== undefined) {
+    childOverrides.__lod_tier__ = lodTierOverride;
   }
 
   // Add constraints
@@ -768,6 +1285,37 @@ async function processComposition(
     overrides: childOverrides,
     asInstance: composition.asInstance
   });
+
+  // E1-002: Handle skeleton from composed builder
+  const childOutput = builder.subBuilders.get(instanceName);
+  if (childOutput?.skeleton) {
+    if (composition.skeleton_attach) {
+      // Merge child skeleton into parent skeleton at specified joint
+      builder.mergeSkeleton(
+        instanceName,
+        childOutput.skeleton,
+        composition.skeleton_attach,
+        {
+          offset,
+          rotation,
+          scale: composition.scale
+        }
+      );
+    } else if (!builder.getSkeleton()) {
+      // H1-001: If parent has no skeleton and no attach point specified,
+      // adopt the child's skeleton as the parent's skeleton (for root components like body)
+      builder.adoptSkeleton(instanceName, childOutput.skeleton, {
+        offset,
+        rotation,
+        scale: composition.scale
+      });
+    }
+  }
+
+  // Also mark if composed builders brought weights (used for determining if weight computation is needed)
+  if (childOutput?.vertexWeights) {
+    builder.hasComposedWeights = true;
+  }
 
   // B5-003: Process blend zone if specified
   if (composition.blend_zone) {

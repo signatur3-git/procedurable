@@ -1,0 +1,9 @@
+# Role Definition: decoration
+key: builders/roles/decoration
+value:
+  name: decoration
+  description: Decorative items - vases, sculptures, plants
+  candidates:
+    - builder: Vase
+      priority: 10
+      description: Decorative vase

@@ -73,6 +73,15 @@ measurements:
 derived: {}
 
 # =============================================================================
+# MATERIALS
+# =============================================================================
+materials:
+  wood:
+    role: primary_wood               # F2-003: resolved from style palette when style is active
+    color: { r: 0.55, g: 0.35, b: 0.20 }   # fallback: medium oak
+    fallback_color: { r: 0.55, g: 0.35, b: 0.20 }
+
+# =============================================================================
 # GEOMETRY
 # =============================================================================
 geometry:
@@ -96,13 +105,19 @@ geometry:
   - loft: shaft
     from: bottom
     to: top
+    color: $wood
 
   # Cap the ends
+  # Circles wind CW from above, so:
+  #   top cap needs flip: true  → CCW from above → normal points up (+Y)
+  #   bottom cap needs flip: false → CW from above → normal points down (-Y)
   - cap: top_cap
     loop: top
-    flip: false
+    flip: true
+    color: $wood
 
   - cap: bottom_cap
     loop: bottom
-    flip: true
+    flip: false
+    color: $wood
 

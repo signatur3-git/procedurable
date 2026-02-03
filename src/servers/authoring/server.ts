@@ -29,6 +29,9 @@ import { geometryNamespace } from './commands/geometry';
 import { textNamespace } from './commands/text';
 import { psdNamespace } from './commands/psd';
 import { metadataNamespace } from './commands/metadata';
+import { constraintNamespace } from './commands/constraint';
+import { styleNamespace } from './commands/style';
+import { textureNamespace } from './commands/texture';
 import { parseAndExecuteBuilder, parseYamlWithLibrary } from '../../generation/builder/YamlBuilderParser';
 import { TracedOutput } from '../../generation/builder/TracedBuilder';
 import { proceduralFontRegistry } from '../../generation/text/ProceduralFont';
@@ -55,6 +58,9 @@ registry.registerNamespace(geometryNamespace);
 registry.registerNamespace(textNamespace);
 registry.registerNamespace(psdNamespace);
 registry.registerNamespace(metadataNamespace);
+registry.registerNamespace(constraintNamespace);
+registry.registerNamespace(styleNamespace);
+registry.registerNamespace(textureNamespace);
 
 // Global state
 let activeBuilder: string | null = null;
@@ -393,6 +399,18 @@ const app = express();
 // Increase body size limit to 50MB to handle large mesh data and builder outputs
 app.use(express.json({ limit: '50mb' }));
 app.use(express.text({ type: 'application/x-yaml', limit: '50mb' }));
+
+// Serve static files from output directory (for baked textures)
+// Disable caching to ensure fresh textures are always loaded
+app.use('/output', express.static('output', {
+  etag: false,
+  lastModified: false,
+  setHeaders: (res) => {
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+  }
+}));
 
 // CORS for local development
 app.use((_req, res, next) => {

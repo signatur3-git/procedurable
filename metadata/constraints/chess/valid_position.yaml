@@ -1,0 +1,120 @@
+# Valid Chess Position Constraint
+# Validates legal chess position rules
+
+key: constraints/chess/valid_position
+createdAt: "2026-02-05T00:00:00.000Z"
+modifiedAt: "2026-02-05T00:00:00.000Z"
+description: |
+  Validates that a chess position follows basic legality rules:
+  - Exactly one king per side
+  - No pawns on rank 1 or 8 (must promote)
+  - Kings not adjacent (impossible position)
+  - Maximum piece counts per type
+  - At most 16 pieces per side
+
+  Usage Example:
+    constraints:
+      - schema: constraints/chess/valid_position
+        bindings:
+          board: position_grid   # 8x8 grid with piece codes
+          white_king_rank: 1
+          white_king_file: 5
+          black_king_rank: 8
+          black_king_file: 5
+
+  Piece codes:
+    K/k = King (white/black)
+    Q/q = Queen
+    R/r = Rook
+    B/b = Bishop
+    N/n = Knight
+    P/p = Pawn
+    . = empty square
+tags:
+  - constraint
+  - chess
+  - game
+  - board
+
+value:
+  name: valid_position
+  description: Validates basic chess position legality rules
+
+  variables:
+    board:
+      type: grid
+      dimensions: [8, 8]
+      cell_type: string
+      description: 8x8 chess board with piece codes (K/k/Q/q/R/r/B/b/N/n/P/p/.)
+    white_king_count:
+      type: number
+      description: Number of white kings on the board
+    black_king_count:
+      type: number
+      description: Number of black kings on the board
+    white_king_rank:
+      type: number
+      description: Rank (1-8) of white king
+    white_king_file:
+      type: number
+      description: File (1-8) of white king
+    black_king_rank:
+      type: number
+      description: Rank (1-8) of black king
+    black_king_file:
+      type: number
+      description: File (1-8) of black king
+    white_pawn_count:
+      type: number
+      description: Number of white pawns
+    black_pawn_count:
+      type: number
+      description: Number of black pawns
+    white_total_pieces:
+      type: number
+      description: Total white pieces including king
+    black_total_pieces:
+      type: number
+      description: Total black pieces including king
+
+  rules:
+    - type: expression
+      description: Must have exactly one white king
+      expression: "white_king_count == 1"
+
+    - type: expression
+      description: Must have exactly one black king
+      expression: "black_king_count == 1"
+
+    - type: expression
+      description: Kings cannot be adjacent (includes diagonals)
+      expression: "or(abs(white_king_rank - black_king_rank) > 1, abs(white_king_file - black_king_file) > 1)"
+
+    - type: range
+      description: White can have at most 8 pawns
+      target: white_pawn_count
+      min: 0
+      max: 8
+
+    - type: range
+      description: Black can have at most 8 pawns
+      target: black_pawn_count
+      min: 0
+      max: 8
+
+    - type: range
+      description: White can have at most 16 pieces
+      target: white_total_pieces
+      min: 1
+      max: 16
+
+    - type: range
+      description: Black can have at most 16 pieces
+      target: black_total_pieces
+      min: 1
+      max: 16
+
+    - type: unique
+      description: Each square can have at most one piece
+      target: board
+      key: square

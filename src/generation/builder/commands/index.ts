@@ -20,7 +20,7 @@ import { LoopCommandHandler } from './LoopCommand';
 import { SweepCommandHandler } from './SweepCommand';
 import { SubdivideCommandHandler } from './SubdivideCommand';
 import { RadialArrayCommandHandler } from './RadialArrayCommand';
-import { WhenCommandHandler, IfCommandHandler, RepeatCommandHandler } from './ControlFlowCommands';
+import { WhenCommandHandler, IfCommandHandler, RepeatCommandHandler, ForCommandHandler, GridCommandHandler } from './ControlFlowCommands';
 import { Extrude2DCommandHandler } from './Extrude2DCommand';
 import { DisplaceCommandHandler } from './DisplaceCommand';
 import { BendCommandHandler } from './BendCommand';
@@ -28,6 +28,8 @@ import { TwistCommandHandler } from './TwistCommand';
 import { TaperCommandHandler } from './TaperCommand';
 import { MirrorCommandHandler } from './MirrorCommand';
 import { MeshRadialArrayCommandHandler } from './MeshRadialArrayCommand';
+import { TerrainCommandHandler } from './TerrainCommand';
+import { BillboardCommandHandler } from './BillboardCommand';
 
 // Export individual handlers for direct use
 export { BoxCommandHandler } from './BoxCommand';
@@ -42,13 +44,15 @@ export { LoopCommandHandler } from './LoopCommand';
 export { SweepCommandHandler } from './SweepCommand';
 export { SubdivideCommandHandler } from './SubdivideCommand';
 export { RadialArrayCommandHandler } from './RadialArrayCommand';
-export { WhenCommandHandler, IfCommandHandler, RepeatCommandHandler } from './ControlFlowCommands';
+export { WhenCommandHandler, IfCommandHandler, RepeatCommandHandler, ForCommandHandler, GridCommandHandler } from './ControlFlowCommands';
 export { DisplaceCommandHandler } from './DisplaceCommand';
 export { BendCommandHandler } from './BendCommand';
 export { TwistCommandHandler } from './TwistCommand';
 export { TaperCommandHandler } from './TaperCommand';
 export { MirrorCommandHandler } from './MirrorCommand';
 export { MeshRadialArrayCommandHandler } from './MeshRadialArrayCommand';
+export { TerrainCommandHandler } from './TerrainCommand';
+export { BillboardCommandHandler } from './BillboardCommand';
 
 /**
  * Create a new registry with all standard geometry command handlers registered.
@@ -76,6 +80,8 @@ export function createStandardRegistry(): GeometryCommandRegistry {
   registry.register(new WhenCommandHandler());
   registry.register(new IfCommandHandler());
   registry.register(new RepeatCommandHandler());
+  registry.register(new ForCommandHandler());
+  registry.register(new GridCommandHandler());
 
   // Complex geometry
   registry.register(new Extrude2DCommandHandler());
@@ -89,6 +95,12 @@ export function createStandardRegistry(): GeometryCommandRegistry {
   // Symmetry
   registry.register(new MirrorCommandHandler());
   registry.register(new MeshRadialArrayCommandHandler());
+
+  // World/Terrain (G1-001)
+  registry.register(new TerrainCommandHandler());
+
+  // Billboard (G7-001)
+  registry.register(new BillboardCommandHandler());
 
   return registry;
 }
@@ -125,4 +137,8 @@ export const STANDARD_COMMAND_KEYS = [
   // Symmetry
   'mirror',
   'mesh_radial_array',
+  // World/Terrain (G1-001)
+  'terrain',
+  // Billboard (G7-001)
+  'billboard',
 ] as const;

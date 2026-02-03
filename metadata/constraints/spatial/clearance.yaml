@@ -1,0 +1,64 @@
+# Clearance Constraint
+# Validates minimum distance between objects
+
+key: constraints/spatial/clearance
+createdAt: "2026-02-05T00:00:00.000Z"
+modifiedAt: "2026-02-05T00:00:00.000Z"
+description: |
+  Validates that objects maintain minimum clearance distances from each other.
+  Useful for walkway clearances, safety zones, accessibility requirements.
+
+  Usage Example:
+    constraints:
+      - schema: constraints/spatial/clearance
+        bindings:
+          object1_center: table_center
+          object2_center: chair_center
+          min_clearance: 0.6  # 60cm walkway clearance
+
+  For furniture layouts:
+    - Dining chairs: 60cm clearance for pushing back
+    - Walkways: 90cm minimum for one person
+    - Accessible routes: 120cm minimum
+tags:
+  - constraint
+  - spatial
+  - clearance
+  - accessibility
+
+value:
+  name: clearance
+  description: Validates minimum clearance distance between objects
+
+  variables:
+    object1_x:
+      type: number
+      description: X position of first object center
+    object1_y:
+      type: number
+      description: Y position of first object center (can be 0 for 2D layouts)
+    object1_z:
+      type: number
+      description: Z position of first object center
+    object2_x:
+      type: number
+      description: X position of second object center
+    object2_y:
+      type: number
+      description: Y position of second object center (can be 0 for 2D layouts)
+    object2_z:
+      type: number
+      description: Z position of second object center
+    min_clearance:
+      type: number
+      description: Minimum required distance between object centers
+
+  rules:
+    - type: range
+      description: Minimum clearance must be positive
+      target: min_clearance
+      min: 0
+
+    - type: expression
+      description: Objects must maintain minimum clearance distance
+      expression: "sqrt((object1_x - object2_x)^2 + (object1_y - object2_y)^2 + (object1_z - object2_z)^2) >= min_clearance"

@@ -1,0 +1,129 @@
+# HybridCreature.yaml - Composed rigged creature
+# H1-001: Rigged Creature Demo
+#
+# A hybrid creature combining:
+# - HorseBody (torso with spine)
+# - EagleWing x2 (left and right)
+# - ScorpionTail
+#
+# Demonstrates skeleton composition and rigged glTF export.
+
+version: "1.0"
+name: HybridCreature
+description: "Hybrid creature with horse body, eagle wings, and scorpion tail - fully rigged"
+
+measurements:
+  # Overall scale
+  creature_scale:
+    value: 1.0
+
+  # Wing positioning
+  wing_spread_angle:
+    value: 30
+  wing_height_offset:
+    value: 0.05
+
+  # Tail positioning
+  tail_angle:
+    value: -15
+
+derived:
+  scaled_body: "creature_scale"
+
+decisions:
+  body_build:
+    type: choice
+    options: [athletic, stocky, lean]
+    default: athletic
+    description: "Body mass distribution"
+
+  wing_style:
+    type: choice
+    options: [folded, extended, soaring]
+    default: extended
+    description: "Wing pose"
+
+  tail_pose:
+    type: choice
+    options: [relaxed, raised, striking]
+    default: raised
+    description: "Tail position"
+
+  color_scheme:
+    type: choice
+    options: [natural, dark, pale]
+    default: natural
+    description: "Overall coloration"
+
+colors:
+  # Base colors adjusted by color_scheme decision
+  body_primary: [0.6, 0.5, 0.4]
+  wing_dark: [0.35, 0.28, 0.22]
+  tail_chitin: [0.3, 0.25, 0.2]
+
+compose:
+  # Main body (provides skeleton root and attachment points)
+  body:
+    builder: HorseBody
+    overrides:
+      body_style: "$body_build"
+    # Body is at origin, provides the base skeleton
+
+  # Left wing
+  wing_L:
+    builder: EagleWing
+    overrides:
+      wing_pose: "$wing_style"
+    attach_to: body.wing_attach_L
+    my_port: body_attach
+    skeleton_attach: shoulder_L
+
+  # Right wing (mirrored via Y-axis rotation)
+  wing_R:
+    builder: EagleWing
+    overrides:
+      wing_pose: "$wing_style"
+    attach_to: body.wing_attach_R
+    my_port: body_attach
+    rotation: { x: 0, y: 3.14159, z: 0 }  # 180° around Y axis to mirror
+    skeleton_attach: shoulder_R
+
+  # Scorpion tail
+  tail:
+    builder: ScorpionTail
+    overrides:
+      tail_pose: "$tail_pose"
+    attach_to: body.tail_attach
+    my_port: body_attach
+    skeleton_attach: tail_base
+
+# Weight rules for the composed creature
+# These supplement the component weights
+weights:
+  # Blend zone between body and wings
+  - type: proximity
+    joint: body.shoulder_L
+    radius: 0.15
+    falloff: smooth
+
+  - type: proximity
+    joint: body.shoulder_R
+    radius: 0.15
+    falloff: smooth
+
+  # Blend zone between body and tail
+  - type: proximity
+    joint: body.tail_base
+    radius: 0.12
+    falloff: smooth
+
+quality:
+  target_tier: 2
+  current_tier: 2
+  gates:
+    - name: has_skeleton
+      check: skeleton_joint_count >= 15
+    - name: has_weights
+      check: weighted_vertex_ratio >= 0.8
+    - name: exportable
+      check: can_export_rigged_gltf

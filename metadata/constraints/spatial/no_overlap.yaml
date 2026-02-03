@@ -1,0 +1,41 @@
+# No Overlap Constraint
+# Validates that placed objects don't intersect
+
+key: constraints/spatial/no_overlap
+createdAt: "2026-02-05T00:00:00.000Z"
+modifiedAt: "2026-02-05T00:00:00.000Z"
+description: |
+  Validates that a set of axis-aligned bounding boxes (AABBs) don't overlap.
+  Useful for furniture placement, item layouts, etc.
+
+  Usage Example:
+    constraints:
+      - schema: constraints/spatial/no_overlap
+        bindings:
+          objects: placed_furniture
+
+  Note: objects should be a set of position/size pairs:
+  [
+    { x: 0, y: 0, z: 0, width: 1, height: 1, depth: 1 },
+    { x: 2, y: 0, z: 0, width: 1, height: 1, depth: 1 }
+  ]
+tags:
+  - constraint
+  - spatial
+  - placement
+
+value:
+  name: no_overlap
+  description: Validates that placed objects don't overlap (AABB non-intersection)
+
+  variables:
+    objects:
+      type: set
+      element_type: position
+      description: Set of objects with position and size (x, y, z, width, height, depth)
+
+  rules:
+    - type: unique
+      description: No two objects may occupy overlapping space
+      target: objects
+      key: bounds

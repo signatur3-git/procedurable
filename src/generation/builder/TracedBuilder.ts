@@ -112,7 +112,7 @@ export class SeededRandom {
 export interface TracedDecision {
   name: string;
   value: any;
-  source: 'random' | 'override' | 'default';
+  source: 'random' | 'override' | 'default' | 'style';  // F2-001: Added 'style' source
   options?: any[];        // Available choices
   weights?: number[];     // Weights if applicable
   randomCall?: number;    // Which RNG call produced this
@@ -155,7 +155,7 @@ export interface SourceLocation {
  * Trace entry - links output to source
  */
 export interface TraceEntry {
-  type: 'measurement' | 'vertex' | 'loop' | 'face' | 'loft' | 'modifier' | 'port';
+  type: 'measurement' | 'vertex' | 'loop' | 'face' | 'loft' | 'modifier' | 'port' | 'weights' | 'morph_targets' | 'joint' | 'skeleton';
   name: string;
   source: SourceLocation;
   details: Record<string, any>;
@@ -203,6 +203,123 @@ export interface TracedPort {
   metadata?: Record<string, any>;
 }
 
+// ============================================================================
+// SKELETON (E1-001: Skeleton Declaration)
+// ============================================================================
+
+/**
+ * Joint constraint types
+ */
+export type JointConstraintType = 'hinge' | 'ball_and_socket' | 'fixed';
+
+/**
+ * Joint constraint definition
+ */
+export interface JointConstraint {
+  type: JointConstraintType;
+  axis?: 'x' | 'y' | 'z';
+  limits?: {
+    min?: number;
+    max?: number;
+    pitch?: [number, number];
+    yaw?: [number, number];
+    roll?: [number, number];
+  };
+}
+
+/**
+ * Traced joint - a joint in a skeleton hierarchy
+ */
+export interface TracedJoint {
+  /** Joint name (unique within skeleton) */
+  name: string;
+  /** Parent joint name (null for root joints) */
+  parent: string | null;
+  /** Position in local space (relative to parent) */
+  position: Vec3;
+  /** Orientation as euler angles in radians */
+  orientation: Vec3;
+  /** Rest-pose world transform (computed from hierarchy) */
+  worldPosition: Vec3;
+  /** Rest-pose world orientation (computed from hierarchy) */
+  worldOrientation: Vec3;
+  /** Optional constraints for animation */
+  constraints?: JointConstraint;
+}
+
+/**
+ * Traced skeleton - complete joint hierarchy for a builder
+ */
+export interface TracedSkeleton {
+  /** All joints in the skeleton */
+  joints: TracedJoint[];
+  /** Quick lookup by joint name */
+  jointMap: Map<string, TracedJoint>;
+  /** Root joint names (joints with no parent) */
+  roots: string[];
+}
+
+// ============================================================================
+// VERTEX WEIGHTS (E2-001: Weight Rules and Assignment)
+// ============================================================================
+
+/**
+ * Single joint influence on a vertex
+ */
+export interface VertexWeight {
+  /** Index of joint in skeleton.joints array */
+  jointIndex: number;
+  /** Weight value (0-1) */
+  weight: number;
+}
+
+/**
+ * Vertex weights for an entire mesh
+ * Sparse representation: only stores vertices with weights
+ * Each vertex can have up to MAX_INFLUENCES joints (typically 4)
+ */
+export interface VertexWeights {
+  /** Weights per vertex index (sparse - missing indices have no weights) */
+  weights: Map<number, VertexWeight[]>;
+  /** Maximum number of influences per vertex (standard: 4) */
+  maxInfluences: number;
+  /** Statistics */
+  stats: {
+    totalVertices: number;
+    weightedVertices: number;
+    unweightedVertices: number;
+    maxInfluencesUsed: number;
+  };
+}
+
+// ============================================================================
+// MORPH TARGETS (E3-001: Morph Target System)
+// ============================================================================
+
+/**
+ * Traced morph target - named vertex offset set
+ */
+export interface TracedMorphTarget {
+  /** Unique name for this target */
+  name: string;
+  /** Sparse array of vertex offsets */
+  offsets: Array<{ vertexIndex: number; offset: Vec3 }>;
+  /** Default weight (0-1, default 0) */
+  defaultWeight: number;
+  /** Optional description */
+  description?: string;
+}
+
+/**
+ * Complete morph target set for a builder
+ */
+export interface TracedMorphTargetSet {
+  /** Base vertex count (for validation) */
+  baseVertexCount: number;
+  /** Named morph targets */
+  targets: TracedMorphTarget[];
+}
+
 /**
  * Complete traced output
  */
@@ -215,6 +332,23 @@ export interface TracedOutput {
   decisions: Map<string, TracedDecision>;  // All "virtual artist" choices
   loops: Map<string, { indices: number[]; purpose: LoopPurpose }>;
   ports: Map<string, TracedPort>;  // Named attachment points (B5-001)
+  skeleton?: TracedSkeleton;        // Joint hierarchy for rigging (E1-001)
+  vertexWeights?: VertexWeights;    // Vertex weights for skinning (E2-001)
+  morphTargets?: TracedMorphTargetSet;  // Morph targets / blend shapes (E3-001)
+  constraintResults?: Array<{       // Constraint evaluation results (F1-002)
+    schema: string;
+    passed: boolean;
+    severity: 'error' | 'warning';
+    results: Array<{ type: string; passed: boolean; message: string }>;
+  }>;
+  connections?: Array<{             // F4-002: Assembly connections
+    type: string;
+    from: string;
+    to: string;
+    data?: Record<string, any>;
+    description?: string;
+  }>;
+  tags?: Record<string, string>;            // Evaluated semantic tags (from YAML tags: section)
   subBuilders: Map<string, TracedOutput>;  // Composed sub-builders
   instances?: Array<{  // NEW: Instance data for efficient rendering
     id: string;
@@ -332,9 +466,20 @@ export class TracedBuilder {
   public decisions: Map<string, TracedDecision>;  // Public for YAML parser access
   private decisionOverrides: Map<string, any>;
   private constraints: Map<string, any>;  // Constraints from parent builder (P2-M2d-002)
+  private styleDefaults: Map<string, any>;  // Style decision defaults (F2-001)
   private vertices: Map<string, number>;  // name → index
   public loops: Map<string, { indices: number[]; purpose: LoopPurpose }>;  // Public for B5-003
   private ports: Map<string, TracedPort>;  // Named attachment points (B5-001)
+  private skeleton: TracedSkeleton | null;  // Joint hierarchy (E1-001)
+  private vertexWeights: VertexWeights | null;  // Vertex weights for skinning (E2-001)
+  private morphTargets: TracedMorphTargetSet | null;  // Morph targets (E3-001)
+  private connections: Array<{  // F4-002: Assembly connections
+    type: string;
+    from: string;
+    to: string;
+    data?: Record<string, any>;
+    description?: string;
+  }>;
   public subBuilders: Map<string, TracedOutput>;  // Composed sub-builders (public for B5-003 blend zones)
   private instances: Array<{  // Instance data for non-merged compositions (P2-M2c-003)
     id: string;
@@ -348,6 +493,7 @@ export class TracedBuilder {
     seed?: number;
   }>;
   private startTime: number;
+  private externalIssues: ValidationIssue[] = [];  // F1-002: Issues added during build
 
   constructor(name: string, seed?: number, overrides?: Record<string, any>) {
     this.name = name;
@@ -360,12 +506,18 @@ export class TracedBuilder {
     this.decisions = new Map();
     this.decisionOverrides = new Map(Object.entries(overrides ?? {}));
     this.constraints = new Map();
+    this.styleDefaults = new Map();  // F2-001: Style defaults
     this.vertices = new Map();
     this.loops = new Map();
     this.ports = new Map();  // B5-001: Attachment points
+    this.skeleton = null;    // E1-001: Skeleton (null until populated)
+    this.vertexWeights = null;  // E2-001: Vertex weights (null until computed)
+    this.morphTargets = null;   // E3-001: Morph targets (null until registered)
+    this.connections = [];      // F4-002: Assembly connections
     this.subBuilders = new Map();
     this.instances = [];
     this.startTime = Date.now();
+    this.externalIssues = [];  // F1-002
 
     // Extract constraints from overrides (P2-M2d-002)
     if (overrides && overrides.__constraints__) {
@@ -376,16 +528,65 @@ export class TracedBuilder {
     }
   }
 
+  /**
+   * Set style decision defaults (F2-001)
+   * These are used when a decision is not explicitly overridden
+   */
+  setStyleDefaults(defaults: Record<string, any>): void {
+    this.styleDefaults = new Map(Object.entries(defaults));
+  }
+
+  /**
+   * Get style defaults (F2-001)
+   */
+  getStyleDefaults(): Map<string, any> {
+    return this.styleDefaults;
+  }
+
+  /**
+   * Add a validation issue during build (F1-002)
+   */
+  addValidationIssue(issue: ValidationIssue): void {
+    this.externalIssues.push(issue);
+  }
+
+  /**
+   * Add an assembly connection (F4-002)
+   * Connections define non-spatial relationships between parts.
+   */
+  addConnection(connection: {
+    type: string;
+    from: string;
+    to: string;
+    data?: Record<string, any>;
+    description?: string;
+  }): void {
+    this.connections.push(connection);
+  }
+
+  /**
+   * Get all connections (F4-002)
+   */
+  getConnections(): Array<{
+    type: string;
+    from: string;
+    to: string;
+    data?: Record<string, any>;
+    description?: string;
+  }> {
+    return [...this.connections];
+  }
+
   // ==========================================================================
   // DECISION MAKING (Virtual Artist Choices)
   // ==========================================================================
 
   /**
    * Make a decision by choosing from options (traced)
-   * If overridden, uses override value instead of random
+   * Resolution order: override > style default > random
    */
   decide<T>(name: string, options: T[], weights?: number[]): T {
-    // Check for override
+    // Check for explicit override
     if (this.decisionOverrides.has(name)) {
       const override = this.decisionOverrides.get(name);
       const decision: TracedDecision = {
@@ -403,6 +604,30 @@ export class TracedBuilder {
         details: decision
       });
       return override;
+    }
+
+    // F2-001: Check for style default
+    if (this.styleDefaults.has(name)) {
+      const styleDefault = this.styleDefaults.get(name);
+      // Verify the style default is a valid option
+      if (options.includes(styleDefault)) {
+        const decision: TracedDecision = {
+          name,
+          value: styleDefault,
+          source: 'style',
+          options: options as any[],
+          weights
+        };
+        this.decisions.set(name, decision);
+        this.traces.set(`decision:${name}`, {
+          type: 'modifier',
+          name,
+          source: { builderName: this.name },
+          details: decision
+        });
+        return styleDefault;
+      }
+      // Style default not in options, fall through to random
     }
 
     // Make random choice
@@ -437,9 +662,10 @@ export class TracedBuilder {
 
   /**
    * Make a numeric decision within a range (traced)
+   * Resolution order: override > style default > builder default > random
    */
   decideNumber(name: string, min: number, max: number, defaultValue?: number): number {
-    // Check for override
+    // Check for explicit override
     if (this.decisionOverrides.has(name)) {
       const override = this.decisionOverrides.get(name);
       const decision: TracedDecision = {
@@ -458,7 +684,28 @@ export class TracedBuilder {
       return override;
     }
 
-    // If default provided and no override, use default
+    // F2-001: Check for style default
+    if (this.styleDefaults.has(name)) {
+      const styleDefault = this.styleDefaults.get(name);
+      if (typeof styleDefault === 'number' && styleDefault >= min && styleDefault <= max) {
+        const decision: TracedDecision = {
+          name,
+          value: styleDefault,
+          source: 'style',
+          expression: `[${min}, ${max}]`
+        };
+        this.decisions.set(name, decision);
+        this.traces.set(`decision:${name}`, {
+          type: 'modifier',
+          name,
+          source: { builderName: this.name },
+          details: decision
+        });
+        return styleDefault;
+      }
+    }
+
+    // If builder default provided and no override/style, use default
     if (defaultValue !== undefined) {
       const decision: TracedDecision = {
         name,
@@ -521,6 +768,27 @@ export class TracedBuilder {
       return override;
     }
 
+    // F2-001: Check for style default
+    if (this.styleDefaults.has(name)) {
+      const styleDefault = this.styleDefaults.get(name);
+      if (typeof styleDefault === 'boolean') {
+        const decision: TracedDecision = {
+          name,
+          value: styleDefault,
+          source: 'style',
+          expression: `chance(${probability})`
+        };
+        this.decisions.set(name, decision);
+        this.traces.set(`decision:${name}`, {
+          type: 'modifier',
+          name,
+          source: { builderName: this.name },
+          details: decision
+        });
+        return styleDefault;
+      }
+    }
+
     const callNumber = this.rng.getCallCount() + 1;
     const value = this.rng.chance(probability);
 
@@ -544,9 +812,10 @@ export class TracedBuilder {
 
   /**
    * Make a count decision (integer in range)
+   * Resolution order: override > style default > random
    */
   decideCount(name: string, min: number, max: number): number {
-    // Check for override
+    // Check for explicit override
     if (this.decisionOverrides.has(name)) {
       const override = this.decisionOverrides.get(name);
       const decision: TracedDecision = {
@@ -563,6 +832,30 @@ export class TracedBuilder {
         details: decision
       });
       return override;
+    }
+
+    // F2-001: Check for style default
+    if (this.styleDefaults.has(name)) {
+      const styleDefault = this.styleDefaults.get(name);
+      if (typeof styleDefault === 'number' &&
+          Number.isInteger(styleDefault) &&
+          styleDefault >= min &&
+          styleDefault <= max) {
+        const decision: TracedDecision = {
+          name,
+          value: styleDefault,
+          source: 'style',
+          expression: `int[${min}, ${max}]`
+        };
+        this.decisions.set(name, decision);
+        this.traces.set(`decision:${name}`, {
+          type: 'modifier',
+          name,
+          source: { builderName: this.name },
+          details: decision
+        });
+        return styleDefault;
+      }
     }
 
     const callNumber = this.rng.getCallCount() + 1;
@@ -771,7 +1064,7 @@ export class TracedBuilder {
       const vertexName = `${name}_v${i}`;
       // Assign UV: u = circumferential position [0,1], v = 0 (placeholder, updated by loftLoops)
       const u = i / segments;
-      const index = this.mesh.addVertex(new Vertex(pos, { uv: [u, 0] }));
+      const index = this.mesh.addVertex(new Vertex(pos, { uv: [u, 0], smoothGroup: 1 }));
       this.vertices.set(vertexName, index);
       indices.push(index);
     }
@@ -890,6 +1183,739 @@ export class TracedBuilder {
   }
 
   // ==========================================================================
+  // SKELETON (E1-001: Skeleton Declaration)
+  // ==========================================================================
+
+  /**
+   * Register a skeleton with joints
+   *
+   * Validates the skeleton hierarchy:
+   * - No duplicate joint names
+   * - Parent references are valid
+   * - No cycles in hierarchy
+   *
+   * Computes world transforms for each joint.
+   */
+  registerSkeleton(joints: Array<{
+    name: string;
+    parent: string | null;
+    position: Vec3;
+    orientation: Vec3;
+    constraints?: JointConstraint;
+  }>): this {
+    // Validate: no duplicate names
+    const names = new Set<string>();
+    for (const joint of joints) {
+      if (names.has(joint.name)) {
+        throw new Error(`Duplicate joint name: '${joint.name}'`);
+      }
+      names.add(joint.name);
+    }
+
+    // Validate: parent references are valid
+    for (const joint of joints) {
+      if (joint.parent !== null && !names.has(joint.parent)) {
+        throw new Error(`Joint '${joint.name}' references non-existent parent '${joint.parent}'`);
+      }
+    }
+
+    // Validate: no cycles (using topological sort approach)
+    const visited = new Set<string>();
+    const inPath = new Set<string>();
+    const jointMap = new Map(joints.map(j => [j.name, j]));
+
+    const hasCycle = (name: string): boolean => {
+      if (inPath.has(name)) return true;
+      if (visited.has(name)) return false;
+
+      visited.add(name);
+      inPath.add(name);
+
+      const joint = jointMap.get(name)!;
+      if (joint.parent !== null && hasCycle(joint.parent)) {
+        return true;
+      }
+
+      inPath.delete(name);
+      return false;
+    };
+
+    for (const joint of joints) {
+      if (hasCycle(joint.name)) {
+        throw new Error(`Cycle detected in skeleton hierarchy involving joint '${joint.name}'`);
+      }
+    }
+
+    // Build TracedJoints with world transforms
+    const tracedJoints: TracedJoint[] = [];
+    const tracedMap = new Map<string, TracedJoint>();
+    const roots: string[] = [];
+
+    // Process in order that ensures parents are processed before children
+    const processed = new Set<string>();
+    const toProcess = [...joints];
+
+    while (toProcess.length > 0) {
+      const nextBatch: typeof toProcess = [];
+
+      for (const joint of toProcess) {
+        // Can process if root or parent already processed
+        if (joint.parent === null || processed.has(joint.parent)) {
+          let worldPosition: Vec3;
+          let worldOrientation: Vec3;
+
+          if (joint.parent === null) {
+            // Root joint: world transform equals local transform
+            worldPosition = joint.position.clone();
+            worldOrientation = joint.orientation.clone();
+            roots.push(joint.name);
+          } else {
+            // Child joint: world transform = parent world + local
+            const parent = tracedMap.get(joint.parent)!;
+            // Apply parent rotation to local position
+            worldPosition = parent.worldPosition.add(
+              this.rotatePoint(joint.position, {
+                x: parent.worldOrientation.x,
+                y: parent.worldOrientation.y,
+                z: parent.worldOrientation.z
+              })
+            );
+            // Combine orientations (simplified: additive for euler angles)
+            worldOrientation = new Vec3(
+              parent.worldOrientation.x + joint.orientation.x,
+              parent.worldOrientation.y + joint.orientation.y,
+              parent.worldOrientation.z + joint.orientation.z
+            );
+          }
+
+          const tracedJoint: TracedJoint = {
+            name: joint.name,
+            parent: joint.parent,
+            position: joint.position,
+            orientation: joint.orientation,
+            worldPosition,
+            worldOrientation,
+            constraints: joint.constraints
+          };
+
+          tracedJoints.push(tracedJoint);
+          tracedMap.set(joint.name, tracedJoint);
+          processed.add(joint.name);
+        } else {
+          // Parent not yet processed, defer to next batch
+          nextBatch.push(joint);
+        }
+      }
+
+      if (nextBatch.length === toProcess.length) {
+        // No progress made, shouldn't happen after cycle detection
+        throw new Error('Failed to process skeleton hierarchy');
+      }
+
+      toProcess.length = 0;
+      toProcess.push(...nextBatch);
+    }
+
+    this.skeleton = {
+      joints: tracedJoints,
+      jointMap: tracedMap,
+      roots
+    };
+
+    // Add traces for each joint
+    for (const joint of tracedJoints) {
+      this.traces.set(`joint:${joint.name}`, {
+        type: 'measurement',  // Reuse measurement type for now
+        name: joint.name,
+        source: { builderName: this.name },
+        details: {
+          parent: joint.parent,
+          position: { x: joint.position.x, y: joint.position.y, z: joint.position.z },
+          orientation: { x: joint.orientation.x, y: joint.orientation.y, z: joint.orientation.z },
+          worldPosition: { x: joint.worldPosition.x, y: joint.worldPosition.y, z: joint.worldPosition.z },
+          constraints: joint.constraints
+        }
+      });
+    }
+
+    return this;
+  }
+
+  /**
+   * Get the skeleton (null if not defined)
+   */
+  getSkeleton(): TracedSkeleton | null {
+    return this.skeleton;
+  }
+
+  /**
+   * Get a specific joint by name
+   */
+  getJoint(name: string): TracedJoint | undefined {
+    return this.skeleton?.jointMap.get(name);
+  }
+
+  /**
+   * Adopt a child skeleton as this builder's skeleton (H1-001)
+   *
+   * Used when the parent builder has no skeleton and the first composed builder
+   * brings a skeleton that should become the parent's skeleton.
+   *
+   * @param instanceName - Prefix for joint names (optional, can be empty for primary component)
+   * @param childSkeleton - The child builder's skeleton to adopt
+   * @param transform - Composition transform (offset, rotation, scale)
+   */
+  adoptSkeleton(
+    instanceName: string,
+    childSkeleton: TracedSkeleton,
+    transform: { offset?: { x: number; y: number; z: number }; rotation?: { x: number; y: number; z: number }; scale?: number }
+  ): void {
+    const offset = transform.offset ?? { x: 0, y: 0, z: 0 };
+    const scale = transform.scale ?? 1;
+
+    // Create new skeleton from child skeleton
+    this.skeleton = {
+      joints: [],
+      jointMap: new Map(),
+      roots: []
+    };
+
+    // Process each joint from the child skeleton
+    for (const childJoint of childSkeleton.joints) {
+      // Transform the position
+      let pos = childJoint.position.clone();
+
+      if (scale !== 1) {
+        pos = pos.mul(scale);
+      }
+
+      if (transform.rotation) {
+        pos = this.rotatePoint(pos, transform.rotation);
+      }
+
+      pos = pos.add(new Vec3(offset.x, offset.y, offset.z));
+
+      // Transform world position
+      let worldPos = childJoint.worldPosition.clone();
+
+      if (scale !== 1) {
+        worldPos = worldPos.mul(scale);
+      }
+
+      if (transform.rotation) {
+        worldPos = this.rotatePoint(worldPos, transform.rotation);
+      }
+
+      worldPos = worldPos.add(new Vec3(offset.x, offset.y, offset.z));
+
+      // Create the adopted joint
+      const adoptedJoint: TracedJoint = {
+        name: childJoint.name, // Keep original names since this is the primary skeleton
+        parent: childJoint.parent,
+        position: pos,
+        orientation: childJoint.orientation.clone(),
+        worldPosition: worldPos,
+        worldOrientation: childJoint.worldOrientation.clone(),
+        constraints: childJoint.constraints
+      };
+
+      this.skeleton.joints.push(adoptedJoint);
+      this.skeleton.jointMap.set(adoptedJoint.name, adoptedJoint);
+
+      if (childJoint.parent === null) {
+        this.skeleton.roots.push(adoptedJoint.name);
+      }
+    }
+
+    this.traces.set(`skeleton:adopted`, {
+      type: 'skeleton',
+      name: 'adopted',
+      source: { builderName: this.name },
+      details: {
+        fromInstance: instanceName,
+        jointCount: this.skeleton.joints.length,
+        roots: this.skeleton.roots
+      }
+    });
+  }
+
+  // Track whether composed builders brought weights
+  hasComposedWeights: boolean = false;
+
+  /**
+   * Merge a child skeleton into this builder's skeleton (E1-002)
+   *
+   * The child skeleton's root joints are re-parented to the specified parent joint.
+   * All child joint names are prefixed with the instance name to avoid conflicts.
+   * Child joint positions are adjusted by the composition transform.
+   *
+   * @param instanceName - Prefix for child joint names (e.g., "wing_L")
+   * @param childSkeleton - The child builder's skeleton to merge
+   * @param parentJointName - Name of the joint in this skeleton to attach to
+   * @param transform - Composition transform (offset, rotation, scale)
+   */
+  mergeSkeleton(
+    instanceName: string,
+    childSkeleton: TracedSkeleton,
+    parentJointName: string,
+    transform: { offset?: { x: number; y: number; z: number }; rotation?: { x: number; y: number; z: number }; scale?: number }
+  ): void {
+    if (!this.skeleton) {
+      throw new Error(`Cannot merge skeleton: parent builder has no skeleton`);
+    }
+
+    const parentJoint = this.skeleton.jointMap.get(parentJointName);
+    if (!parentJoint) {
+      throw new Error(`Cannot merge skeleton: parent joint '${parentJointName}' not found`);
+    }
+
+    const offset = transform.offset ?? { x: 0, y: 0, z: 0 };
+    const scale = transform.scale ?? 1;
+
+    // Process each child joint
+    for (const childJoint of childSkeleton.joints) {
+      // Prefix the joint name with instance name
+      const prefixedName = `${instanceName}.${childJoint.name}`;
+
+      // Determine the new parent
+      let newParent: string | null;
+      if (childJoint.parent === null) {
+        // Root joints in child skeleton attach to the specified parent joint
+        newParent = parentJointName;
+      } else {
+        // Non-root joints keep their parent, but prefixed
+        newParent = `${instanceName}.${childJoint.parent}`;
+      }
+
+      // Transform the position by the composition transform
+      let pos = childJoint.position.clone();
+
+      // Apply scale
+      if (scale !== 1) {
+        pos = pos.mul(scale);
+      }
+
+      // Apply rotation
+      if (transform.rotation) {
+        pos = this.rotatePoint(pos, transform.rotation);
+      }
+
+      // For root joints, add the composition offset
+      if (childJoint.parent === null) {
+        pos = pos.add(new Vec3(offset.x, offset.y, offset.z));
+      }
+
+      // Compute new world position
+      let worldPosition: Vec3;
+      if (childJoint.parent === null) {
+        // Root of child attaches to parent joint
+        worldPosition = parentJoint.worldPosition.add(
+          this.rotatePoint(pos, {
+            x: parentJoint.worldOrientation.x,
+            y: parentJoint.worldOrientation.y,
+            z: parentJoint.worldOrientation.z
+          })
+        );
+      } else {
+        // Find the already-merged parent joint
+        const mergedParent = this.skeleton.jointMap.get(newParent);
+        if (mergedParent) {
+          worldPosition = mergedParent.worldPosition.add(
+            this.rotatePoint(pos, {
+              x: mergedParent.worldOrientation.x,
+              y: mergedParent.worldOrientation.y,
+              z: mergedParent.worldOrientation.z
+            })
+          );
+        } else {
+          // Parent not yet processed (shouldn't happen with ordered processing)
+          worldPosition = pos;
+        }
+      }
+
+      // Combine orientations
+      let worldOrientation = childJoint.worldOrientation.clone();
+      if (transform.rotation) {
+        worldOrientation = new Vec3(
+          worldOrientation.x + transform.rotation.x,
+          worldOrientation.y + transform.rotation.y,
+          worldOrientation.z + transform.rotation.z
+        );
+      }
+
+      const mergedJoint: TracedJoint = {
+        name: prefixedName,
+        parent: newParent,
+        position: pos,
+        orientation: childJoint.orientation.clone(),
+        worldPosition,
+        worldOrientation,
+        constraints: childJoint.constraints
+      };
+
+      this.skeleton.joints.push(mergedJoint);
+      this.skeleton.jointMap.set(prefixedName, mergedJoint);
+
+      // Add trace
+      this.traces.set(`joint:${prefixedName}`, {
+        type: 'measurement',
+        name: prefixedName,
+        source: { builderName: this.name },
+        details: {
+          parent: newParent,
+          position: { x: pos.x, y: pos.y, z: pos.z },
+          orientation: { x: mergedJoint.orientation.x, y: mergedJoint.orientation.y, z: mergedJoint.orientation.z },
+          worldPosition: { x: worldPosition.x, y: worldPosition.y, z: worldPosition.z },
+          mergedFrom: instanceName,
+          originalJoint: childJoint.name,
+          constraints: childJoint.constraints
+        }
+      });
+    }
+  }
+
+  // ==========================================================================
+  // VERTEX WEIGHTS (E2-001)
+  // ==========================================================================
+
+  /** Maximum number of joint influences per vertex (standard for real-time) */
+  static readonly MAX_INFLUENCES = 4;
+
+  /**
+   * Compute vertex weights from a set of rules
+   *
+   * @param rules Array of weight rules (proximity, region, gradient)
+   */
+  computeWeights(rules: Array<{
+    type: 'proximity' | 'region' | 'gradient';
+    joint?: string;
+    joint_a?: string;
+    joint_b?: string;
+    radius?: number;
+    falloff?: 'linear' | 'smooth' | 'sharp';
+    min?: Vec3;
+    max?: Vec3;
+    weight?: number;
+    axis?: 'x' | 'y' | 'z';
+  }>): void {
+    if (!this.skeleton) {
+      throw new Error('Cannot compute weights: no skeleton defined');
+    }
+
+    const weights = new Map<number, VertexWeight[]>();
+    const jointIndexMap = new Map<string, number>();
+
+    // Build joint index lookup
+    this.skeleton.joints.forEach((joint, index) => {
+      jointIndexMap.set(joint.name, index);
+    });
+
+    // Process each vertex
+    for (let vi = 0; vi < this.mesh.vertices.length; vi++) {
+      const vertex = this.mesh.vertices[vi];
+      const pos = vertex.position;
+      const vertexWeights: VertexWeight[] = [];
+
+      // Apply each rule
+      for (const rule of rules) {
+        if (rule.type === 'proximity') {
+          const jointIndex = jointIndexMap.get(rule.joint!);
+          if (jointIndex === undefined) continue;
+
+          const joint = this.skeleton.joints[jointIndex];
+          const distance = pos.sub(joint.worldPosition).length();
+          const radius = rule.radius ?? 1;
+
+          if (distance <= radius) {
+            const t = distance / radius;
+            let weight: number;
+
+            switch (rule.falloff ?? 'linear') {
+              case 'smooth':
+                // Smooth falloff: 1 at center, 0 at edge, smooth curve
+                weight = 1 - (3 * t * t - 2 * t * t * t);
+                break;
+              case 'sharp':
+                // Sharp falloff: drops quickly near edge
+                weight = 1 - t * t;
+                break;
+              case 'linear':
+              default:
+                weight = 1 - t;
+            }
+
+            if (weight > 0) {
+              vertexWeights.push({ jointIndex, weight });
+            }
+          }
+        } else if (rule.type === 'region') {
+          const jointIndex = jointIndexMap.get(rule.joint!);
+          if (jointIndex === undefined) continue;
+
+          const min = rule.min!;
+          const max = rule.max!;
+
+          if (pos.x >= min.x && pos.x <= max.x &&
+              pos.y >= min.y && pos.y <= max.y &&
+              pos.z >= min.z && pos.z <= max.z) {
+            vertexWeights.push({
+              jointIndex,
+              weight: rule.weight ?? 1
+            });
+          }
+        } else if (rule.type === 'gradient') {
+          const jointAIndex = jointIndexMap.get(rule.joint_a!);
+          const jointBIndex = jointIndexMap.get(rule.joint_b!);
+          if (jointAIndex === undefined || jointBIndex === undefined) continue;
+
+          const jointA = this.skeleton.joints[jointAIndex];
+          const jointB = this.skeleton.joints[jointBIndex];
+          const axis = rule.axis ?? 'y';
+
+          // Get position along axis
+          const posVal = axis === 'x' ? pos.x : axis === 'y' ? pos.y : pos.z;
+          const aVal = axis === 'x' ? jointA.worldPosition.x : axis === 'y' ? jointA.worldPosition.y : jointA.worldPosition.z;
+          const bVal = axis === 'x' ? jointB.worldPosition.x : axis === 'y' ? jointB.worldPosition.y : jointB.worldPosition.z;
+
+          // Compute blend factor (0 = joint_a, 1 = joint_b)
+          const range = bVal - aVal;
+          if (Math.abs(range) < 0.0001) continue;
+
+          const t = Math.max(0, Math.min(1, (posVal - aVal) / range));
+
+          if (1 - t > 0.001) {
+            vertexWeights.push({ jointIndex: jointAIndex, weight: 1 - t });
+          }
+          if (t > 0.001) {
+            vertexWeights.push({ jointIndex: jointBIndex, weight: t });
+          }
+        }
+      }
+
+      // Merge duplicate joint weights
+      const merged = new Map<number, number>();
+      for (const vw of vertexWeights) {
+        merged.set(vw.jointIndex, (merged.get(vw.jointIndex) ?? 0) + vw.weight);
+      }
+
+      // Sort by weight and take top MAX_INFLUENCES
+      const sortedWeights = Array.from(merged.entries())
+        .map(([jointIndex, weight]) => ({ jointIndex, weight }))
+        .sort((a, b) => b.weight - a.weight)
+        .slice(0, TracedBuilder.MAX_INFLUENCES);
+
+      // Normalize weights to sum to 1
+      if (sortedWeights.length > 0) {
+        const total = sortedWeights.reduce((sum, w) => sum + w.weight, 0);
+        if (total > 0) {
+          for (const w of sortedWeights) {
+            w.weight /= total;
+          }
+          weights.set(vi, sortedWeights);
+        }
+      }
+    }
+
+    // Compute statistics
+    const totalVertices = this.mesh.vertices.length;
+    const weightedVertices = weights.size;
+    let maxInfluencesUsed = 0;
+    for (const vw of weights.values()) {
+      maxInfluencesUsed = Math.max(maxInfluencesUsed, vw.length);
+    }
+
+    this.vertexWeights = {
+      weights,
+      maxInfluences: TracedBuilder.MAX_INFLUENCES,
+      stats: {
+        totalVertices,
+        weightedVertices,
+        unweightedVertices: totalVertices - weightedVertices,
+        maxInfluencesUsed
+      }
+    };
+
+    // Add trace
+    this.traces.set('weights:computed', {
+      type: 'modifier',
+      name: 'weights',
+      source: { builderName: this.name },
+      details: {
+        ruleCount: rules.length,
+        ...this.vertexWeights.stats
+      }
+    });
+  }
+
+  /**
+   * Get the computed vertex weights (null if not computed)
+   */
+  getVertexWeights(): VertexWeights | null {
+    return this.vertexWeights;
+  }
+
+  /**
+   * Get weights for a specific vertex
+   */
+  getWeightsForVertex(vertexIndex: number): VertexWeight[] {
+    return this.vertexWeights?.weights.get(vertexIndex) ?? [];
+  }
+
+  // ==========================================================================
+  // MORPH TARGETS (E3-001: Morph Target System)
+  // ==========================================================================
+
+  /**
+   * Register morph targets for this builder
+   *
+   * Each target is a named set of vertex position offsets.
+   * Used for character variation, facial expressions, LOD blending, etc.
+   *
+   * @param targets Array of morph target definitions
+   */
+  registerMorphTargets(targets: Array<{
+    name: string;
+    offsets: Array<{ vertexIndex: number; offset: Vec3 }>;
+    defaultWeight?: number;
+    description?: string;
+  }>): this {
+    const baseVertexCount = this.mesh.vertices.length;
+
+    // Validate all targets
+    const names = new Set<string>();
+    for (const target of targets) {
+      // Check for duplicate names
+      if (names.has(target.name)) {
+        throw new Error(`Duplicate morph target name: '${target.name}'`);
+      }
+      names.add(target.name);
+
+      // Validate vertex indices
+      for (const offset of target.offsets) {
+        if (offset.vertexIndex < 0 || offset.vertexIndex >= baseVertexCount) {
+          throw new Error(
+            `Morph target '${target.name}': vertex index ${offset.vertexIndex} out of bounds (0-${baseVertexCount - 1})`
+          );
+        }
+      }
+    }
+
+    // Store the morph targets
+    this.morphTargets = {
+      baseVertexCount,
+      targets: targets.map(t => ({
+        name: t.name,
+        offsets: t.offsets.map(o => ({
+          vertexIndex: o.vertexIndex,
+          offset: o.offset.clone()
+        })),
+        defaultWeight: t.defaultWeight ?? 0,
+        description: t.description
+      }))
+    };
+
+    // Add trace entry
+    this.traces.set('morph_targets', {
+      type: 'morph_targets',
+      name: 'morph_targets',
+      source: { expression: 'registerMorphTargets()', builderName: this.name },
+      details: {
+        targetCount: targets.length,
+        targetNames: targets.map(t => t.name)
+      }
+    });
+
+    return this;
+  }
+
+  /**
+   * Add a single morph target computed from another mesh (variant)
+   *
+   * @param name Name for the morph target
+   * @param variantMesh The variant mesh (must have identical topology)
+   * @param defaultWeight Default blend weight (0-1)
+   * @param description Optional description
+   * @param threshold Minimum offset magnitude to include (default 0.0001)
+   */
+  addMorphTargetFromMesh(
+    name: string,
+    variantMesh: Mesh,
+    defaultWeight: number = 0,
+    description?: string,
+    threshold: number = 0.0001
+  ): this {
+    const base = this.mesh;
+
+    // Validate topology match
+    if (base.vertices.length !== variantMesh.vertices.length) {
+      throw new Error(
+        `Topology mismatch: base has ${base.vertices.length} vertices, variant has ${variantMesh.vertices.length}`
+      );
+    }
+
+    if (base.faces.length !== variantMesh.faces.length) {
+      throw new Error(
+        `Topology mismatch: base has ${base.faces.length} faces, variant has ${variantMesh.faces.length}`
+      );
+    }
+
+    // Compute position deltas
+    const offsets: Array<{ vertexIndex: number; offset: Vec3 }> = [];
+    for (let i = 0; i < base.vertices.length; i++) {
+      const basePos = base.vertices[i].position;
+      const variantPos = variantMesh.vertices[i].position;
+      const delta = variantPos.sub(basePos);
+
+      if (delta.length() > threshold) {
+        offsets.push({ vertexIndex: i, offset: delta });
+      }
+    }
+
+    // Initialize or add to existing set
+    if (!this.morphTargets) {
+      this.morphTargets = {
+        baseVertexCount: base.vertices.length,
+        targets: []
+      };
+    }
+
+    // Check for duplicate name
+    if (this.morphTargets.targets.some(t => t.name === name)) {
+      throw new Error(`Morph target '${name}' already exists`);
+    }
+
+    this.morphTargets.targets.push({
+      name,
+      offsets,
+      defaultWeight,
+      description
+    });
+
+    return this;
+  }
+
+  /**
+   * Get the morph targets (null if not defined)
+   */
+  getMorphTargets(): TracedMorphTargetSet | null {
+    return this.morphTargets;
+  }
+
+  /**
+   * Get a specific morph target by name
+   */
+  getMorphTarget(name: string): TracedMorphTarget | undefined {
+    return this.morphTargets?.targets.find(t => t.name === name);
+  }
+
+  /**
+   * Get all morph target names
+   */
+  getMorphTargetNames(): string[] {
+    return this.morphTargets?.targets.map(t => t.name) ?? [];
+  }
+
+  // ==========================================================================
   // FACES
   // ==========================================================================
 
@@ -998,16 +2024,16 @@ export class TracedBuilder {
 
     for (let i = 0; i < n; i++) {
       const next = (i + 1) % n;
-      // Face winding: loop1[next] -> loop2[next] -> loop2[i] -> loop1[i]
-      // This creates quad faces with outward-facing normals when both loops
-      // are wound counter-clockwise. Compatible with cap convention:
-      // - loop1 cap (bottom/from): use flip=true
-      // - loop2 cap (top/to): use flip=false
+      // Face winding: loop1[i] -> loop2[i] -> loop2[next] -> loop1[next]
+      // Circles wind CW from above (+Y), so this quad has its normal pointing
+      // outward (away from the cylinder axis). Compatible with capLoop convention:
+      // - loop1 (bottom/from) cap: flip=false  → normal points down (-Y)
+      // - loop2 (top/to) cap:    flip=true   → normal points up (+Y)
       this.mesh.addFace(new Face([
-        loop1.indices[next],
-        loop2.indices[next],
+        loop1.indices[i],
         loop2.indices[i],
-        loop1.indices[i]
+        loop2.indices[next],
+        loop1.indices[next]
       ], color, materialSlotIndex));
     }
 
@@ -1037,13 +2063,17 @@ export class TracedBuilder {
     if (!loop) throw new Error(`Loop '${loopName}' not found for cap '${name}'`);
 
     // Create new vertices for the cap with radial UVs (don't reuse loft vertices — need separate UVs)
+    // Cap vertices get a different smoothGroup than body to produce hard edges at the cap boundary
     const loopLen = loop.indices.length;
     const capIndices: number[] = [];
+    // Use a high smoothGroup ID to avoid collisions with body smoothGroups
+    const capSmoothGroup = 100 + this.mesh.faces.length;
     for (let i = 0; i < loopLen; i++) {
       const angle = (i / loopLen) * Math.PI * 2;
       const origVertex = this.mesh.vertices[loop.indices[i]];
       const capVertex = origVertex.clone();
       capVertex.attributes.uv = [0.5 + Math.cos(angle) * 0.5, 0.5 + Math.sin(angle) * 0.5];
+      capVertex.attributes.smoothGroup = capSmoothGroup;
       capIndices.push(this.mesh.addVertex(capVertex));
     }
 
@@ -1179,10 +2209,23 @@ export class TracedBuilder {
       this.vertices.set(`${instanceName}_v${i}`, newIndex);
     }
 
-    // Add all faces with remapped indices
+    // Merge material slots from child to parent and create index mapping
+    const materialSlotMap = new Map<number, number>();
+    for (let i = 0; i < subOutput.mesh.materialSlots.length; i++) {
+      const childSlot = subOutput.mesh.materialSlots[i];
+      // Add slot to parent (or get existing index if same name)
+      const parentIndex = this.mesh.addMaterialSlot(childSlot);
+      materialSlotMap.set(i, parentIndex);
+    }
+
+    // Add all faces with remapped indices and material slot
     for (const face of subOutput.mesh.faces) {
       const newIndices = face.indices.map(idx => vertexMap.get(idx)!);
-      this.mesh.addFace(new Face(newIndices));
+      // Remap material slot index if present
+      const newMaterialSlotIndex = face.materialSlotIndex !== undefined
+        ? materialSlotMap.get(face.materialSlotIndex)
+        : undefined;
+      this.mesh.addFace(new Face(newIndices, face.color, newMaterialSlotIndex));
     }
 
     // Merge loops with prefixed names
@@ -1359,6 +2402,10 @@ export class TracedBuilder {
       decisions: this.decisions,
       loops: this.loops,
       ports: this.ports,  // B5-001: Attachment points
+      skeleton: this.skeleton ?? undefined,  // E1-001: Skeleton
+      vertexWeights: this.vertexWeights ?? undefined,  // E2-001: Vertex Weights
+      morphTargets: this.morphTargets ?? undefined,  // E3-001: Morph Targets
+      connections: this.connections.length > 0 ? this.connections : undefined,  // F4-002: Assembly connections
       subBuilders: this.subBuilders,
       instances: this.instances.length > 0 ? this.instances : undefined,  // Include if any instances
       validation: {
@@ -1422,6 +2469,9 @@ export class TracedBuilder {
         suggestion: 'Check measurement units (expected meters)'
       });
     }
+
+    // F1-002: Include external issues (from constraint validation, etc.)
+    issues.push(...this.externalIssues);
 
     return issues;
   }

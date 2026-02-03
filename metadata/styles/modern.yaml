@@ -1,9 +1,10 @@
 # Style Palettes
 # Design styles with colors, materials, and proportions
+# Format: F2-001 StyleDefinition with decision_defaults and material_palette
 
 key: styles/modern
 createdAt: "2026-02-02T00:00:00.000Z"
-modifiedAt: "2026-02-02T00:00:00.000Z"
+modifiedAt: "2026-02-05T00:00:00.000Z"
 description: Modern/contemporary design style - clean lines, minimal ornamentation
 tags:
   - style
@@ -14,6 +15,53 @@ value:
   name: Modern
   description: Clean lines, minimal ornamentation, geometric forms
 
+  # F2-001: Decision defaults - fallback values when decisions aren't explicitly set
+  decision_defaults:
+    leg_style: straight
+    back_style: slatted
+    arm_style: none
+    edge_treatment: sharp
+    surface_finish: matte
+    edge_radius: 0.005
+    leg_taper: 0.0
+    bevel_width: 0.002
+
+  # F2-001: Material palette - role-based material definitions
+  material_palette:
+    primary_wood:
+      rgb: [0.88, 0.88, 0.88]
+      roughness: 0.3
+      metalness: 0.0
+      name: white_lacquer
+    secondary_wood:
+      rgb: [0.60, 0.42, 0.30]
+      roughness: 0.5
+      metalness: 0.0
+      name: walnut
+    accent_metal:
+      rgb: [0.75, 0.75, 0.75]
+      roughness: 0.2
+      metalness: 1.0
+      name: chrome
+    fabric:
+      rgb: [0.62, 0.62, 0.62]
+      roughness: 0.8
+      metalness: 0.0
+      name: warm_grey
+
+  # F2-001: Proportion rules - constraints on measurement relationships
+  proportion_rules:
+    - "seat_height / total_height >= 0.35"
+    - "seat_width / seat_depth >= 0.8"
+    - "seat_width / seat_depth <= 1.3"
+
+  # F2-001: Pattern preferences
+  pattern_preferences:
+    symmetry: bilateral
+    repetition: low
+    ornamentation: minimal
+
+  # Legacy fields preserved for backward compatibility
   colors:
     primary:
       - { name: white, hex: "#FFFFFF", rgb: [1.0, 1.0, 1.0] }

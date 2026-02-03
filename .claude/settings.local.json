@@ -9,7 +9,23 @@
       "Bash(dir:*)",
       "Bash(find:*)",
       "Bash(git mv:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(tasklist:*)",
+      "Bash(node -e:*)",
+      "Bash(npx tsx:*)",
+      "Bash(powershell -Command \"Get-ChildItem output/textures/ChessBoard_*_albedo.png | ForEach-Object { ''{0}: {1} bytes'' -f $_Name, $_Length }\")",
+      "Bash(git.exe show:*)",
+      "Bash(node_modules/.bin/jest --no-coverage)",
+      "Bash(node node_modules/.bin/jest:*)",
+      "Bash(node node_modules/jest/bin/jest.js:*)",
+      "Bash(set NODE_OPTIONS=--experimental-vm-modules)",
+      "Bash(echo:*)",
+      "Bash(node:*)",
+      "Bash(/usr/bin/ls:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(cd:*)",
+      "Bash(findstr:*)",
+      "Bash(npm test:*)"
     ]
   }
 }

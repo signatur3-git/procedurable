@@ -362,6 +362,44 @@
       letter-spacing: 0.5px;
     }
 
+    /* Texture links section */
+    .texture-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 4px 0;
+    }
+
+    .texture-link {
+      padding: 4px 12px;
+      background: #30363d;
+      border-radius: 4px;
+      color: #58a6ff;
+      text-decoration: none;
+      font-size: 12px;
+      transition: background 0.2s;
+    }
+
+    .texture-link:hover {
+      background: #3d444d;
+    }
+
+    .texture-link.uv-debug {
+      background: #2d4a3e;
+      color: #7ee787;
+    }
+
+    .texture-link.uv-debug:hover {
+      background: #3d5a4e;
+    }
+
+    .texture-hint {
+      font-size: 10px;
+      color: #8b949e;
+      font-style: italic;
+      margin-top: 4px;
+    }
+
     .decision-item {
       display: flex;
       justify-content: space-between;

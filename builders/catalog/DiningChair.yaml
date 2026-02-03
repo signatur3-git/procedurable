@@ -23,9 +23,35 @@ quality:
 
 materials:
   wood:
-    color: { r: 0.55, g: 0.35, b: 0.2 }
+    role: primary_wood               # F2-003: resolved from style palette when style is active
+    color: { r: 0.55, g: 0.35, b: 0.20 }   # fallback: medium oak
+    fallback_color: { r: 0.55, g: 0.35, b: 0.20 }
   wood_dark:
-    color: { r: 0.4, g: 0.25, b: 0.15 }
+    role: secondary_wood             # F2-003: resolved from style palette when style is active
+    color: { r: 0.40, g: 0.25, b: 0.15 }   # fallback: dark walnut
+    fallback_color: { r: 0.40, g: 0.25, b: 0.15 }
+
+# H5-001: Procedural texture materials for texture baking
+procedural_materials:
+  wood_frame:
+    description: "Oak wood with grain, edge wear, and oil finish"
+    layers:
+      - generator: wood_grain
+        params:
+          species: oak
+          grain_scale: 0.15
+        blendMode: normal
+        opacity: 1.0
+      - generator: wear
+        params:
+          intensity: 0.3
+          edge_bias: 0.7
+        blendMode: multiply
+        opacity: 0.4
+        mask:
+          type: curvature
+          threshold: 0.3
+          falloff: 0.2
 
 decisions:
   leg_style:
@@ -140,7 +166,8 @@ geometry:
       name: seat
       center: { x: 0, y: "seat_height + seat_thickness/2", z: 0 }
       size: { x: seat_width, y: seat_thickness, z: seat_depth }
-      color: wood
+      color: $wood
+      uv_mode: world_scale
 
   # LEGS - Round
   - if: leg_style == "round"
@@ -158,10 +185,10 @@ geometry:
       - loft: leg_bl
         from: bl_bot
         to: bl_top
-        color: wood
+        color: $wood
       - cap: leg_bl_cap
         loop: bl_bot
-        color: wood
+        color: $wood
 
       - circle: br_bot
         center: { x: "leg_x", y: 0, z: "-leg_z" }
@@ -176,10 +203,10 @@ geometry:
       - loft: leg_br
         from: br_bot
         to: br_top
-        color: wood
+        color: $wood
       - cap: leg_br_cap
         loop: br_bot
-        color: wood
+        color: $wood
 
       - circle: fl_bot
         center: { x: "-leg_x", y: 0, z: "leg_z" }
@@ -194,10 +221,10 @@ geometry:
       - loft: leg_fl
         from: fl_bot
         to: fl_top
-        color: wood
+        color: $wood
       - cap: leg_fl_cap
         loop: fl_bot
-        color: wood
+        color: $wood
 
       - circle: fr_bot
         center: { x: "leg_x", y: 0, z: "leg_z" }
@@ -212,10 +239,10 @@ geometry:
       - loft: leg_fr
         from: fr_bot
         to: fr_top
-        color: wood
+        color: $wood
       - cap: leg_fr_cap
         loop: fr_bot
-        color: wood
+        color: $wood
 
   # LEGS - Tapered (same geometry as round but with taper)
   - if: leg_style == "tapered"
@@ -233,10 +260,10 @@ geometry:
       - loft: leg_bl
         from: bl_bot
         to: bl_top
-        color: wood
+        color: $wood
       - cap: leg_bl_cap
         loop: bl_bot
-        color: wood
+        color: $wood
 
       - circle: br_bot
         center: { x: "leg_x", y: 0, z: "-leg_z" }
@@ -251,10 +278,10 @@ geometry:
       - loft: leg_br
         from: br_bot
         to: br_top
-        color: wood
+        color: $wood
       - cap: leg_br_cap
         loop: br_bot
-        color: wood
+        color: $wood
 
       - circle: fl_bot
         center: { x: "-leg_x", y: 0, z: "leg_z" }
@@ -269,10 +296,10 @@ geometry:
       - loft: leg_fl
         from: fl_bot
         to: fl_top
-        color: wood
+        color: $wood
       - cap: leg_fl_cap
         loop: fl_bot
-        color: wood
+        color: $wood
 
       - circle: fr_bot
         center: { x: "leg_x", y: 0, z: "leg_z" }
@@ -287,10 +314,10 @@ geometry:
       - loft: leg_fr
         from: fr_bot
         to: fr_top
-        color: wood
+        color: $wood
       - cap: leg_fr_cap
         loop: fr_bot
-        color: wood
+        color: $wood
 
   # LEGS - Square
   - if: leg_style == "square"
@@ -299,22 +326,26 @@ geometry:
           name: leg_bl
           center: { x: "-leg_x", y: "seat_height/2", z: "-leg_z" }
           size: { x: leg_width, y: seat_height, z: leg_width }
-          color: wood
+          color: $wood
+          uv_mode: world_scale
       - box:
           name: leg_br
           center: { x: "leg_x", y: "seat_height/2", z: "-leg_z" }
           size: { x: leg_width, y: seat_height, z: leg_width }
-          color: wood
+          color: $wood
+          uv_mode: world_scale
       - box:
           name: leg_fl
           center: { x: "-leg_x", y: "seat_height/2", z: "leg_z" }
           size: { x: leg_width, y: seat_height, z: leg_width }
-          color: wood
+          color: $wood
+          uv_mode: world_scale
       - box:
           name: leg_fr
           center: { x: "leg_x", y: "seat_height/2", z: "leg_z" }
           size: { x: leg_width, y: seat_height, z: leg_width }
-          color: wood
+          color: $wood
+          uv_mode: world_scale
 
   # BACK - Solid
   - if: back_style == "solid"
@@ -323,7 +354,8 @@ geometry:
           name: back_panel
           center: { x: 0, y: "seat_top + back_height/2", z: "-half_depth" }
           size: { x: "seat_width - 0.04", y: back_height, z: back_thickness }
-          color: wood
+          color: $wood
+          uv_mode: world_scale
 
   # BACK - Slat
   - if: back_style == "slat"
@@ -332,12 +364,14 @@ geometry:
           name: top_rail
           center: { x: 0, y: "back_top - 0.02", z: "-half_depth" }
           size: { x: "seat_width - 0.04", y: 0.04, z: back_thickness }
-          color: wood_dark
+          color: $wood_dark
+          uv_mode: world_scale
       - box:
           name: bot_rail
           center: { x: 0, y: "seat_top + 0.02", z: "-half_depth" }
           size: { x: "seat_width - 0.04", y: 0.04, z: back_thickness }
-          color: wood_dark
+          color: $wood_dark
+          uv_mode: world_scale
       - repeat: slat_count
         as: i
         geometry:
@@ -348,7 +382,8 @@ geometry:
                 y: "seat_top + back_height/2"
                 z: "-half_depth"
               size: { x: slat_width, y: "back_height - 0.06", z: "back_thickness * 0.7" }
-              color: wood
+              color: $wood
+              uv_mode: world_scale
 
   # BACK - Ladder
   - if: back_style == "ladder"
@@ -357,12 +392,14 @@ geometry:
           name: left_post
           center: { x: "-back_hw", y: "seat_top + back_height/2", z: "-half_depth" }
           size: { x: 0.035, y: back_height, z: back_thickness }
-          color: wood_dark
+          color: $wood_dark
+          uv_mode: world_scale
       - box:
           name: right_post
           center: { x: "back_hw", y: "seat_top + back_height/2", z: "-half_depth" }
           size: { x: 0.035, y: back_height, z: back_thickness }
-          color: wood_dark
+          color: $wood_dark
+          uv_mode: world_scale
       - repeat: ladder_rung_count
         as: i
         geometry:
@@ -373,7 +410,8 @@ geometry:
                 y: "seat_top + 0.06 + (back_height - 0.12) * (i + 0.5) / ladder_rung_count"
                 z: "-half_depth"
               size: { x: "back_hw * 2 - 0.04", y: rung_height, z: "back_thickness * 0.8" }
-              color: wood
+              color: $wood
+              uv_mode: world_scale
 
   # BACK - Spindle
   - if: back_style == "spindle"
@@ -383,7 +421,8 @@ geometry:
           name: sp_rail
           center: { x: 0, y: "back_top - 0.015", z: "-half_depth" }
           size: { x: "seat_width - 0.04", y: 0.03, z: "back_thickness * 1.2" }
-          color: wood_dark
+          color: $wood_dark
+          uv_mode: world_scale
       # Spindles connecting seat to top rail
       - repeat: spindle_count
         as: i
@@ -407,7 +446,7 @@ geometry:
           - loft: spindle_${i}
             from: sp_${i}_b
             to: sp_${i}_t
-            color: wood
+            color: $wood
 
   # STRETCHERS
   - if: has_stretchers
@@ -425,7 +464,7 @@ geometry:
       - loft: str_front
         from: sf_l
         to: sf_r
-        color: wood_dark
+        color: $wood_dark
 
       - circle: sb_l
         center: { x: "-leg_x", y: stretcher_height_m, z: "-leg_z" }
@@ -440,7 +479,7 @@ geometry:
       - loft: str_back
         from: sb_l
         to: sb_r
-        color: wood_dark
+        color: $wood_dark
 
       - circle: sl_f
         center: { x: "-leg_x", y: stretcher_height_m, z: "leg_z" }
@@ -455,7 +494,7 @@ geometry:
       - loft: str_left
         from: sl_f
         to: sl_b
-        color: wood_dark
+        color: $wood_dark
 
       - circle: sr_f
         center: { x: "leg_x", y: stretcher_height_m, z: "leg_z" }
@@ -470,4 +509,4 @@ geometry:
       - loft: str_right
         from: sr_f
         to: sr_b
-        color: wood_dark
+        color: $wood_dark

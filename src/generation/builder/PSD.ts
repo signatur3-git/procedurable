@@ -15,7 +15,7 @@
  * B2-001, B2-002
  */
 
-import type { TracedOutput } from './TracedBuilder';
+import type { TracedOutput, TracedSkeleton, VertexWeights, TracedMorphTargetSet } from './TracedBuilder';
 import type { Mesh } from '../../platform/geometry/Mesh';
 import type { FaceColor } from '../../platform/geometry/Face';
 
@@ -41,6 +41,9 @@ export interface PSDScene {
 
   /** Scene-wide material definitions, referenced by index from mesh prims */
   materials: PSDMaterial[];
+
+  /** F4-002: Non-spatial connections between prims (gear mesh, joints, etc.) */
+  connections?: PSDConnection[];
 
   /** Optional metadata (build time, quality tier, etc.) */
   metadata?: Record<string, any>;
@@ -110,6 +113,33 @@ export interface PSDMaterial {
 }
 
 // ============================================================================
+// Connections (F4-002: Assembly Metadata)
+// ============================================================================
+
+/**
+ * Connection - Non-spatial relationship between prims
+ *
+ * Used for mechanical assemblies, gear meshing, constraints, etc.
+ * Example: "gear_a meshes with gear_b at ratio 3.5"
+ */
+export interface PSDConnection {
+  /** Connection type (e.g., "gear_mesh", "axle_joint", "weld", "hinge") */
+  type: string;
+
+  /** Source prim path */
+  from: string;
+
+  /** Target prim path */
+  to: string;
+
+  /** Connection-specific data (e.g., gear ratio, joint limits) */
+  data?: Record<string, any>;
+
+  /** Optional description */
+  description?: string;
+}
+
+// ============================================================================
 // Ports (B5-001: Attachment Points)
 // ============================================================================
 
@@ -138,6 +168,101 @@ export interface PSDPort {
 
   /** Optional metadata (e.g., snap type, constraints) */
   metadata?: Record<string, any>;
+}
+
+// ============================================================================
+// Skeleton (E1-001: Skeleton Declaration)
+// ============================================================================
+
+/**
+ * Joint constraint types for skeleton rigging
+ */
+export type PSDJointConstraintType = 'hinge' | 'ball_and_socket' | 'fixed';
+
+/**
+ * Joint constraint definition for animation
+ */
+export interface PSDJointConstraint {
+  /** Constraint type */
+  type: PSDJointConstraintType;
+
+  /** For hinge constraints: which axis the joint rotates around */
+  axis?: 'x' | 'y' | 'z';
+
+  /** Rotation limits */
+  limits?: {
+    min?: number;
+    max?: number;
+    pitch?: [number, number];
+    yaw?: [number, number];
+    roll?: [number, number];
+  };
+}
+
+/**
+ * Joint in a skeleton hierarchy
+ */
+export interface PSDJoint {
+  /** Joint name (unique within skeleton) */
+  name: string;
+
+  /** Parent joint name (null for root joints) */
+  parent: string | null;
+
+  /** Rest-pose transform in local space (relative to parent) */
+  restTransform: PSDTransform;
+
+  /** Rest-pose world position [x, y, z] */
+  worldPosition: [number, number, number];
+
+  /** Optional constraints for animation */
+  constraints?: PSDJointConstraint;
+}
+
+/**
+ * Complete skeleton for a mesh
+ */
+export interface PSDSkeleton {
+  /** All joints in the skeleton */
+  joints: PSDJoint[];
+
+  /** Root joint names (joints with no parent) */
+  roots: string[];
+}
+
+// ============================================================================
+// Morph Targets (E3-001, E3-002)
+// ============================================================================
+
+/**
+ * A single vertex offset in a morph target
+ */
+export interface PSDMorphOffset {
+  /** Index of the vertex to offset */
+  vertexIndex: number;
+  /** Position offset [dx, dy, dz] */
+  offset: [number, number, number];
+}
+
+/**
+ * Morph target (blend shape) for a mesh
+ *
+ * Morph targets define per-vertex position offsets that can be blended
+ * with a weight (0 = base mesh, 1 = fully morphed). Multiple targets
+ * can be combined additively.
+ */
+export interface PSDMorphTarget {
+  /** Target name (e.g., "smile", "stocky", "LOD1") */
+  name: string;
+
+  /** Sparse array of vertex offsets (only non-zero deltas stored) */
+  offsets: PSDMorphOffset[];
+
+  /** Default blend weight (0-1, typically 0) */
+  defaultWeight: number;
+
+  /** Optional description of what this target does */
+  description?: string;
 }
 
 // ============================================================================
@@ -212,13 +337,36 @@ export interface PSDMeshPrim extends PSDPrimBase {
   /** Named attachment points (B5-001) */
   ports?: PSDPort[];
 
-  // ---- Phase 3 stubs (rigging) ----
+  // ---- Rigging (E1-001, E2-001) ----
 
-  /** Skeleton reference. Null until Phase 3. */
-  skeleton: null;
+  /** Skeleton for this mesh. Undefined if mesh has no skeleton. */
+  skeleton?: PSDSkeleton;
 
-  /** Joint weights per vertex. Empty until Phase 3. */
-  jointWeights: [];
+  /**
+   * Joint weights per vertex (E2-001).
+   * Flat array: [v0_j0, v0_w0, v0_j1, v0_w1, ..., v0_jN, v0_wN, v1_j0, v1_w0, ...]
+   * Each vertex has up to maxInfluences pairs of (jointIndex, weight).
+   * Padded with (-1, 0) if fewer influences.
+   */
+  jointWeights?: number[];
+
+  /** Number of influences per vertex (typically 4) */
+  maxInfluences?: number;
+
+  /** Weight statistics */
+  weightStats?: {
+    totalVertices: number;
+    weightedVertices: number;
+    unweightedVertices: number;
+  };
+
+  // ---- Morph Targets (E3-001, E3-002) ----
+
+  /**
+   * Morph targets (blend shapes) for this mesh.
+   * Each target defines vertex position offsets that can be blended.
+   */
+  morphTargets?: PSDMorphTarget[];
 }
 
 /**
@@ -326,9 +474,29 @@ export function validatePSDScene(scene: PSDScene): string[] {
         }
       }
 
-      // Skeleton stub must be null
-      if (meshPrim.skeleton !== null) {
-        errors.push(`Prim '${path}' skeleton should be null (Phase 3 stub)`);
+      // Validate skeleton if present (E1-001)
+      if (meshPrim.skeleton) {
+        const skeleton = meshPrim.skeleton;
+        const jointNames = new Set(skeleton.joints.map(j => j.name));
+
+        // Check for duplicate joint names
+        if (jointNames.size !== skeleton.joints.length) {
+          errors.push(`Prim '${path}' skeleton has duplicate joint names`);
+        }
+
+        // Check parent references
+        for (const joint of skeleton.joints) {
+          if (joint.parent !== null && !jointNames.has(joint.parent)) {
+            errors.push(`Prim '${path}' skeleton joint '${joint.name}' references non-existent parent '${joint.parent}'`);
+          }
+        }
+
+        // Check roots array
+        for (const root of skeleton.roots) {
+          if (!jointNames.has(root)) {
+            errors.push(`Prim '${path}' skeleton roots references non-existent joint '${root}'`);
+          }
+        }
       }
     }
 
@@ -474,6 +642,76 @@ function boundsToBox(bounds: { min: { x: number; y: number; z: number }; max: { 
 }
 
 /**
+ * Convert a TracedSkeleton to PSDSkeleton format (E1-001)
+ */
+function tracedSkeletonToPSD(skeleton: TracedSkeleton): PSDSkeleton {
+  const joints: PSDJoint[] = skeleton.joints.map(joint => ({
+    name: joint.name,
+    parent: joint.parent,
+    restTransform: {
+      position: [joint.position.x, joint.position.y, joint.position.z],
+      rotation: [joint.orientation.x, joint.orientation.y, joint.orientation.z],
+      scale: [1, 1, 1]
+    },
+    worldPosition: [joint.worldPosition.x, joint.worldPosition.y, joint.worldPosition.z],
+    constraints: joint.constraints ? {
+      type: joint.constraints.type,
+      axis: joint.constraints.axis,
+      limits: joint.constraints.limits
+    } : undefined
+  }));
+
+  return {
+    joints,
+    roots: skeleton.roots
+  };
+}
+
+/**
+ * Convert VertexWeights to flat array format for PSD (E2-001)
+ *
+ * Format: flat array where each vertex has maxInfluences pairs of (jointIndex, weight)
+ * Vertices without weights are padded with (-1, 0) pairs
+ */
+function vertexWeightsToPSD(
+  weights: VertexWeights,
+  totalVertices: number
+): { data: number[]; maxInfluences: number } {
+  const maxInfluences = weights.maxInfluences;
+  const data: number[] = [];
+
+  for (let vi = 0; vi < totalVertices; vi++) {
+    const vw = weights.weights.get(vi) ?? [];
+
+    for (let i = 0; i < maxInfluences; i++) {
+      if (i < vw.length) {
+        data.push(vw[i].jointIndex, vw[i].weight);
+      } else {
+        // Pad with invalid joint index and zero weight
+        data.push(-1, 0);
+      }
+    }
+  }
+
+  return { data, maxInfluences };
+}
+
+/**
+ * Convert TracedMorphTargetSet to PSD format (E3-002)
+ */
+function tracedMorphTargetsToPSD(morphTargets: TracedMorphTargetSet): PSDMorphTarget[] {
+  return morphTargets.targets.map(target => ({
+    name: target.name,
+    offsets: target.offsets.map(o => ({
+      vertexIndex: o.vertexIndex,
+      offset: [o.offset.x, o.offset.y, o.offset.z] as [number, number, number]
+    })),
+    defaultWeight: target.defaultWeight,
+    description: target.description
+  }));
+}
+
+/**
  * Serialize a TracedOutput into a PSDScene.
  *
  * Structure:
@@ -526,6 +764,22 @@ export function serializeToPSD(output: TracedOutput): PSDScene {
       }
     }
 
+    // Convert vertex weights if present
+    let jointWeights: number[] | undefined;
+    let maxInfluences: number | undefined;
+    let weightStats: { totalVertices: number; weightedVertices: number; unweightedVertices: number } | undefined;
+
+    if (output.vertexWeights) {
+      const converted = vertexWeightsToPSD(output.vertexWeights, output.mesh.vertices.length);
+      jointWeights = converted.data;
+      maxInfluences = converted.maxInfluences;
+      weightStats = {
+        totalVertices: output.vertexWeights.stats.totalVertices,
+        weightedVertices: output.vertexWeights.stats.weightedVertices,
+        unweightedVertices: output.vertexWeights.stats.unweightedVertices
+      };
+    }
+
     const meshPrim: PSDMeshPrim = {
       path: meshPath,
       type: 'Mesh',
@@ -538,10 +792,48 @@ export function serializeToPSD(output: TracedOutput): PSDScene {
       geometry: serializeMeshGeometry(output.mesh),
       materialSlots: mergedSlots,
       ports: ports.length > 0 ? ports : undefined,
-      skeleton: null,
-      jointWeights: [] as []
+      skeleton: output.skeleton ? tracedSkeletonToPSD(output.skeleton) : undefined,
+      jointWeights,
+      maxInfluences,
+      weightStats,
+      morphTargets: output.morphTargets ? tracedMorphTargetsToPSD(output.morphTargets) : undefined
     };
     scene.prims[meshPath] = meshPrim;
+  }
+
+  // ---- Merged Sub-Builder Prims (H3-001: Semantic prims for composed-but-merged sub-builders) ----
+  // Create Xform prims for sub-builders that were merged (not asInstance), so they can be queried by tag.
+  if (output.subBuilders.size > 0) {
+    const instanceIds = new Set((output.instances ?? []).map(i => i.id));
+    for (const [instanceName, subOutput] of output.subBuilders) {
+      // Skip sub-builders that are already represented as instance prims
+      if (instanceIds.has(instanceName)) continue;
+      // Skip if no tags — not worth adding an empty prim
+      if (!subOutput.tags || Object.keys(subOutput.tags).length === 0) continue;
+
+      const subPrimPath = `${rootPath}/${instanceName}`;
+      const subTags: string[] = Object.entries(subOutput.tags).map(([k, v]) => `${k}:${v}`);
+
+      // Get compose offset from trace
+      const composeTrace = output.traces.get(`compose:${instanceName}`);
+      const offset = composeTrace?.details?.offset as { x: number; y: number; z: number } | undefined;
+
+      const subXform: PSDXformPrim = {
+        path: subPrimPath,
+        type: 'Xform',
+        parent: rootPath,
+        transform: {
+          position: offset ? [offset.x, offset.y, offset.z] : [0, 0, 0],
+          rotation: [0, 0, 0],
+          scale: [1, 1, 1]
+        },
+        tags: subTags,
+        bounds: boundsToBox(subOutput.validation.bounds),
+        children: []
+      };
+      scene.prims[subPrimPath] = subXform;
+      rootChildren.push(subPrimPath);
+    }
   }
 
   // ---- Instances ----
@@ -574,6 +866,22 @@ export function serializeToPSD(output: TracedOutput): PSDScene {
         scene.materials.push(...protoExtracted.materials);
         const protoSlots = protoExtracted.slots.map(s => s + materialOffset);
 
+        // Convert vertex weights for prototype if present
+        let protoJointWeights: number[] | undefined;
+        let protoMaxInfluences: number | undefined;
+        let protoWeightStats: { totalVertices: number; weightedVertices: number; unweightedVertices: number } | undefined;
+
+        if (subOutput.vertexWeights) {
+          const converted = vertexWeightsToPSD(subOutput.vertexWeights, subOutput.mesh.vertices.length);
+          protoJointWeights = converted.data;
+          protoMaxInfluences = converted.maxInfluences;
+          protoWeightStats = {
+            totalVertices: subOutput.vertexWeights.stats.totalVertices,
+            weightedVertices: subOutput.vertexWeights.stats.weightedVertices,
+            unweightedVertices: subOutput.vertexWeights.stats.unweightedVertices
+          };
+        }
+
         const protoPrim: PSDMeshPrim = {
           path: protoPath,
           type: 'Mesh',
@@ -585,8 +893,11 @@ export function serializeToPSD(output: TracedOutput): PSDScene {
           children: [],
           geometry: serializeMeshGeometry(subOutput.mesh),
           materialSlots: protoSlots,
-          skeleton: null,
-          jointWeights: [] as []
+          skeleton: subOutput.skeleton ? tracedSkeletonToPSD(subOutput.skeleton) : undefined,
+          jointWeights: protoJointWeights,
+          maxInfluences: protoMaxInfluences,
+          weightStats: protoWeightStats,
+          morphTargets: subOutput.morphTargets ? tracedMorphTargetsToPSD(subOutput.morphTargets) : undefined
         };
         scene.prims[protoPath] = protoPrim;
       }
@@ -615,6 +926,15 @@ export function serializeToPSD(output: TracedOutput): PSDScene {
         ? [scl, scl, scl]
         : scl ? [scl.x, scl.y, scl.z] : [1, 1, 1];
 
+      // Propagate sub-builder tags to instance prim (H3-001)
+      const subBuilderOutput = output.subBuilders.get(inst.id);
+      const instTags: string[] = [];
+      if (subBuilderOutput?.tags) {
+        for (const [k, v] of Object.entries(subBuilderOutput.tags)) {
+          instTags.push(`${k}:${v}`);
+        }
+      }
+
       const instPrim: PSDInstancePrim = {
         path: instPath,
         type: 'Instance',
@@ -624,7 +944,7 @@ export function serializeToPSD(output: TracedOutput): PSDScene {
           rotation: [rot.x, rot.y, rot.z],
           scale: sclArr
         },
-        tags: [],
+        tags: instTags,
         bounds: { ...PSD_EMPTY_BOX },  // Instance bounds computed from prototype + transform
         children: [],
         prototype: `${rootPath}/__prototypes__/${inst.builderName}`,
@@ -647,6 +967,17 @@ export function serializeToPSD(output: TracedOutput): PSDScene {
     children: rootChildren
   };
   scene.prims[rootPath] = rootPrim;
+
+  // ---- F4-002: Assembly Connections ----
+  if (output.connections && output.connections.length > 0) {
+    scene.connections = output.connections.map(conn => ({
+      type: conn.type,
+      from: conn.from,
+      to: conn.to,
+      data: conn.data,
+      description: conn.description
+    }));
+  }
 
   return scene;
 }
@@ -802,10 +1133,18 @@ export function collectAggregatedTags(scene: PSDScene, primPath: string): string
 export function queryByTag(scene: PSDScene, tag: string): string[] {
   const results: string[] = [];
 
+  // Support two query forms:
+  //   "key:value" → exact match against "key:value" tag strings
+  //   "key" → match any tag string that starts with "key:" or equals "key"
+  const isKeyValue = tag.includes(':');
+
   for (const path of Object.keys(scene.prims)) {
     // Check if this prim or any of its descendants has the tag
     const aggregatedTags = collectAggregatedTags(scene, path);
-    if (aggregatedTags.includes(tag)) {
+    const matched = isKeyValue
+      ? aggregatedTags.includes(tag)
+      : aggregatedTags.some(t => t === tag || t.startsWith(`${tag}:`));
+    if (matched) {
       results.push(path);
     }
   }

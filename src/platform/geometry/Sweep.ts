@@ -139,7 +139,7 @@ export function lathe(
       // UV: v = height_t (normalized position along profile)
       const v = (pt.y - minY) / heightRange;
 
-      mesh.addVertex(new Vertex(new Vec3(x, y, z), { uv: [u, v] }));
+      mesh.addVertex(new Vertex(new Vec3(x, y, z), { uv: [u, v], smoothGroup: 1 }));
     }
   }
 
@@ -155,14 +155,91 @@ export function lathe(
       const v2 = nextS * profileLen + p + 1;
       const v3 = nextS * profileLen + p;
 
-      mesh.addFace(new Face([v0, v3, v2, v1]));
+      mesh.addFace(new Face([v0, v1, v2, v3]));
     }
   }
 
-  // Cap ends if profile starts/ends on axis (x = 0)
-  if (Math.abs(profile[0].x) < 0.0001) {
-    // Top cap - all segments connect to first point
-    // (simplified - works for convex shapes)
+  // Cap generation for closed lathe (when profile ends are on axis)
+  // Caps need NEW vertices with planar UVs (not the body vertices with cylindrical UVs)
+  const firstOnAxis = Math.abs(profile[0].x) < 0.0001;
+  const lastOnAxis = Math.abs(profile[profile.length - 1].x) < 0.0001;
+
+  // Find max radius for UV normalization
+  const maxRadius = Math.max(...profile.map(p => Math.abs(p.x))) || 1;
+
+  // Bottom cap (at first profile point) - if first point is on axis
+  if (firstOnAxis && closed) {
+    const capY = profile[0].y;
+    const capStartIdx = mesh.vertices.length;
+
+    // Create center vertex with UV at center (0.5, 0.5)
+    mesh.addVertex(new Vertex(new Vec3(0, capY, 0), { uv: [0.5, 0.5], smoothGroup: 2 }));
+
+    // Create edge vertices with planar UVs
+    // Use the second profile point (first non-axis point) for the cap edge
+    const edgeRadius = profile.length > 1 ? profile[1].x : 0;
+    for (let s = 0; s < segments; s++) {
+      const angle = (s / segments) * arcAngle;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      const x = edgeRadius * cos;
+      const z = edgeRadius * sin;
+
+      // Planar UV: map XZ position to [0,1] based on radius
+      // Center at (0.5, 0.5), radius maps to 0.5
+      const uvU = 0.5 + (x / maxRadius) * 0.5;
+      const uvV = 0.5 + (z / maxRadius) * 0.5;
+
+      mesh.addVertex(new Vertex(new Vec3(x, capY, z), { uv: [uvU, uvV], smoothGroup: 2 }));
+    }
+
+    // Create fan triangles from center to edge
+    // [center, edge1, edge2] → normal pointing -Y (downward, away from the body)
+    const centerIdx = capStartIdx;
+    for (let s = 0; s < segments; s++) {
+      const edgeIdx1 = capStartIdx + 1 + s;
+      const edgeIdx2 = capStartIdx + 1 + ((s + 1) % segments);
+      // Bottom cap: normal pointing -Y (downward)
+      mesh.addFace(new Face([centerIdx, edgeIdx1, edgeIdx2]));
+    }
+  }
+
+  // Top cap (at last profile point) - if last point is on axis
+  if (lastOnAxis && closed) {
+    const capY = profile[profile.length - 1].y;
+    const capStartIdx = mesh.vertices.length;
+
+    // Create center vertex with UV at center (0.5, 0.5)
+    mesh.addVertex(new Vertex(new Vec3(0, capY, 0), { uv: [0.5, 0.5], smoothGroup: 3 }));
+
+    // Create edge vertices with planar UVs
+    // Use the second-to-last profile point for the cap edge
+    const edgeRadius = profile.length > 1 ? profile[profile.length - 2].x : 0;
+    for (let s = 0; s < segments; s++) {
+      const angle = (s / segments) * arcAngle;
+      const cos = Math.cos(angle);
+      const sin = Math.sin(angle);
+
+      const x = edgeRadius * cos;
+      const z = edgeRadius * sin;
+
+      // Planar UV: map XZ position to [0,1] based on radius
+      const uvU = 0.5 + (x / maxRadius) * 0.5;
+      const uvV = 0.5 + (z / maxRadius) * 0.5;
+
+      mesh.addVertex(new Vertex(new Vec3(x, capY, z), { uv: [uvU, uvV], smoothGroup: 3 }));
+    }
+
+    // Create fan triangles from center to edge
+    // [center, edge2, edge1] → normal pointing +Y (upward, away from the body)
+    const centerIdx = capStartIdx;
+    for (let s = 0; s < segments; s++) {
+      const edgeIdx1 = capStartIdx + 1 + s;
+      const edgeIdx2 = capStartIdx + 1 + ((s + 1) % segments);
+      // Top cap: normal pointing +Y (upward)
+      mesh.addFace(new Face([centerIdx, edgeIdx2, edgeIdx1]));
+    }
   }
 
   return mesh;
@@ -231,7 +308,7 @@ export function sweep(
         .add(frame.binormal.mul(spy));
 
       // UV: (profile_t, path_t)
-      mesh.addVertex(new Vertex(worldPos, { uv: [profileT, t] }));
+      mesh.addVertex(new Vertex(worldPos, { uv: [profileT, t], smoothGroup: 1 }));
     }
   }
 
@@ -246,7 +323,7 @@ export function sweep(
       const v2 = (s + 1) * profileLen + nextP;
       const v3 = (s + 1) * profileLen + p;
 
-      mesh.addFace(new Face([v0, v3, v2, v1]));
+      mesh.addFace(new Face([v0, v1, v2, v3]));
     }
   }
 
@@ -254,7 +331,7 @@ export function sweep(
   if (profile.closed) {
     if (capStart) {
       const startIndices = [];
-      for (let p = profileLen - 1; p >= 0; p--) {
+      for (let p = 0; p < profileLen; p++) {
         startIndices.push(p);
       }
       mesh.addFace(new Face(startIndices));
@@ -263,7 +340,7 @@ export function sweep(
     if (capEnd) {
       const endIndices = [];
       const endOffset = segments * profileLen;
-      for (let p = 0; p < profileLen; p++) {
+      for (let p = profileLen - 1; p >= 0; p--) {
         endIndices.push(endOffset + p);
       }
       mesh.addFace(new Face(endIndices));
@@ -303,26 +380,37 @@ export function loftProfiles(
     }
   }
 
-  // Create vertices for each profile
-  for (const profileDef of profiles) {
+  const numProfiles = profiles.length;
+
+  // Create vertices for each profile with UVs
+  for (let profileIdx = 0; profileIdx < numProfiles; profileIdx++) {
+    const profileDef = profiles[profileIdx];
     const { position, normal, profile, scale = 1 } = profileDef;
+
+    // V coordinate: position along loft (0 to 1)
+    const vCoord = profileIdx / (numProfiles - 1);
 
     // Create frame from normal
     const up = Math.abs(normal.y) < 0.99 ? new Vec3(0, 1, 0) : new Vec3(1, 0, 0);
     const right = normal.cross(up).normalize();
     const realUp = right.cross(normal).normalize();
 
-    for (const p of profile.points) {
+    for (let pointIdx = 0; pointIdx < profile.points.length; pointIdx++) {
+      const p = profile.points[pointIdx];
       const worldPos = position
         .add(right.mul(p.x * scale))
         .add(realUp.mul(p.y * scale));
 
-      mesh.addVertex(new Vertex(worldPos));
+      // U coordinate: position around profile (0 to 1)
+      const uCoord = profile.closed
+        ? pointIdx / profileLen
+        : pointIdx / (profileLen - 1 || 1);
+
+      mesh.addVertex(new Vertex(worldPos, { uv: [uCoord, vCoord], smoothGroup: 1 }));
     }
   }
 
   // Create faces between adjacent profiles
-  const numProfiles = profiles.length;
   const connections = closed ? numProfiles : numProfiles - 1;
 
   for (let pi = 0; pi < connections; pi++) {
@@ -338,7 +426,7 @@ export function loftProfiles(
       const v2 = nextPi * profileLen + nextP;
       const v3 = nextPi * profileLen + p;
 
-      mesh.addFace(new Face([v0, v3, v2, v1]));
+      mesh.addFace(new Face([v0, v1, v2, v3]));
     }
   }
 

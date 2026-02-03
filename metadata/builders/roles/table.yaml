@@ -1,0 +1,8 @@
+# Role Definition: table
+key: builders/roles/table
+value:
+  name: table
+  description: Horizontal surfaces for eating, working, or display
+  candidates:
+    - builder: Table
+      priority: 10

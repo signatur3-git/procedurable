@@ -1,9 +1,10 @@
 # Style Palettes - Rustic
 # Warm, natural, handcrafted aesthetic
+# Format: F2-001 StyleDefinition with decision_defaults and material_palette
 
 key: styles/rustic
 createdAt: "2026-02-02T00:00:00.000Z"
-modifiedAt: "2026-02-02T00:00:00.000Z"
+modifiedAt: "2026-02-05T00:00:00.000Z"
 description: Rustic design style - warm, natural, handcrafted feel
 tags:
   - style
@@ -14,6 +15,52 @@ value:
   name: Rustic
   description: Warm, natural materials, handcrafted appearance, organic forms
 
+  # F2-001: Decision defaults
+  decision_defaults:
+    leg_style: turned
+    back_style: ladder
+    arm_style: curved
+    edge_treatment: rounded
+    surface_finish: oiled
+    edge_radius: 0.01
+    leg_taper: 0.15
+    bevel_width: 0.008
+
+  # F2-001: Material palette
+  material_palette:
+    primary_wood:
+      rgb: [0.76, 0.60, 0.42]
+      roughness: 0.8
+      metalness: 0.0
+      name: natural_oak
+    secondary_wood:
+      rgb: [0.36, 0.25, 0.20]
+      roughness: 0.7
+      metalness: 0.0
+      name: dark_walnut
+    accent_metal:
+      rgb: [0.17, 0.17, 0.17]
+      roughness: 0.6
+      metalness: 0.8
+      name: wrought_iron
+    fabric:
+      rgb: [0.98, 0.94, 0.90]
+      roughness: 0.7
+      metalness: 0.0
+      name: linen
+
+  # F2-001: Proportion rules
+  proportion_rules:
+    - "seat_height / total_height >= 0.30"
+    - "leg_width / seat_width >= 0.05"
+
+  # F2-001: Pattern preferences
+  pattern_preferences:
+    symmetry: approximate
+    repetition: medium
+    ornamentation: moderate
+
+  # Legacy fields preserved for backward compatibility
   colors:
     primary:
       - { name: natural_oak, hex: "#C19A6B", rgb: [0.76, 0.60, 0.42] }
